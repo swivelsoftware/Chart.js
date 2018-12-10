@@ -354,7 +354,6 @@ var Legend = Element.extend({
 				var index = legendItem.datasetIndex;
 				var ci = me.chart;
 				var meta = ci.getDatasetMeta(index);
-				console.log('meta', meta)
 
 				if (isNaN(boxWidth) || boxWidth <= 0) {
 					return;
@@ -376,7 +375,10 @@ var Legend = Element.extend({
 					ctx.setLineDash(valueOrDefault(legendItem.lineDash, lineDefault.borderDash));
 				}
 
-				if (opts.labels && opts.labels.usePointStyle) {
+				if (meta.type === 'line') {
+					// Draw line as legend symbol
+					ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
+				} if (opts.labels && opts.labels.usePointStyle) {
 					// Recalculate x and y for drawPoint() because its expecting
 					// x and y to be center of figure (instead of top left)
 					var radius = fontSize * Math.SQRT2 / 2;
