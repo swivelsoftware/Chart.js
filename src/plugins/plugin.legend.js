@@ -390,8 +390,7 @@ var Legend = Element.extend({
 					ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
 
 					// Draw point at center
-					var radius = fontSize * Math.SQRT2 / 2;
-					var offSet = radius / Math.SQRT2;
+					var radius = fontSize / 2;
 					var centerX = x + boxWidth / 2;
 					var centerY = y + fontSize / 2;
 					helpers.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY);
