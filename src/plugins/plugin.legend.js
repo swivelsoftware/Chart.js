@@ -393,7 +393,7 @@ var Legend = Element.extend({
 					var radius = fontSize * Math.sqrt(5) / 5;
 					var centerX = x + boxWidth / 2;
 					var centerY = y + fontSize / 2;
-					console.log('ctx.lineWidth', ctx.lineWidth)
+					ctx.lineWidth *= Math.SQRT2 / 2
 					helpers.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY);
 				} else {
 					// Draw box as legend symbol
