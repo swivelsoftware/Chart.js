@@ -388,6 +388,13 @@ var Legend = Element.extend({
 				} else if (meta.type === 'line') {
 					// Draw line as legend symbol
 					ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
+
+					// Draw point at center
+					var radius = fontSize * Math.SQRT2 / 2;
+					var offSet = radius / Math.SQRT2;
+					var centerX = x + boxWidth / 2;
+					var centerY = y + fontSize / 2;
+					helpers.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY);
 				} else {
 					// Draw box as legend symbol
 					if (!isLineWidthZero) {
