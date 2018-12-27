@@ -9,9 +9,6 @@ describe('Core.scale', function() {
 			// actual label
 			labelString: '',
 
-			// actual label
-			lineHeight: 1.2,
-
 			// top/bottom padding
 			padding: {
 				top: 4,
@@ -63,10 +60,14 @@ describe('Core.scale', function() {
 				labels: [
 					'January 2018', 'February 2018', 'March 2018', 'April 2018',
 					'May 2018', 'June 2018', 'July 2018', 'August 2018',
-					'September 2018', 'October 2018', 'November 2018', 'December 2018'
+					'September 2018', 'October 2018', 'November 2018', 'December 2018',
+					'January 2019', 'February 2019', 'March 2019', 'April 2019',
+					'May 2019', 'June 2019', 'July 2019', 'August 2019',
+					'September 2019', 'October 2019', 'November 2019', 'December 2019',
+					'January 2020', 'February 2020'
 				],
 				datasets: [{
-					data: [12, 19, 3, 5, 2, 3, 7, 8, 9, 10, 11, 12]
+					data: [12, 19, 3, 5, 2, 3, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 				}]
 			});
 
@@ -204,6 +205,140 @@ describe('Core.scale', function() {
 			}).map(function(x) {
 				return x.args[1];
 			})).toEqual(test.expected);
+		});
+	});
+
+	describe('given the axes display option is set to auto', function() {
+		describe('for the x axes', function() {
+			it('should draw the axes if at least one associated dataset is visible', function() {
+				var chart = window.acquireChart({
+					type: 'line',
+					data: {
+						datasets: [{
+							data: [100, 200, 100, 50],
+							xAxisId: 'foo',
+							hidden: true,
+							labels: ['Q1', 'Q2', 'Q3', 'Q4']
+						}, {
+							data: [100, 200, 100, 50],
+							xAxisId: 'foo',
+							labels: ['Q1', 'Q2', 'Q3', 'Q4']
+						}]
+					},
+					options: {
+						scales: {
+							xAxes: [{
+								id: 'foo',
+								display: 'auto'
+							}],
+							yAxes: [{
+								type: 'category',
+								id: 'yScale0'
+							}]
+						}
+					}
+				});
+
+				var scale = chart.scales.foo;
+				scale.ctx = window.createMockContext();
+				chart.draw();
+
+				expect(scale.ctx.getCalls().length).toBeGreaterThan(0);
+				expect(scale.height).toBeGreaterThan(0);
+			});
+
+			it('should not draw the axes if no associated datasets are visible', function() {
+				var chart = window.acquireChart({
+					type: 'line',
+					data: {
+						datasets: [{
+							data: [100, 200, 100, 50],
+							xAxisId: 'foo',
+							hidden: true,
+							labels: ['Q1', 'Q2', 'Q3', 'Q4']
+						}]
+					},
+					options: {
+						scales: {
+							xAxes: [{
+								id: 'foo',
+								display: 'auto'
+							}]
+						}
+					}
+				});
+
+				var scale = chart.scales.foo;
+				scale.ctx = window.createMockContext();
+				chart.draw();
+
+				expect(scale.ctx.getCalls().length).toBe(0);
+				expect(scale.height).toBe(0);
+			});
+		});
+
+		describe('for the y axes', function() {
+			it('should draw the axes if at least one associated dataset is visible', function() {
+				var chart = window.acquireChart({
+					type: 'line',
+					data: {
+						datasets: [{
+							data: [100, 200, 100, 50],
+							yAxisId: 'foo',
+							hidden: true,
+							labels: ['Q1', 'Q2', 'Q3', 'Q4']
+						}, {
+							data: [100, 200, 100, 50],
+							yAxisId: 'foo',
+							labels: ['Q1', 'Q2', 'Q3', 'Q4']
+						}]
+					},
+					options: {
+						scales: {
+							yAxes: [{
+								id: 'foo',
+								display: 'auto'
+							}]
+						}
+					}
+				});
+
+				var scale = chart.scales.foo;
+				scale.ctx = window.createMockContext();
+				chart.draw();
+
+				expect(scale.ctx.getCalls().length).toBeGreaterThan(0);
+				expect(scale.width).toBeGreaterThan(0);
+			});
+
+			it('should not draw the axes if no associated datasets are visible', function() {
+				var chart = window.acquireChart({
+					type: 'line',
+					data: {
+						datasets: [{
+							data: [100, 200, 100, 50],
+							yAxisId: 'foo',
+							hidden: true,
+							labels: ['Q1', 'Q2', 'Q3', 'Q4']
+						}]
+					},
+					options: {
+						scales: {
+							yAxes: [{
+								id: 'foo',
+								display: 'auto'
+							}]
+						}
+					}
+				});
+
+				var scale = chart.scales.foo;
+				scale.ctx = window.createMockContext();
+				chart.draw();
+
+				expect(scale.ctx.getCalls().length).toBe(0);
+				expect(scale.width).toBe(0);
+			});
 		});
 	});
 });

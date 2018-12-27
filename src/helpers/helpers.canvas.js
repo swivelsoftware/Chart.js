@@ -12,7 +12,7 @@ var TWO_THIRDS_PI = PI * 2 / 3;
 /**
  * @namespace Chart.helpers.canvas
  */
-var exports = module.exports = {
+var exports = {
 	/**
 	 * Clears the entire canvas associated to the given `chart`.
 	 * @param {Chart} chart - The chart for which to clear the canvas.
@@ -184,8 +184,13 @@ var exports = module.exports = {
 	},
 
 	lineTo: function(ctx, previous, target, flip) {
-		if (target.steppedLine) {
-			if ((target.steppedLine === 'after' && !flip) || (target.steppedLine !== 'after' && flip)) {
+		var stepped = target.steppedLine;
+		if (stepped) {
+			if (stepped === 'middle') {
+				var midpoint = (previous.x + target.x) / 2.0;
+				ctx.lineTo(midpoint, flip ? target.y : previous.y);
+				ctx.lineTo(midpoint, flip ? previous.y : target.y);
+			} else if ((stepped === 'after' && !flip) || (stepped !== 'after' && flip)) {
 				ctx.lineTo(previous.x, target.y);
 			} else {
 				ctx.lineTo(target.x, previous.y);
@@ -208,6 +213,8 @@ var exports = module.exports = {
 			target.y);
 	}
 };
+
+module.exports = exports;
 
 // DEPRECATIONS
 
