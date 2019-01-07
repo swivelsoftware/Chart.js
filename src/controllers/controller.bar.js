@@ -37,7 +37,7 @@ function computeMinSampleSize(scale, pixels) {
 	var prev, curr, i, ilen;
 
 	for (i = 1, ilen = pixels.length; i < ilen; ++i) {
-		min = Math.min(min, pixels[i] - pixels[i - 1]);
+		min = Math.min(min, Math.abs(pixels[i] - pixels[i - 1]));
 	}
 
 	for (i = 0, ilen = ticks.length; i < ilen; ++i) {
@@ -95,8 +95,8 @@ function computeFlexCategoryTraits(index, ruler, options) {
 
 	if (prev === null) {
 		// first data: its size is double based on the next point or,
-		// if it's also the last data, we use the scale end extremity.
-		prev = curr - (next === null ? ruler.end - curr : next - curr);
+		// if it's also the last data, we use the scale size.
+		prev = curr - (next === null ? ruler.end - ruler.start : next - curr);
 	}
 
 	if (next === null) {
@@ -104,8 +104,8 @@ function computeFlexCategoryTraits(index, ruler, options) {
 		next = curr + curr - prev;
 	}
 
-	start = curr - ((curr - prev) / 2) * percent;
-	size = ((next - prev) / 2) * percent;
+	start = curr - (curr - Math.min(prev, next)) / 2 * percent;
+	size = Math.abs(next - prev) / 2 * percent;
 
 	return {
 		chunk: size / ruler.stackCount,
@@ -311,7 +311,7 @@ module.exports = DatasetController.extend({
 		var scale = me.getValueScale();
 		var isHorizontal = scale.isHorizontal();
 		var datasets = chart.data.datasets;
-		var value = scale.getRightValue(datasets[datasetIndex].data[index]);
+		var value = +scale.getRightValue(datasets[datasetIndex].data[index]);
 		var minBarLength = scale.options.minBarLength;
 		var stacked = scale.options.stacked;
 		var stack = meta.stack;
@@ -327,7 +327,7 @@ module.exports = DatasetController.extend({
 					imeta.controller.getValueScaleId() === scale.id &&
 					chart.isDatasetVisible(i)) {
 
-					ivalue = scale.getRightValue(datasets[i].data[index]);
+					ivalue = +scale.getRightValue(datasets[i].data[index]);
 					if ((value < 0 && ivalue < 0) || (value >= 0 && ivalue > 0)) {
 						start += ivalue;
 					}
@@ -337,7 +337,7 @@ module.exports = DatasetController.extend({
 
 		base = scale.getPixelForValue(start);
 		head = scale.getPixelForValue(start + value);
-		size = (head - base) / 2;
+		size = head - base;
 
 		if (minBarLength !== undefined && Math.abs(size) < minBarLength) {
 			size = minBarLength;
