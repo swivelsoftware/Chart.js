@@ -5,6 +5,9 @@ var Element = require('./core.element');
 var helpers = require('../helpers/index');
 var Ticks = require('./core.ticks');
 
+var valueOrDefault = helpers.valueOrDefault;
+var valueAtIndexOrDefault = helpers.valueAtIndexOrDefault;
+
 defaults._set('scale', {
 	display: true,
 	position: 'left',
@@ -193,7 +196,8 @@ module.exports = Element.extend({
 		// we still support no return (`this.ticks` internally set by calling this method).
 		ticks = me.buildTicks() || [];
 
-		me.afterBuildTicks();
+		// Allow modification of ticks in callback.
+		ticks = me.afterBuildTicks(ticks) || ticks;
 
 		me.beforeTickToLabelConversion();
 
@@ -287,8 +291,15 @@ module.exports = Element.extend({
 		helpers.callback(this.options.beforeBuildTicks, [this]);
 	},
 	buildTicks: helpers.noop,
-	afterBuildTicks: function() {
-		helpers.callback(this.options.afterBuildTicks, [this]);
+	afterBuildTicks: function(ticks) {
+		var me = this;
+		// ticks is empty for old axis implementations here
+		if (helpers.isArray(ticks) && ticks.length) {
+			return helpers.callback(me.options.afterBuildTicks, [me, ticks]);
+		}
+		// Support old implementations (that modified `this.ticks` directly in buildTicks)
+		me.ticks = helpers.callback(me.options.afterBuildTicks, [me, me.ticks]) || me.ticks;
+		return ticks;
 	},
 
 	beforeTickToLabelConversion: function() {
@@ -730,24 +741,24 @@ module.exports = Element.extend({
 
 		var parseFont = helpers.options._parseFont;
 		var ticks = optionTicks.autoSkip ? me._autoSkip(me.getTicks()) : me.getTicks();
-		var tickFontColor = helpers.valueOrDefault(optionTicks.fontColor, defaultFontColor);
+		var tickFontColor = valueOrDefault(optionTicks.fontColor, defaultFontColor);
 		var tickFont = parseFont(optionTicks);
 		var lineHeight = tickFont.lineHeight;
-		var majorTickFontColor = helpers.valueOrDefault(optionMajorTicks.fontColor, defaultFontColor);
+		var majorTickFontColor = valueOrDefault(optionMajorTicks.fontColor, defaultFontColor);
 		var majorTickFont = parseFont(optionMajorTicks);
 		var tickPadding = optionTicks.padding;
 		var labelOffset = optionTicks.labelOffset;
 
 		var tl = gridLines.drawTicks ? gridLines.tickMarkLength : 0;
 
-		var scaleLabelFontColor = helpers.valueOrDefault(scaleLabel.fontColor, defaultFontColor);
+		var scaleLabelFontColor = valueOrDefault(scaleLabel.fontColor, defaultFontColor);
 		var scaleLabelFont = parseFont(scaleLabel);
 		var scaleLabelPadding = helpers.options.toPadding(scaleLabel.padding);
 		var labelRotationRadians = helpers.toRadians(me.labelRotation);
 
 		var itemsToDraw = [];
 
-		var axisWidth = gridLines.drawBorder ? helpers.valueAtIndexOrDefault(gridLines.lineWidth, 0, 0) : 0;
+		var axisWidth = gridLines.drawBorder ? valueAtIndexOrDefault(gridLines.lineWidth, 0, 0) : 0;
 		var alignPixel = helpers._alignPixel;
 		var borderValue, tickStart, tickEnd;
 
@@ -786,8 +797,8 @@ module.exports = Element.extend({
 				borderDash = gridLines.zeroLineBorderDash || [];
 				borderDashOffset = gridLines.zeroLineBorderDashOffset || 0.0;
 			} else {
-				lineWidth = helpers.valueAtIndexOrDefault(gridLines.lineWidth, index);
-				lineColor = helpers.valueAtIndexOrDefault(gridLines.color, index);
+				lineWidth = valueAtIndexOrDefault(gridLines.lineWidth, index);
+				lineColor = valueAtIndexOrDefault(gridLines.color, index);
 				borderDash = gridLines.borderDash || [];
 				borderDashOffset = gridLines.borderDashOffset || 0.0;
 			}
@@ -961,7 +972,7 @@ module.exports = Element.extend({
 		if (axisWidth) {
 			// Draw the line at the edge of the axis
 			var firstLineWidth = axisWidth;
-			var lastLineWidth = helpers.valueAtIndexOrDefault(gridLines.lineWidth, ticks.length - 1, 0);
+			var lastLineWidth = valueAtIndexOrDefault(gridLines.lineWidth, ticks.length - 1, 0);
 			var x1, x2, y1, y2;
 
 			if (isHorizontal) {
@@ -975,7 +986,7 @@ module.exports = Element.extend({
 			}
 
 			context.lineWidth = axisWidth;
-			context.strokeStyle = helpers.valueAtIndexOrDefault(gridLines.color, 0);
+			context.strokeStyle = valueAtIndexOrDefault(gridLines.color, 0);
 			context.beginPath();
 			context.moveTo(x1, y1);
 			context.lineTo(x2, y2);

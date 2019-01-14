@@ -1,13 +1,14 @@
 /**
  * @namespace Chart
  */
-var Chart = require('./core/core')();
+var Chart = require('./core/core.controller');
 
 Chart.helpers = require('./helpers/index');
 
 // @todo dispatch these helpers into appropriated helpers/helpers.* file and write unit tests!
 require('./core/core.helpers')(Chart);
 
+Chart._adapters = require('./core/core.adapters');
 Chart.Animation = require('./core/core.animation');
 Chart.animationService = require('./core/core.animations');
 Chart.controllers = require('./controllers/index');
@@ -24,13 +25,14 @@ Chart.scaleService = require('./core/core.scaleService');
 Chart.Ticks = require('./core/core.ticks');
 Chart.Tooltip = require('./core/core.tooltip');
 
-require('./core/core.controller')(Chart);
-
 // Register built-in scales
 var scales = require('./scales');
 Chart.helpers.each(scales, function(scale, type) {
 	Chart.scaleService.registerScaleType(type, scale, scale._defaults);
 });
+
+// Load to register built-in adapters (as side effects)
+require('./adapters');
 
 // Loading built-in plugins
 var plugins = require('./plugins');
