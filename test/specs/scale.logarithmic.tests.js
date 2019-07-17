@@ -477,6 +477,68 @@ describe('Logarithmic Scale tests', function() {
 		expect(yScale.ticks[tickCount - 1]).toBe(10);
 	});
 
+	it('should ignore negative min and max options', function() {
+		var chart = window.acquireChart({
+			type: 'bar',
+			data: {
+				datasets: [{
+					data: [1, 1, 1, 2, 1, 0]
+				}],
+				labels: []
+			},
+			options: {
+				scales: {
+					yAxes: [{
+						id: 'yScale',
+						type: 'logarithmic',
+						ticks: {
+							min: -10,
+							max: -1010,
+							callback: function(value) {
+								return value;
+							}
+						}
+					}]
+				}
+			}
+		});
+
+		var yScale = chart.scales.yScale;
+		expect(yScale.min).toBe(0);
+		expect(yScale.max).toBe(2);
+	});
+
+	it('should ignore invalid min and max options', function() {
+		var chart = window.acquireChart({
+			type: 'bar',
+			data: {
+				datasets: [{
+					data: [1, 1, 1, 2, 1, 0]
+				}],
+				labels: []
+			},
+			options: {
+				scales: {
+					yAxes: [{
+						id: 'yScale',
+						type: 'logarithmic',
+						ticks: {
+							min: '',
+							max: false,
+							callback: function(value) {
+								return value;
+							}
+						}
+					}]
+				}
+			}
+		});
+
+		var yScale = chart.scales.yScale;
+		expect(yScale.min).toBe(0);
+		expect(yScale.max).toBe(2);
+	});
+
 	it('should generate tick marks', function() {
 		var chart = window.acquireChart({
 			type: 'bar',
@@ -800,6 +862,8 @@ describe('Logarithmic Scale tests', function() {
 				type: 'logarithmic'
 			}];
 			Chart.helpers.extend(scaleConfig, setup.scale);
+			scaleConfig[setup.axis + 'Axes'][0].type = 'logarithmic';
+
 			var description = 'dataset has stack option and ' + setup.describe
 				+ ' and axis is "' + setup.axis + '";';
 			describe(description, function() {

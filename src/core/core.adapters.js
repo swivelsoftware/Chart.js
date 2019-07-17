@@ -6,6 +6,8 @@
 
 'use strict';
 
+var helpers = require('../helpers/index');
+
 function abstract() {
 	throw new Error(
 		'This method is not implemented: either no adapter can ' +
@@ -27,22 +29,20 @@ function abstract() {
  * @name Unit
  */
 
-/** @lends Chart._adapters._date */
-module.exports._date = {
+/**
+ * @class
+ */
+function DateAdapter(options) {
+	this.options = options || {};
+}
+
+helpers.extend(DateAdapter.prototype, /** @lends DateAdapter */ {
 	/**
-	 * Returns a map of time formats for the supported units.
+	 * Returns a map of time formats for the supported formatting units defined
+	 * in Unit as well as 'datetime' representing a detailed date/time string.
 	 * @returns {{string: string}}
 	 */
 	formats: abstract,
-
-	/**
-	 * Returns a map of date/time formats for the following presets:
-	 * 'full': date + time + millisecond
-	 * 'time': date + time
-	 * 'date': date
-	 * @returns {{string: string}}
-	 */
-	presets: abstract,
 
 	/**
 	 * Parses the given `value` and return the associated timestamp.
@@ -112,4 +112,10 @@ module.exports._date = {
 	_create: function(value) {
 		return value;
 	}
+});
+
+DateAdapter.override = function(members) {
+	helpers.extend(DateAdapter.prototype, members);
 };
+
+module.exports._date = DateAdapter;

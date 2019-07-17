@@ -5,9 +5,11 @@
 'use strict';
 
 var helpers = require('../helpers/index');
+var stylesheet = require('./platform.dom.css');
 
 var EXPANDO_KEY = '$chartjs';
 var CSS_PREFIX = 'chartjs-';
+var CSS_SIZE_MONITOR = CSS_PREFIX + 'size-monitor';
 var CSS_RENDER_MONITOR = CSS_PREFIX + 'render-monitor';
 var CSS_RENDER_ANIMATION = CSS_PREFIX + 'render-animation';
 var ANIMATION_START_EVENTS = ['animationstart', 'webkitAnimationStart'];
@@ -36,7 +38,7 @@ var EVENT_TYPES = {
  * `element` has a size relative to its parent and this last one is not yet displayed,
  * for example because of `display: none` on a parent node.
  * @see https://developer.mozilla.org/en-US/docs/Web/CSS/used_value
- * @returns {Number} Size in pixels or undefined if unknown.
+ * @returns {number} Size in pixels or undefined if unknown.
  */
 function readUsedSize(element, property) {
 	var value = helpers.getStyle(element, property);
@@ -124,11 +126,11 @@ var supportsEventListenerOptions = (function() {
 // https://github.com/chartjs/Chart.js/issues/4287
 var eventListenerOptions = supportsEventListenerOptions ? {passive: true} : false;
 
-function addEventListener(node, type, listener) {
+function addListener(node, type, listener) {
 	node.addEventListener(type, listener, eventListenerOptions);
 }
 
-function removeEventListener(node, type, listener) {
+function removeListener(node, type, listener) {
 	node.removeEventListener(type, listener, eventListenerOptions);
 }
 
@@ -166,48 +168,24 @@ function throttled(fn, thisArg) {
 	};
 }
 
-function createDiv(cls, style) {
+function createDiv(cls) {
 	var el = document.createElement('div');
-	el.style.cssText = style || '';
 	el.className = cls || '';
 	return el;
 }
 
 // Implementation based on https://github.com/marcj/css-element-queries
 function createResizer(handler) {
-	var cls = CSS_PREFIX + 'size-monitor';
 	var maxSize = 1000000;
-	var style =
-		'position:absolute;' +
-		'left:0;' +
-		'top:0;' +
-		'right:0;' +
-		'bottom:0;' +
-		'overflow:hidden;' +
-		'pointer-events:none;' +
-		'visibility:hidden;' +
-		'z-index:-1;';
 
 	// NOTE(SB) Don't use innerHTML because it could be considered unsafe.
 	// https://github.com/chartjs/Chart.js/issues/5902
-	var resizer = createDiv(cls, style);
-	var expand = createDiv(cls + '-expand', style);
-	var shrink = createDiv(cls + '-shrink', style);
+	var resizer = createDiv(CSS_SIZE_MONITOR);
+	var expand = createDiv(CSS_SIZE_MONITOR + '-expand');
+	var shrink = createDiv(CSS_SIZE_MONITOR + '-shrink');
 
-	expand.appendChild(createDiv('',
-		'position:absolute;' +
-		'height:' + maxSize + 'px;' +
-		'width:' + maxSize + 'px;' +
-		'left:0;' +
-		'top:0;'
-	));
-	shrink.appendChild(createDiv('',
-		'position:absolute;' +
-		'height:200%;' +
-		'width:200%;' +
-		'left:0;' +
-		'top:0;'
-	));
+	expand.appendChild(createDiv());
+	shrink.appendChild(createDiv());
 
 	resizer.appendChild(expand);
 	resizer.appendChild(shrink);
@@ -223,8 +201,8 @@ function createResizer(handler) {
 		handler();
 	};
 
-	addEventListener(expand, 'scroll', onScroll.bind(expand, 'expand'));
-	addEventListener(shrink, 'scroll', onScroll.bind(shrink, 'shrink'));
+	addListener(expand, 'scroll', onScroll.bind(expand, 'expand'));
+	addListener(shrink, 'scroll', onScroll.bind(shrink, 'shrink'));
 
 	return resizer;
 }
@@ -239,7 +217,7 @@ function watchForRender(node, handler) {
 	};
 
 	helpers.each(ANIMATION_START_EVENTS, function(type) {
-		addEventListener(node, type, proxy);
+		addListener(node, type, proxy);
 	});
 
 	// #4737: Chrome might skip the CSS animation when the CSS_RENDER_MONITOR class
@@ -258,7 +236,7 @@ function unwatchForRender(node) {
 
 	if (proxy) {
 		helpers.each(ANIMATION_START_EVENTS, function(type) {
-			removeEventListener(node, type, proxy);
+			removeListener(node, type, proxy);
 		});
 
 		delete expando.renderProxy;
@@ -273,7 +251,19 @@ function addResizeListener(node, listener, chart) {
 	// Let's keep track of this added resizer and thus avoid DOM query when removing it.
 	var resizer = expando.resizer = createResizer(throttled(function() {
 		if (expando.resizer) {
-			return listener(createEvent('resize', chart));
+			var container = chart.options.maintainAspectRatio && node.parentNode;
+			var w = container ? container.clientWidth : 0;
+			listener(createEvent('resize', chart));
+			if (container && container.clientWidth < w && chart.canvas) {
+				// If the container size shrank during chart resize, let's assume
+				// scrollbar appeared. So we resize again with the scrollbar visible -
+				// effectively making chart smaller and the scrollbar hidden again.
+				// Because we are inside `throttled`, and currently `ticking`, scroll
+				// events are ignored during this whole 2 resize process.
+				// If we assumed wrong and something else happened, we are resizing
+				// twice in a frame (potential performance issue)
+				listener(createEvent('resize', chart));
+			}
 		}
 	}));
 
@@ -319,25 +309,35 @@ function injectCSS(platform, css) {
 
 module.exports = {
 	/**
+	 * When `true`, prevents the automatic injection of the stylesheet required to
+	 * correctly detect when the chart is added to the DOM and then resized. This
+	 * switch has been added to allow external stylesheet (`dist/Chart(.min)?.js`)
+	 * to be manually imported to make this library compatible with any CSP.
+	 * See https://github.com/chartjs/Chart.js/issues/5208
+	 */
+	disableCSSInjection: false,
+
+	/**
 	 * This property holds whether this platform is enabled for the current environment.
 	 * Currently used by platform.js to select the proper implementation.
 	 * @private
 	 */
 	_enabled: typeof window !== 'undefined' && typeof document !== 'undefined',
 
-	initialize: function() {
-		var keyframes = 'from{opacity:0.99}to{opacity:1}';
+	/**
+	 * @private
+	 */
+	_ensureLoaded: function() {
+		if (this._loaded) {
+			return;
+		}
 
-		injectCSS(this,
-			// DOM rendering detection
-			// https://davidwalsh.name/detect-node-insertion
-			'@-webkit-keyframes ' + CSS_RENDER_ANIMATION + '{' + keyframes + '}' +
-			'@keyframes ' + CSS_RENDER_ANIMATION + '{' + keyframes + '}' +
-			'.' + CSS_RENDER_MONITOR + '{' +
-				'-webkit-animation:' + CSS_RENDER_ANIMATION + ' 0.001s;' +
-				'animation:' + CSS_RENDER_ANIMATION + ' 0.001s;' +
-			'}'
-		);
+		this._loaded = true;
+
+		// https://github.com/chartjs/Chart.js/issues/5208
+		if (!this.disableCSSInjection) {
+			injectCSS(this, stylesheet);
+		}
 	},
 
 	acquireContext: function(item, config) {
@@ -357,6 +357,10 @@ module.exports = {
 		// method, for example: https://github.com/kkapsner/CanvasBlocker
 		// https://github.com/chartjs/Chart.js/issues/2807
 		var context = item && item.getContext && item.getContext('2d');
+
+		// Load platform resources on first chart creation, to make possible to change
+		// platform options after importing the library (e.g. `disableCSSInjection`).
+		this._ensureLoaded();
 
 		// `instanceof HTMLCanvasElement/CanvasRenderingContext2D` fails when the item is
 		// inside an iframe or when running in a protected environment. We could guess the
@@ -417,7 +421,7 @@ module.exports = {
 			listener(fromNativeEvent(event, chart));
 		};
 
-		addEventListener(canvas, type, proxy);
+		addListener(canvas, type, proxy);
 	},
 
 	removeEventListener: function(chart, type, listener) {
@@ -435,7 +439,7 @@ module.exports = {
 			return;
 		}
 
-		removeEventListener(canvas, type, proxy);
+		removeListener(canvas, type, proxy);
 	}
 };
 
@@ -450,7 +454,7 @@ module.exports = {
  * @todo remove at version 3
  * @private
  */
-helpers.addEvent = addEventListener;
+helpers.addEvent = addListener;
 
 /**
  * Provided for backward compatibility, use EventTarget.removeEventListener instead.
@@ -461,4 +465,4 @@ helpers.addEvent = addEventListener;
  * @todo remove at version 3
  * @private
  */
-helpers.removeEvent = removeEventListener;
+helpers.removeEvent = removeListener;

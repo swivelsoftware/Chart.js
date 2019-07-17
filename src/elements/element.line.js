@@ -26,6 +26,8 @@ defaults._set('global', {
 });
 
 module.exports = Element.extend({
+	_type: 'line',
+
 	draw: function() {
 		var me = this;
 		var vm = me._view;
@@ -35,11 +37,23 @@ module.exports = Element.extend({
 		var globalDefaults = defaults.global;
 		var globalOptionLineElements = globalDefaults.elements.line;
 		var lastDrawnIndex = -1;
-		var index, current, previous, currentVM;
+		var closePath = me._loop;
+		var index, previous, currentVM;
 
-		// If we are looping, adding the first point again
 		if (me._loop && points.length) {
-			points.push(points[0]);
+			for (index = 0; index < points.length; ++index) {
+				previous = helpers.previousItem(points, index);
+				// If the line has an open path, shift the point array
+				if (!points[index]._view.skip && previous._view.skip) {
+					points = points.slice(index).concat(points.slice(0, index));
+					closePath = spanGaps;
+					break;
+				}
+			}
+			// If the line has a close path, add the first point again
+			if (closePath) {
+				points.push(points[0]);
+			}
 		}
 
 		ctx.save();
@@ -62,9 +76,8 @@ module.exports = Element.extend({
 		lastDrawnIndex = -1;
 
 		for (index = 0; index < points.length; ++index) {
-			current = points[index];
 			previous = helpers.previousItem(points, index);
-			currentVM = current._view;
+			currentVM = points[index]._view;
 
 			// First point moves to it's starting position no matter what
 			if (index === 0) {
@@ -81,11 +94,15 @@ module.exports = Element.extend({
 						ctx.moveTo(currentVM.x, currentVM.y);
 					} else {
 						// Line to next point
-						helpers.canvas.lineTo(ctx, previous._view, current._view);
+						helpers.canvas.lineTo(ctx, previous._view, currentVM);
 					}
 					lastDrawnIndex = index;
 				}
 			}
+		}
+
+		if (closePath) {
+			ctx.closePath();
 		}
 
 		ctx.stroke();

@@ -3,10 +3,10 @@
 'use strict';
 
 var moment = require('moment');
-var adapter = require('../core/core.adapters')._date;
-var helpers = require('../helpers/helpers.core');
+var adapters = require('../core/core.adapters');
 
 var FORMATS = {
+	datetime: 'MMM D, YYYY, h:mm:ss a',
 	millisecond: 'h:mm:ss.SSS a',
 	second: 'h:mm:ss a',
 	minute: 'h:mm a',
@@ -18,21 +18,11 @@ var FORMATS = {
 	year: 'YYYY'
 };
 
-var PRESETS = {
-	full: 'MMM D, YYYY h:mm:ss.SSS a',
-	time: 'MMM D, YYYY h:mm:ss a',
-	date: 'MMM D, YYYY'
-};
-
-helpers.merge(adapter, moment ? {
+adapters._date.override(typeof moment === 'function' ? {
 	_id: 'moment', // DEBUG ONLY
 
 	formats: function() {
 		return FORMATS;
-	},
-
-	presets: function() {
-		return PRESETS;
 	},
 
 	parse: function(value, format) {
@@ -53,7 +43,7 @@ helpers.merge(adapter, moment ? {
 	},
 
 	diff: function(max, min, unit) {
-		return moment.duration(moment(max).diff(moment(min))).as(unit);
+		return moment(max).diff(moment(min), unit);
 	},
 
 	startOf: function(time, unit, weekday) {

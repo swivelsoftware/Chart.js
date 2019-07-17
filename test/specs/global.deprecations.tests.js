@@ -1,4 +1,12 @@
 describe('Deprecations', function() {
+	describe('Version 2.9.0', function() {
+		describe('Chart.Scale.mergeTicksOptions', function() {
+			it('should be defined as a function', function() {
+				expect(typeof Chart.Scale.prototype.mergeTicksOptions).toBe('function');
+			});
+		});
+	});
+
 	describe('Version 2.8.0', function() {
 		[
 			['Bar', 'bar'],
@@ -24,6 +32,12 @@ describe('Deprecations', function() {
 			});
 		});
 
+		describe('Chart.Chart', function() {
+			it('should be defined as an alias to Chart', function() {
+				expect(Chart.Chart).toBe(Chart);
+			});
+		});
+
 		describe('Chart.helpers.aliasPixel', function() {
 			it('should be defined as a function', function() {
 				expect(typeof Chart.helpers.aliasPixel).toBe('function');
@@ -40,6 +54,18 @@ describe('Deprecations', function() {
 		describe('Chart.types', function() {
 			it('should be defined as an empty object', function() {
 				expect(Chart.types).toEqual({});
+			});
+		});
+
+		describe('Chart.helpers.configMerge', function() {
+			it('should be defined as a function', function() {
+				expect(typeof Chart.helpers.configMerge).toBe('function');
+			});
+		});
+
+		describe('Chart.helpers.scaleMerge', function() {
+			it('should be defined as a function', function() {
+				expect(typeof Chart.helpers.scaleMerge).toBe('function');
 			});
 		});
 	});

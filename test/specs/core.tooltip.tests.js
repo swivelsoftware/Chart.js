@@ -137,11 +137,11 @@ describe('Core.Tooltip', function() {
 				footer: [],
 				caretPadding: 2,
 				labelColors: [{
-					borderColor: 'rgb(255, 0, 0)',
-					backgroundColor: 'rgb(0, 255, 0)'
+					borderColor: globalDefaults.defaultColor,
+					backgroundColor: globalDefaults.defaultColor
 				}, {
-					borderColor: 'rgb(0, 0, 255)',
-					backgroundColor: 'rgb(0, 255, 255)'
+					borderColor: globalDefaults.defaultColor,
+					backgroundColor: globalDefaults.defaultColor
 				}]
 			}));
 
@@ -338,8 +338,8 @@ describe('Core.Tooltip', function() {
 			caretPadding: 2,
 			labelTextColors: ['#fff'],
 			labelColors: [{
-				borderColor: 'rgb(255, 0, 0)',
-				backgroundColor: 'rgb(0, 255, 0)'
+				borderColor: globalDefaults.defaultColor,
+				backgroundColor: globalDefaults.defaultColor
 			}]
 		}));
 
@@ -488,11 +488,11 @@ describe('Core.Tooltip', function() {
 			caretPadding: 2,
 			labelTextColors: ['labelTextColor', 'labelTextColor'],
 			labelColors: [{
-				borderColor: 'rgb(255, 0, 0)',
-				backgroundColor: 'rgb(0, 255, 0)'
+				borderColor: globalDefaults.defaultColor,
+				backgroundColor: globalDefaults.defaultColor
 			}, {
-				borderColor: 'rgb(0, 0, 255)',
-				backgroundColor: 'rgb(0, 255, 255)'
+				borderColor: globalDefaults.defaultColor,
+				backgroundColor: globalDefaults.defaultColor
 			}]
 		}));
 
@@ -547,6 +547,7 @@ describe('Core.Tooltip', function() {
 
 		// Check and see if tooltip was displayed
 		var tooltip = chart.tooltip;
+		var globalDefaults = Chart.defaults.global;
 
 		expect(tooltip._view).toEqual(jasmine.objectContaining({
 			// Positioning
@@ -568,11 +569,11 @@ describe('Core.Tooltip', function() {
 			afterBody: [],
 			footer: [],
 			labelColors: [{
-				borderColor: 'rgb(0, 0, 255)',
-				backgroundColor: 'rgb(0, 255, 255)'
+				borderColor: globalDefaults.defaultColor,
+				backgroundColor: globalDefaults.defaultColor
 			}, {
-				borderColor: 'rgb(255, 0, 0)',
-				backgroundColor: 'rgb(0, 255, 0)'
+				borderColor: globalDefaults.defaultColor,
+				backgroundColor: globalDefaults.defaultColor
 			}]
 		}));
 
@@ -629,6 +630,7 @@ describe('Core.Tooltip', function() {
 
 		// Check and see if tooltip was displayed
 		var tooltip = chart.tooltip;
+		var globalDefaults = Chart.defaults.global;
 
 		expect(tooltip._view).toEqual(jasmine.objectContaining({
 			// Positioning
@@ -646,8 +648,8 @@ describe('Core.Tooltip', function() {
 			afterBody: [],
 			footer: [],
 			labelColors: [{
-				borderColor: 'rgb(0, 0, 255)',
-				backgroundColor: 'rgb(0, 255, 255)'
+				borderColor: globalDefaults.defaultColor,
+				backgroundColor: globalDefaults.defaultColor
 			}]
 		}));
 	});
@@ -704,64 +706,61 @@ describe('Core.Tooltip', function() {
 		}));
 	});
 
-	it('Should have dataPoints', function() {
-		var chart = window.acquireChart({
-			type: 'line',
-			data: {
-				datasets: [{
-					label: 'Dataset 1',
-					data: [10, 20, 30],
-					pointHoverBorderColor: 'rgb(255, 0, 0)',
-					pointHoverBackgroundColor: 'rgb(0, 255, 0)'
-				}, {
-					label: 'Dataset 2',
-					data: [40, 40, 40],
-					pointHoverBorderColor: 'rgb(0, 0, 255)',
-					pointHoverBackgroundColor: 'rgb(0, 255, 255)'
-				}],
-				labels: ['Point 1', 'Point 2', 'Point 3']
-			},
-			options: {
-				tooltips: {
-					mode: 'single'
+	['line', 'bar', 'horizontalBar'].forEach(function(type) {
+		it('Should have dataPoints in a ' + type + ' chart', function() {
+			var chart = window.acquireChart({
+				type: type,
+				data: {
+					datasets: [{
+						label: 'Dataset 1',
+						data: [10, 20, 30],
+						pointHoverBorderColor: 'rgb(255, 0, 0)',
+						pointHoverBackgroundColor: 'rgb(0, 255, 0)'
+					}, {
+						label: 'Dataset 2',
+						data: [40, 40, 40],
+						pointHoverBorderColor: 'rgb(0, 0, 255)',
+						pointHoverBackgroundColor: 'rgb(0, 255, 255)'
+					}],
+					labels: ['Point 1', 'Point 2', 'Point 3']
+				},
+				options: {
+					tooltips: {
+						mode: 'single'
+					}
 				}
-			}
+			});
+
+			// Trigger an event over top of the element
+			var pointIndex = 1;
+			var datasetIndex = 0;
+			var point = chart.getDatasetMeta(datasetIndex).data[pointIndex];
+			jasmine.triggerMouseEvent(chart, 'mousemove', point);
+
+			// Check and see if tooltip was displayed
+			var tooltip = chart.tooltip;
+
+			expect(tooltip._view instanceof Object).toBe(true);
+			expect(tooltip._view.dataPoints instanceof Array).toBe(true);
+			expect(tooltip._view.dataPoints.length).toBe(1);
+
+			var tooltipItem = tooltip._view.dataPoints[0];
+
+			expect(tooltipItem.index).toBe(pointIndex);
+			expect(tooltipItem.datasetIndex).toBe(datasetIndex);
+			var indexLabel = type !== 'horizontalBar' ? 'xLabel' : 'yLabel';
+			expect(typeof tooltipItem[indexLabel]).toBe('string');
+			expect(tooltipItem[indexLabel]).toBe(chart.data.labels[pointIndex]);
+			var valueLabel = type !== 'horizontalBar' ? 'yLabel' : 'xLabel';
+			expect(typeof tooltipItem[valueLabel]).toBe('number');
+			expect(tooltipItem[valueLabel]).toBe(chart.data.datasets[datasetIndex].data[pointIndex]);
+			expect(typeof tooltipItem.label).toBe('string');
+			expect(tooltipItem.label).toBe(chart.data.labels[pointIndex]);
+			expect(typeof tooltipItem.value).toBe('string');
+			expect(tooltipItem.value).toBe('' + chart.data.datasets[datasetIndex].data[pointIndex]);
+			expect(tooltipItem.x).toBeCloseToPixel(point._model.x);
+			expect(tooltipItem.y).toBeCloseToPixel(point._model.y);
 		});
-
-		// Trigger an event over top of the
-		var pointIndex = 1;
-		var datasetIndex = 0;
-		var meta = chart.getDatasetMeta(datasetIndex);
-		var point = meta.data[pointIndex];
-		var node = chart.canvas;
-		var rect = node.getBoundingClientRect();
-		var evt = new MouseEvent('mousemove', {
-			view: window,
-			bubbles: true,
-			cancelable: true,
-			clientX: rect.left + point._model.x,
-			clientY: rect.top + point._model.y
-		});
-
-		// Manually trigger rather than having an async test
-		node.dispatchEvent(evt);
-
-		// Check and see if tooltip was displayed
-		var tooltip = chart.tooltip;
-
-		expect(tooltip._view instanceof Object).toBe(true);
-		expect(tooltip._view.dataPoints instanceof Array).toBe(true);
-		expect(tooltip._view.dataPoints.length).toEqual(1);
-		expect(tooltip._view.dataPoints[0].index).toEqual(pointIndex);
-		expect(tooltip._view.dataPoints[0].datasetIndex).toEqual(datasetIndex);
-		expect(tooltip._view.dataPoints[0].xLabel).toEqual(
-			chart.data.labels[pointIndex]
-		);
-		expect(tooltip._view.dataPoints[0].yLabel).toEqual(
-			chart.data.datasets[datasetIndex].data[pointIndex]
-		);
-		expect(tooltip._view.dataPoints[0].x).toBeCloseToPixel(point._model.x);
-		expect(tooltip._view.dataPoints[0].y).toBeCloseToPixel(point._model.y);
 	});
 
 	it('Should not update if active element has not changed', function() {
@@ -1091,11 +1090,11 @@ describe('Core.Tooltip', function() {
 			caretPadding: 2,
 			labelTextColors: ['labelTextColor', 'labelTextColor'],
 			labelColors: [{
-				borderColor: 'rgb(255, 0, 0)',
-				backgroundColor: 'rgb(0, 255, 0)'
+				borderColor: globalDefaults.defaultColor,
+				backgroundColor: globalDefaults.defaultColor
 			}, {
-				borderColor: 'rgb(0, 0, 255)',
-				backgroundColor: 'rgb(0, 255, 255)'
+				borderColor: globalDefaults.defaultColor,
+				backgroundColor: globalDefaults.defaultColor
 			}]
 		}));
 	});
@@ -1207,13 +1206,16 @@ describe('Core.Tooltip', function() {
 			tooltip.draw();
 
 			expect(mockContext.getCalls()).toEqual(Array.prototype.concat(drawBody, [
+				{name: 'setTextAlign', args: ['left']},
 				{name: 'setFillStyle', args: ['#fff']},
-				{name: 'fillText', args: ['title', 105, 105]},
+				{name: 'fillText', args: ['title', 105, 111]},
+				{name: 'setTextAlign', args: ['left']},
 				{name: 'setFillStyle', args: ['#fff']},
 				{name: 'setFillStyle', args: ['#fff']},
-				{name: 'fillText', args: ['label', 105, 123]},
+				{name: 'fillText', args: ['label', 105, 129]},
+				{name: 'setTextAlign', args: ['left']},
 				{name: 'setFillStyle', args: ['#fff']},
-				{name: 'fillText', args: ['footer', 105, 141]},
+				{name: 'fillText', args: ['footer', 105, 147]},
 				{name: 'restore', args: []}
 			]));
 		});
@@ -1224,13 +1226,16 @@ describe('Core.Tooltip', function() {
 			tooltip.draw();
 
 			expect(mockContext.getCalls()).toEqual(Array.prototype.concat(drawBody, [
+				{name: 'setTextAlign', args: ['right']},
 				{name: 'setFillStyle', args: ['#fff']},
-				{name: 'fillText', args: ['title', 195, 105]},
+				{name: 'fillText', args: ['title', 195, 111]},
+				{name: 'setTextAlign', args: ['right']},
 				{name: 'setFillStyle', args: ['#fff']},
 				{name: 'setFillStyle', args: ['#fff']},
-				{name: 'fillText', args: ['label', 195, 123]},
+				{name: 'fillText', args: ['label', 195, 129]},
+				{name: 'setTextAlign', args: ['right']},
 				{name: 'setFillStyle', args: ['#fff']},
-				{name: 'fillText', args: ['footer', 195, 141]},
+				{name: 'fillText', args: ['footer', 195, 147]},
 				{name: 'restore', args: []}
 			]));
 		});
@@ -1241,13 +1246,16 @@ describe('Core.Tooltip', function() {
 			tooltip.draw();
 
 			expect(mockContext.getCalls()).toEqual(Array.prototype.concat(drawBody, [
+				{name: 'setTextAlign', args: ['center']},
 				{name: 'setFillStyle', args: ['#fff']},
-				{name: 'fillText', args: ['title', 150, 105]},
+				{name: 'fillText', args: ['title', 150, 111]},
+				{name: 'setTextAlign', args: ['center']},
 				{name: 'setFillStyle', args: ['#fff']},
 				{name: 'setFillStyle', args: ['#fff']},
-				{name: 'fillText', args: ['label', 150, 123]},
+				{name: 'fillText', args: ['label', 150, 129]},
+				{name: 'setTextAlign', args: ['center']},
 				{name: 'setFillStyle', args: ['#fff']},
-				{name: 'fillText', args: ['footer', 150, 141]},
+				{name: 'fillText', args: ['footer', 150, 147]},
 				{name: 'restore', args: []}
 			]));
 		});
@@ -1258,13 +1266,16 @@ describe('Core.Tooltip', function() {
 			tooltip.draw();
 
 			expect(mockContext.getCalls()).toEqual(Array.prototype.concat(drawBody, [
+				{name: 'setTextAlign', args: ['right']},
 				{name: 'setFillStyle', args: ['#fff']},
-				{name: 'fillText', args: ['title', 195, 105]},
+				{name: 'fillText', args: ['title', 195, 111]},
+				{name: 'setTextAlign', args: ['center']},
 				{name: 'setFillStyle', args: ['#fff']},
 				{name: 'setFillStyle', args: ['#fff']},
-				{name: 'fillText', args: ['label', 150, 123]},
+				{name: 'fillText', args: ['label', 150, 129]},
+				{name: 'setTextAlign', args: ['left']},
 				{name: 'setFillStyle', args: ['#fff']},
-				{name: 'fillText', args: ['footer', 105, 141]},
+				{name: 'fillText', args: ['footer', 105, 147]},
 				{name: 'restore', args: []}
 			]));
 		});

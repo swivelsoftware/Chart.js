@@ -5,7 +5,7 @@ var defaults = require('../core/core.defaults');
 var elements = require('../elements/index');
 var helpers = require('../helpers/index');
 
-var resolve = helpers.options.resolve;
+var valueOrDefault = helpers.valueOrDefault;
 
 defaults._set('radar', {
 	scale: {
@@ -19,6 +19,12 @@ defaults._set('radar', {
 });
 
 module.exports = DatasetController.extend({
+	/**
+	 * @private
+	 */
+	_getValueScaleId: function() {
+		return this.chart.scale.id;
+	},
 
 	datasetElementType: elements.Line,
 
@@ -26,48 +32,64 @@ module.exports = DatasetController.extend({
 
 	linkScales: helpers.noop,
 
+	/**
+	 * @private
+	 */
+	_datasetElementOptions: [
+		'backgroundColor',
+		'borderWidth',
+		'borderColor',
+		'borderCapStyle',
+		'borderDash',
+		'borderDashOffset',
+		'borderJoinStyle',
+		'fill'
+	],
+
+	/**
+	 * @private
+	 */
+	_dataElementOptions: {
+		backgroundColor: 'pointBackgroundColor',
+		borderColor: 'pointBorderColor',
+		borderWidth: 'pointBorderWidth',
+		hitRadius: 'pointHitRadius',
+		hoverBackgroundColor: 'pointHoverBackgroundColor',
+		hoverBorderColor: 'pointHoverBorderColor',
+		hoverBorderWidth: 'pointHoverBorderWidth',
+		hoverRadius: 'pointHoverRadius',
+		pointStyle: 'pointStyle',
+		radius: 'pointRadius',
+		rotation: 'pointRotation'
+	},
+
 	update: function(reset) {
 		var me = this;
 		var meta = me.getMeta();
 		var line = meta.dataset;
 		var points = meta.data || [];
-		var custom = line.custom || {};
-		var dataset = me.getDataset();
-		var lineElementOptions = me.chart.options.elements.line;
 		var scale = me.chart.scale;
+		var config = me._config;
 		var i, ilen;
 
 		// Compatibility: If the properties are defined with only the old name, use those values
-		if ((dataset.tension !== undefined) && (dataset.lineTension === undefined)) {
-			dataset.lineTension = dataset.tension;
+		if (config.tension !== undefined && config.lineTension === undefined) {
+			config.lineTension = config.tension;
 		}
 
-		helpers.extend(meta.dataset, {
-			// Utility
-			_datasetIndex: me.index,
-			_scale: scale,
-			// Data
-			_children: points,
-			_loop: true,
-			// Model
-			_model: {
-				// Appearance
-				tension: resolve([custom.tension, dataset.lineTension, lineElementOptions.tension]),
-				backgroundColor: resolve([custom.backgroundColor, dataset.backgroundColor, lineElementOptions.backgroundColor]),
-				borderWidth: resolve([custom.borderWidth, dataset.borderWidth, lineElementOptions.borderWidth]),
-				borderColor: resolve([custom.borderColor, dataset.borderColor, lineElementOptions.borderColor]),
-				fill: resolve([custom.fill, dataset.fill, lineElementOptions.fill]),
-				borderCapStyle: resolve([custom.borderCapStyle, dataset.borderCapStyle, lineElementOptions.borderCapStyle]),
-				borderDash: resolve([custom.borderDash, dataset.borderDash, lineElementOptions.borderDash]),
-				borderDashOffset: resolve([custom.borderDashOffset, dataset.borderDashOffset, lineElementOptions.borderDashOffset]),
-				borderJoinStyle: resolve([custom.borderJoinStyle, dataset.borderJoinStyle, lineElementOptions.borderJoinStyle]),
-			}
-		});
+		// Utility
+		line._scale = scale;
+		line._datasetIndex = me.index;
+		// Data
+		line._children = points;
+		line._loop = true;
+		// Model
+		line._model = me._resolveDatasetElementOptions(line);
 
-		meta.dataset.pivot();
+		line.pivot();
 
 		// Update Points
-		for (i = 0, ilen = points.length; i < ilen; i++) {
+		for (i = 0, ilen = points.length; i < ilen; ++i) {
 			me.updateElement(points[i], i, reset);
 		}
 
@@ -75,7 +97,7 @@ module.exports = DatasetController.extend({
 		me.updateBezierControlPoints();
 
 		// Now pivot the point for animation
-		for (i = 0, ilen = points.length; i < ilen; i++) {
+		for (i = 0, ilen = points.length; i < ilen; ++i) {
 			points[i].pivot();
 		}
 	},
@@ -85,43 +107,50 @@ module.exports = DatasetController.extend({
 		var custom = point.custom || {};
 		var dataset = me.getDataset();
 		var scale = me.chart.scale;
-		var pointElementOptions = me.chart.options.elements.point;
 		var pointPosition = scale.getPointPositionForValue(index, dataset.data[index]);
+		var options = me._resolveDataElementOptions(point, index);
+		var lineModel = me.getMeta().dataset._model;
+		var x = reset ? scale.xCenter : pointPosition.x;
+		var y = reset ? scale.yCenter : pointPosition.y;
 
-		// Compatibility: If the properties are defined with only the old name, use those values
-		if ((dataset.radius !== undefined) && (dataset.pointRadius === undefined)) {
-			dataset.pointRadius = dataset.radius;
-		}
-		if ((dataset.hitRadius !== undefined) && (dataset.pointHitRadius === undefined)) {
-			dataset.pointHitRadius = dataset.hitRadius;
-		}
+		// Utility
+		point._scale = scale;
+		point._options = options;
+		point._datasetIndex = me.index;
+		point._index = index;
 
-		helpers.extend(point, {
-			// Utility
-			_datasetIndex: me.index,
-			_index: index,
-			_scale: scale,
+		// Desired view properties
+		point._model = {
+			x: x, // value not used in dataset scale, but we want a consistent API between scales
+			y: y,
+			skip: custom.skip || isNaN(x) || isNaN(y),
+			// Appearance
+			radius: options.radius,
+			pointStyle: options.pointStyle,
+			rotation: options.rotation,
+			backgroundColor: options.backgroundColor,
+			borderColor: options.borderColor,
+			borderWidth: options.borderWidth,
+			tension: valueOrDefault(custom.tension, lineModel ? lineModel.tension : 0),
 
-			// Desired view properties
-			_model: {
-				x: reset ? scale.xCenter : pointPosition.x, // value not used in dataset scale, but we want a consistent API between scales
-				y: reset ? scale.yCenter : pointPosition.y,
+			// Tooltip
+			hitRadius: options.hitRadius
+		};
+	},
 
-				// Appearance
-				tension: resolve([custom.tension, dataset.lineTension, me.chart.options.elements.line.tension]),
-				radius: resolve([custom.radius, dataset.pointRadius, pointElementOptions.radius], undefined, index),
-				backgroundColor: resolve([custom.backgroundColor, dataset.pointBackgroundColor, pointElementOptions.backgroundColor], undefined, index),
-				borderColor: resolve([custom.borderColor, dataset.pointBorderColor, pointElementOptions.borderColor], undefined, index),
-				borderWidth: resolve([custom.borderWidth, dataset.pointBorderWidth, pointElementOptions.borderWidth], undefined, index),
-				pointStyle: resolve([custom.pointStyle, dataset.pointStyle, pointElementOptions.pointStyle], undefined, index),
-				rotation: resolve([custom.rotation, dataset.pointRotation, pointElementOptions.rotation], undefined, index),
+	/**
+	 * @private
+	 */
+	_resolveDatasetElementOptions: function() {
+		var me = this;
+		var config = me._config;
+		var options = me.chart.options;
+		var values = DatasetController.prototype._resolveDatasetElementOptions.apply(me, arguments);
 
-				// Tooltip
-				hitRadius: resolve([custom.hitRadius, dataset.pointHitRadius, pointElementOptions.hitRadius], undefined, index)
-			}
-		});
+		values.spanGaps = valueOrDefault(config.spanGaps, options.spanGaps);
+		values.tension = valueOrDefault(config.lineTension, options.elements.line.tension);
 
-		point._model.skip = custom.skip || isNaN(point._model.x) || isNaN(point._model.y);
+		return values;
 	},
 
 	updateBezierControlPoints: function() {
@@ -131,11 +160,18 @@ module.exports = DatasetController.extend({
 		var points = meta.data || [];
 		var i, ilen, model, controlPoints;
 
+		// Only consider points that are drawn in case the spanGaps option is used
+		if (meta.dataset._model.spanGaps) {
+			points = points.filter(function(pt) {
+				return !pt._model.skip;
+			});
+		}
+
 		function capControlPoint(pt, min, max) {
 			return Math.max(Math.min(pt, max), min);
 		}
 
-		for (i = 0, ilen = points.length; i < ilen; i++) {
+		for (i = 0, ilen = points.length; i < ilen; ++i) {
 			model = points[i]._model;
 			controlPoints = helpers.splineCurve(
 				helpers.previousItem(points, i, true)._model,
@@ -153,11 +189,8 @@ module.exports = DatasetController.extend({
 	},
 
 	setHoverStyle: function(point) {
-		// Point
-		var dataset = this.chart.data.datasets[point._datasetIndex];
-		var custom = point.custom || {};
-		var index = point._index;
 		var model = point._model;
+		var options = point._options;
 		var getHoverColor = helpers.getHoverColor;
 
 		point.$previousStyle = {
@@ -167,9 +200,9 @@ module.exports = DatasetController.extend({
 			radius: model.radius
 		};
 
-		model.radius = resolve([custom.hoverRadius, dataset.pointHoverRadius, this.chart.options.elements.point.hoverRadius], undefined, index);
-		model.backgroundColor = resolve([custom.hoverBackgroundColor, dataset.pointHoverBackgroundColor, getHoverColor(model.backgroundColor)], undefined, index);
-		model.borderColor = resolve([custom.hoverBorderColor, dataset.pointHoverBorderColor, getHoverColor(model.borderColor)], undefined, index);
-		model.borderWidth = resolve([custom.hoverBorderWidth, dataset.pointHoverBorderWidth, model.borderWidth], undefined, index);
+		model.backgroundColor = valueOrDefault(options.hoverBackgroundColor, getHoverColor(options.backgroundColor));
+		model.borderColor = valueOrDefault(options.hoverBorderColor, getHoverColor(options.borderColor));
+		model.borderWidth = valueOrDefault(options.hoverBorderWidth, options.borderWidth);
+		model.radius = valueOrDefault(options.hoverRadius, options.radius);
 	}
 });
