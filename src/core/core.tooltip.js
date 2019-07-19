@@ -829,7 +829,7 @@ var exports = Element.extend({
 						var x = colorX;
 						var y = pt.y;
 						var fontSize = bodyFontSize;
-						var boxWidth = bodyFontSzie;
+						var boxWidth = bodyFontSize;
 
 						// Draw line as legend symbol
 						ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
