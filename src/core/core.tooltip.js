@@ -777,8 +777,6 @@ var exports = Element.extend({
 	drawBody: function(pt, vm, ctx) {
 		var me = this;
 		var ci = me._chart;
-		console.log('core.tooltip.js', 'drawBody');
-		console.log(ci);
 		var bodyFontSize = vm.bodyFontSize;
 		var bodySpacing = vm.bodySpacing;
 		var bodyAlign = vm._bodyAlign;
@@ -830,6 +828,9 @@ var exports = Element.extend({
 						var y = pt.y;
 						var fontSize = bodyFontSize;
 						var boxWidth = bodyFontSize;
+
+						ctx.fillStyle = 'transparent';
+						ctx.strokeStyle = labelColors.borderColor;
 
 						// Draw line as legend symbol
 						ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);

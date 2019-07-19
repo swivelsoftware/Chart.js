@@ -399,13 +399,14 @@ var Legend = Element.extend({
 					helpers.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY, legendItem.rotation);
 				} else if (meta.type === 'line') {
 					// Draw line as legend symbol
+					ctx.fillStyle = 'transparent';
 					ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
 
 					// Draw point at center
 					var radius = fontSize * Math.sqrt(5) / 5;
 					var centerX = x + boxWidth / 2;
 					var centerY = y + fontSize / 2;
-					ctx.lineWidth *= Math.SQRT2 / 2
+					ctx.lineWidth *= Math.SQRT2 / 2;
 					helpers.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY, legendItem.rotation);
 				} else {
 					// Draw box as legend symbol

@@ -2,7 +2,7 @@
   "name": "@swivelsoftware/chart.js",
   "homepage": "https://www.chartjs.org",
   "description": "Customized version of chart.js. Simple HTML5 charts using the canvas element.",
-  "version": "2.8.0-16",
+  "version": "2.8.0-17",
   "license": "MIT",
   "jsdelivr": "dist/Chart.min.js",
   "unpkg": "dist/Chart.min.js",
