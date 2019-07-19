@@ -817,7 +817,7 @@ var exports = Element.extend({
 
 			lines = bodyItem.lines;
 			for (j = 0, jlen = lines.length; j < jlen; ++j) {
-				var meta = ci.getDatasetMeta(i);
+				var meta = ci.getDatasetMeta(j);
 
 				// Draw Legend-like boxes if needed
 				if (drawColorBoxes) {
