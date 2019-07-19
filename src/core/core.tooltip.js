@@ -810,6 +810,10 @@ var exports = Element.extend({
 
 		// Draw body lines now
 		for (i = 0, ilen = body.length; i < ilen; ++i) {
+			var point = vm.dataPoints[i];
+			var meta = ci.getDatasetMeta(point.datasetIndex);
+			var style = meta.controller.getStyle(usePointStyle ? 0 : undefined);
+
 			bodyItem = body[i];
 			textColor = vm.labelTextColors[i];
 			labelColors = vm.labelColors[i];
@@ -821,19 +825,36 @@ var exports = Element.extend({
 			for (j = 0, jlen = lines.length; j < jlen; ++j) {
 				// Draw Legend-like boxes if needed
 				if (drawColorBoxes) {
-					// Fill a white rect so that colours merge nicely if the opacity is < 1
-					ctx.fillStyle = vm.legendColorBackground;
-					ctx.fillRect(colorX, pt.y, bodyFontSize, bodyFontSize);
+					if (meta.type === 'line') {
+						var x = colorX;
+						var y = pt.y;
+						var fontSize = bodyFontSize;
+						var boxWidth = bodyFontSzie;
 
-					// Border
-					ctx.lineWidth = 1;
-					ctx.strokeStyle = labelColors.borderColor;
-					ctx.strokeRect(colorX, pt.y, bodyFontSize, bodyFontSize);
+						// Draw line as legend symbol
+						ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
 
-					// Inner square
-					ctx.fillStyle = labelColors.backgroundColor;
-					ctx.fillRect(colorX + 1, pt.y + 1, bodyFontSize - 2, bodyFontSize - 2);
-					ctx.fillStyle = textColor;
+						// Draw point at center
+						var radius = fontSize * Math.sqrt(5) / 5;
+						var centerX = x + boxWidth / 2;
+						var centerY = y + fontSize / 2;
+						ctx.lineWidth *= Math.SQRT2 / 2;
+						helpers.canvas.drawPoint(ctx, style.pointStyle, radius, centerX, centerY, style.rotation);
+					} else {
+						// Fill a white rect so that colours merge nicely if the opacity is < 1
+						ctx.fillStyle = vm.legendColorBackground;
+						ctx.fillRect(colorX, pt.y, bodyFontSize, bodyFontSize);
+
+						// Border
+						ctx.lineWidth = 1;
+						ctx.strokeStyle = labelColors.borderColor;
+						ctx.strokeRect(colorX, pt.y, bodyFontSize, bodyFontSize);
+
+						// Inner square
+						ctx.fillStyle = labelColors.backgroundColor;
+						ctx.fillRect(colorX + 1, pt.y + 1, bodyFontSize - 2, bodyFontSize - 2);
+						ctx.fillStyle = textColor;
+					}
 				}
 
 				fillLineOfText(lines[j]);
