@@ -777,7 +777,6 @@ var exports = Element.extend({
 	drawBody: function(pt, vm, ctx) {
 		var me = this;
 		var ci = me._chart;
-		console.log('core.tooltip.js', 'drawBody', ci);
 		var bodyFontSize = vm.bodyFontSize;
 		var bodySpacing = vm.bodySpacing;
 		var bodyAlign = vm._bodyAlign;
@@ -823,15 +822,19 @@ var exports = Element.extend({
 				// Draw Legend-like boxes if needed
 				if (drawColorBoxes) {
 					if (meta.type === 'line') {
+						var x = colorX;
+						var y = pt.y;
+						var boxWidth = bodyFontSize;
+
 						// Draw line as legend symbol
 						ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
 
 						// Draw point at center
-						var radius = fontSize * Math.sqrt(5) / 5;
+						var radius = bodyFontSize * Math.sqrt(5) / 5;
 						var centerX = x + boxWidth / 2;
-						var centerY = y + fontSize / 2;
+						var centerY = y + bodyFontSize / 2;
 						ctx.lineWidth *= Math.SQRT2 / 2;
-						helpers.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY, legendItem.rotation);
+						helpers.canvas.drawPoint(ctx, false, radius, centerX, centerY, false);
 					} else {
 						// Fill a white rect so that colours merge nicely if the opacity is < 1
 						ctx.fillStyle = vm.legendColorBackground;
