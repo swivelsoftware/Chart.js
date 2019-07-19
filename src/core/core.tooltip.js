@@ -812,7 +812,7 @@ var exports = Element.extend({
 		for (i = 0, ilen = body.length; i < ilen; ++i) {
 			var point = vm.dataPoints[i];
 			var meta = ci.getDatasetMeta(point.datasetIndex);
-			var style = meta.controller.getStyle(usePointStyle ? 0 : undefined);
+			var style = meta.controller.getStyle(undefined);
 
 			bodyItem = body[i];
 			textColor = vm.labelTextColors[i];
