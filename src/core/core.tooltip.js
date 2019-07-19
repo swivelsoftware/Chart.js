@@ -776,6 +776,7 @@ var exports = Element.extend({
 
 	drawBody: function(pt, vm, ctx) {
 		var ci = this;
+		console.log('core.tooltip.js', 'drawBody', ci);
 		var bodyFontSize = vm.bodyFontSize;
 		var bodySpacing = vm.bodySpacing;
 		var bodyAlign = vm._bodyAlign;
