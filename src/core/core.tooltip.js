@@ -777,6 +777,8 @@ var exports = Element.extend({
 	drawBody: function(pt, vm, ctx) {
 		var me = this;
 		var ci = me._chart;
+		console.log('core.tooltip.js', 'drawBody');
+		console.log(vm, ctx);
 		var bodyFontSize = vm.bodyFontSize;
 		var bodySpacing = vm.bodySpacing;
 		var bodyAlign = vm._bodyAlign;
@@ -817,40 +819,21 @@ var exports = Element.extend({
 
 			lines = bodyItem.lines;
 			for (j = 0, jlen = lines.length; j < jlen; ++j) {
-				var meta = ci.getDatasetMeta(j);
-
 				// Draw Legend-like boxes if needed
 				if (drawColorBoxes) {
-					if (meta.type === 'line') {
-						var x = colorX;
-						var y = pt.y;
-						var fontSize = bodyFontSize;
-						var boxWidth = bodyFontSize;
+					// Fill a white rect so that colours merge nicely if the opacity is < 1
+					ctx.fillStyle = vm.legendColorBackground;
+					ctx.fillRect(colorX, pt.y, bodyFontSize, bodyFontSize);
 
-						// Draw line as legend symbol
-						ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
+					// Border
+					ctx.lineWidth = 1;
+					ctx.strokeStyle = labelColors.borderColor;
+					ctx.strokeRect(colorX, pt.y, bodyFontSize, bodyFontSize);
 
-						// Draw point at center
-						var radius = fontSize * Math.sqrt(5) / 5;
-						var centerX = x + boxWidth / 2;
-						var centerY = y + fontSize / 2;
-						ctx.lineWidth *= Math.SQRT2 / 2;
-						helpers.canvas.drawPoint(ctx, false, radius, centerX, centerY, false);
-					} else {
-						// Fill a white rect so that colours merge nicely if the opacity is < 1
-						ctx.fillStyle = vm.legendColorBackground;
-						ctx.fillRect(colorX, pt.y, bodyFontSize, bodyFontSize);
-
-						// Border
-						ctx.lineWidth = 1;
-						ctx.strokeStyle = labelColors.borderColor;
-						ctx.strokeRect(colorX, pt.y, bodyFontSize, bodyFontSize);
-
-						// Inner square
-						ctx.fillStyle = labelColors.backgroundColor;
-						ctx.fillRect(colorX + 1, pt.y + 1, bodyFontSize - 2, bodyFontSize - 2);
-						ctx.fillStyle = textColor;
-					}
+					// Inner square
+					ctx.fillStyle = labelColors.backgroundColor;
+					ctx.fillRect(colorX + 1, pt.y + 1, bodyFontSize - 2, bodyFontSize - 2);
+					ctx.fillStyle = textColor;
 				}
 
 				fillLineOfText(lines[j]);
