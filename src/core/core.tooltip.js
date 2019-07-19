@@ -824,15 +824,16 @@ var exports = Element.extend({
 					if (meta.type === 'line') {
 						var x = colorX;
 						var y = pt.y;
+						var fontSize = bodyFontSize;
 						var boxWidth = bodyFontSize;
 
 						// Draw line as legend symbol
 						ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
 
 						// Draw point at center
-						var radius = bodyFontSize * Math.sqrt(5) / 5;
+						var radius = fontSize * Math.sqrt(5) / 5;
 						var centerX = x + boxWidth / 2;
-						var centerY = y + bodyFontSize / 2;
+						var centerY = y + fontSize / 2;
 						ctx.lineWidth *= Math.SQRT2 / 2;
 						helpers.canvas.drawPoint(ctx, false, radius, centerX, centerY, false);
 					} else {
