@@ -854,8 +854,8 @@ var exports = Element.extend({
 						// Inner square
 						ctx.fillStyle = labelColors.backgroundColor;
 						ctx.fillRect(colorX + 1, pt.y + 1, bodyFontSize - 2, bodyFontSize - 2);
-						ctx.fillStyle = textColor;
 					}
+					ctx.fillStyle = textColor;
 				}
 
 				fillLineOfText(lines[j]);
