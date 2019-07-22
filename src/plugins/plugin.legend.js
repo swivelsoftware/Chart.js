@@ -21,13 +21,30 @@ defaults._set('global', {
 		onClick: function(e, legendItem) {
 			var index = legendItem.datasetIndex;
 			var ci = this.chart;
-			var meta = ci.getDatasetMeta(index);
 
-			// See controller.isDatasetVisible comment
-			meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
+			var datasets = ci.data.datasets || [];
+			var metas = datasets.map(function(dataset, i) {
+				return ci.getDatasetMeta(i);
+			});
+			var hiddens = metas.map(function(meta) {
+				return meta.hidden || ci.data.datasets[index].hidden;
+			});
+			var allHidden = hiddens.reduce(function(result, flag, i) {
+				if (i === index) {
+					return result;
+				}
+				return result && (flag || false);
+			}, true);
 
-			// We hid a dataset ... rerender the chart
-			ci.update();
+			if (!allHidden) {
+				var meta = ci.getDatasetMeta(index);
+
+				// See controller.isDatasetVisible comment
+				meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
+
+				// We hid a dataset ... rerender the chart
+				ci.update();
+			}
 		},
 
 		onHover: null,
