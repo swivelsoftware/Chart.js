@@ -382,6 +382,7 @@ var Legend = Element.extend({
 			// current position
 			var drawLegendBox = function(x, y, legendItem) {
 				var index = legendItem.datasetIndex || legendItem.index;
+				console.log('legendItem', legendItem);
 				var ci = me.chart;
 				var meta = ci.getDatasetMeta(index);
 
