@@ -5,6 +5,8 @@ var Element = require('./core.element');
 var helpers = require('../helpers/index');
 var Ticks = require('./core.ticks');
 
+var isArray = helpers.isArray;
+var isNullOrUndef = helpers.isNullOrUndef;
 var valueOrDefault = helpers.valueOrDefault;
 var valueAtIndexOrDefault = helpers.valueAtIndexOrDefault;
 
@@ -125,15 +127,15 @@ function computeLabelSizes(ctx, tickFonts, ticks, caches) {
 		lineHeight = tickFont.lineHeight;
 		width = height = 0;
 		// Undefined labels and arrays should not be measured
-		if (!helpers.isNullOrUndef(label) && !helpers.isArray(label)) {
+		if (!isNullOrUndef(label) && !isArray(label)) {
 			width = helpers.measureText(ctx, cache.data, cache.gc, width, label);
 			height = lineHeight;
-		} else if (helpers.isArray(label)) {
+		} else if (isArray(label)) {
 			// if it is an array let's measure each element
 			for (j = 0, jlen = label.length; j < jlen; ++j) {
 				nestedLabel = label[j];
 				// Undefined labels and arrays should not be measured
-				if (!helpers.isNullOrUndef(nestedLabel) && !helpers.isArray(nestedLabel)) {
+				if (!isNullOrUndef(nestedLabel) && !isArray(nestedLabel)) {
 					width = helpers.measureText(ctx, cache.data, cache.gc, width, nestedLabel);
 					height += lineHeight;
 				}
@@ -250,8 +252,17 @@ var Scale = Element.extend({
 		helpers.callback(this.options.beforeUpdate, [this]);
 	},
 
+	/**
+	 * @param {number} maxWidth - the max width in pixels
+	 * @param {number} maxHeight - the max height in pixels
+	 * @param {object} margins - the space between the edge of the other scales and edge of the chart
+	 *   This space comes from two sources:
+	 *     - padding - space that's required to show the labels at the edges of the scale
+	 *     - thickness of scales or legends in another orientation
+	 */
 	update: function(maxWidth, maxHeight, margins) {
 		var me = this;
+		var tickOpts = me.options.ticks;
 		var i, ilen, labels, label, ticks, tick;
 
 		// Update Lifecycle - Probably don't want to ever extend or overwrite this function ;)
@@ -271,7 +282,6 @@ var Scale = Element.extend({
 		me._maxLabelLines = 0;
 		me.longestLabelWidth = 0;
 		me.longestTextCache = me.longestTextCache || {};
-		me._ticksToDraw = null;
 		me._gridLineItems = null;
 		me._labelItems = null;
 
@@ -312,7 +322,7 @@ var Scale = Element.extend({
 
 		me.ticks = labels;   // BACKWARD COMPATIBILITY
 
-		// IMPORTANT: from this point, we consider that `this.ticks` will NEVER change!
+		// IMPORTANT: below this point, we consider that `this.ticks` will NEVER change!
 
 		// BACKWARD COMPAT: synchronize `_ticks` with labels (so potentially `this.ticks`)
 		for (i = 0, ilen = labels.length; i < ilen; ++i) {
@@ -344,9 +354,13 @@ var Scale = Element.extend({
 		me.beforeFit();
 		me.fit();
 		me.afterFit();
-		//
+		// Auto-skip
+		me._ticksToDraw = tickOpts.display && tickOpts.autoSkip ? me._autoSkip(me._ticks) : me._ticks;
+
 		me.afterUpdate();
 
+		// TODO(v3): remove minSize as a public property and return value from all layout boxes. It is unused
+		// make maxWidth and maxHeight private
 		return me.minSize;
 
 	},
@@ -426,7 +440,7 @@ var Scale = Element.extend({
 	afterBuildTicks: function(ticks) {
 		var me = this;
 		// ticks is empty for old axis implementations here
-		if (helpers.isArray(ticks) && ticks.length) {
+		if (isArray(ticks) && ticks.length) {
 			return helpers.callback(me.options.afterBuildTicks, [me, ticks]);
 		}
 		// Support old implementations (that modified `this.ticks` directly in buildTicks)
@@ -508,6 +522,7 @@ var Scale = Element.extend({
 			height: 0
 		};
 
+		var chart = me.chart;
 		var opts = me.options;
 		var tickOpts = opts.ticks;
 		var scaleLabelOpts = opts.scaleLabel;
@@ -593,8 +608,13 @@ var Scale = Element.extend({
 
 		me.handleMargins();
 
-		me.width = minSize.width;
-		me.height = minSize.height;
+		if (isHorizontal) {
+			me.width = me._length = chart.width - me.margins.left - me.margins.right;
+			me.height = minSize.height;
+		} else {
+			me.width = minSize.width;
+			me.height = me._length = chart.height - me.margins.top - me.margins.bottom;
+		}
 	},
 
 	/**
@@ -627,7 +647,7 @@ var Scale = Element.extend({
 	// Get the correct value. NaN bad inputs, If the value type is object get the x or y based on whether we are horizontal or not
 	getRightValue: function(rawValue) {
 		// Null and undefined values first
-		if (helpers.isNullOrUndef(rawValue)) {
+		if (isNullOrUndef(rawValue)) {
 			return NaN;
 		}
 		// isNaN(object) returns true, so make sure NaN is checking for a number; Discard Infinite values
@@ -671,7 +691,7 @@ var Scale = Element.extend({
 	_parseValue: function(value) {
 		var start, end, min, max;
 
-		if (helpers.isArray(value)) {
+		if (isArray(value)) {
 			start = +this.getRightValue(value[0]);
 			end = +this.getRightValue(value[1]);
 			min = Math.min(start, end);
@@ -870,25 +890,6 @@ var Scale = Element.extend({
 		return false;
 	},
 
-	_getTicksToDraw: function() {
-		var me = this;
-		var optionTicks = me.options.ticks;
-		var ticks = me._ticksToDraw;
-
-		if (ticks) {
-			return ticks;
-		}
-
-		ticks = me.getTicks();
-
-		if (optionTicks.display && optionTicks.autoSkip) {
-			ticks = me._autoSkip(ticks);
-		}
-
-		me._ticksToDraw = ticks;
-		return ticks;
-	},
-
 	/**
 	 * @private
 	 */
@@ -900,8 +901,9 @@ var Scale = Element.extend({
 		var position = options.position;
 		var offsetGridLines = gridLines.offsetGridLines;
 		var isHorizontal = me.isHorizontal();
-		var ticks = me._getTicksToDraw();
+		var ticks = me._ticksToDraw;
 		var ticksLength = ticks.length + (offsetGridLines ? 1 : 0);
+
 		var tl = getTickMarkLength(gridLines);
 		var items = [];
 		var axisWidth = gridLines.drawBorder ? valueAtIndexOrDefault(gridLines.lineWidth, 0, 0) : 0;
@@ -944,7 +946,7 @@ var Scale = Element.extend({
 			label = tick.label;
 
 			// autoskipper skipped this tick (#4635)
-			if (helpers.isNullOrUndef(label) && i < ticks.length) {
+			if (isNullOrUndef(label) && i < ticks.length) {
 				continue;
 			}
 
@@ -1008,7 +1010,7 @@ var Scale = Element.extend({
 		var position = options.position;
 		var isMirrored = optionTicks.mirror;
 		var isHorizontal = me.isHorizontal();
-		var ticks = me._getTicksToDraw();
+		var ticks = me._ticksToDraw;
 		var fonts = parseTickFontOptions(optionTicks);
 		var tickPadding = optionTicks.padding;
 		var tl = getTickMarkLength(options.gridLines);
@@ -1035,14 +1037,14 @@ var Scale = Element.extend({
 			label = tick.label;
 
 			// autoskipper skipped this tick (#4635)
-			if (helpers.isNullOrUndef(label)) {
+			if (isNullOrUndef(label)) {
 				continue;
 			}
 
 			pixel = me.getPixelForTick(i) + optionTicks.labelOffset;
 			font = tick.major ? fonts.major : fonts.minor;
 			lineHeight = font.lineHeight;
-			lineCount = helpers.isArray(label) ? label.length : 1;
+			lineCount = isArray(label) ? label.length : 1;
 
 			if (isHorizontal) {
 				x = pixel;
@@ -1173,7 +1175,7 @@ var Scale = Element.extend({
 
 			label = item.label;
 			y = item.textOffset;
-			if (helpers.isArray(label)) {
+			if (isArray(label)) {
 				for (j = 0, jlen = label.length; j < jlen; ++j) {
 					// We just make sure the multiline element is a string here..
 					ctx.fillText('' + label[j], 0, y);
