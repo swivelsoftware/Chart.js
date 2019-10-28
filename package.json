@@ -2,18 +2,13 @@
   "name": "@swivelsoftware/chart.js",
   "homepage": "https://www.chartjs.org",
   "description": "Customized version of chart.js. Simple HTML5 charts using the canvas element.",
-  "version": "2.9.1-3",
+  "version": "2.9.1-4",
   "license": "MIT",
   "jsdelivr": "dist/Chart.min.js",
   "unpkg": "dist/Chart.min.js",
   "main": "src/index.js",
   "types": "index.d.ts",
-  "scripts": {
-    "build": "gulp",
-    "dist": "npm publish --access=public",
-    "prepublishOnly": "npm i && npm run build",
-    "postpublish": "rm package-lock.json && rm -rf dist"
-  },
+  "module": "dist/Chart.esm.js",
   "keywords": [
     "canvas",
     "charts",
