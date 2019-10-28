@@ -217,8 +217,6 @@ describe('Chart.controllers.line', function() {
 		].forEach(function(expected, i) {
 			expect(meta.data[i]._datasetIndex).toBe(0);
 			expect(meta.data[i]._index).toBe(i);
-			expect(meta.data[i]._xScale).toBe(chart.scales.firstXScaleID);
-			expect(meta.data[i]._yScale).toBe(chart.scales.firstYScaleID);
 			expect(meta.data[i]._model.x).toBeCloseToPixel(expected.x);
 			expect(meta.data[i]._model.y).toBeCloseToPixel(expected.y);
 			expect(meta.data[i]._model).toEqual(jasmine.objectContaining({
@@ -870,30 +868,32 @@ describe('Chart.controllers.line', function() {
 			expect(point._model.radius).toBe(3);
 		});
 
-		it ('should handle hover styles defined via element custom', function() {
+		it ('should handle dataset hover styles defined via dataset properties', function() {
 			var chart = this.chart;
 			var point = chart.getDatasetMeta(0).data[0];
+			var dataset = chart.getDatasetMeta(0).dataset;
 
-			point.custom = {
-				hoverBackgroundColor: 'rgb(200, 100, 150)',
-				hoverBorderColor: 'rgb(150, 50, 100)',
-				hoverBorderWidth: 8.4,
-				hoverRadius: 4.2
-			};
+			Chart.helpers.merge(chart.data.datasets[0], {
+				backgroundColor: '#AAA',
+				borderColor: '#BBB',
+				borderWidth: 6,
+				hoverBackgroundColor: '#000',
+				hoverBorderColor: '#111',
+				hoverBorderWidth: 12
+			});
 
+			chart.options.hover = {mode: 'dataset'};
 			chart.update();
 
 			jasmine.triggerMouseEvent(chart, 'mousemove', point);
-			expect(point._model.backgroundColor).toBe('rgb(200, 100, 150)');
-			expect(point._model.borderColor).toBe('rgb(150, 50, 100)');
-			expect(point._model.borderWidth).toBe(8.4);
-			expect(point._model.radius).toBe(4.2);
+			expect(dataset._model.backgroundColor).toBe('#000');
+			expect(dataset._model.borderColor).toBe('#111');
+			expect(dataset._model.borderWidth).toBe(12);
 
 			jasmine.triggerMouseEvent(chart, 'mouseout', point);
-			expect(point._model.backgroundColor).toBe('rgb(100, 150, 200)');
-			expect(point._model.borderColor).toBe('rgb(50, 100, 150)');
-			expect(point._model.borderWidth).toBe(2);
-			expect(point._model.radius).toBe(3);
+			expect(dataset._model.backgroundColor).toBe('#AAA');
+			expect(dataset._model.borderColor).toBe('#BBB');
+			expect(dataset._model.borderWidth).toBe(6);
 		});
 	});
 

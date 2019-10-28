@@ -35,7 +35,7 @@ defaults._set('bubble', {
 			label: function(item, data) {
 				var datasetLabel = data.datasets[item.datasetIndex].label || '';
 				var dataPoint = data.datasets[item.datasetIndex].data[item.index];
-				return datasetLabel + ': (' + item.xLabel + ', ' + item.yLabel + ', ' + dataPoint.r + ')';
+				return datasetLabel + ': (' + item.label + ', ' + item.value + ', ' + dataPoint.r + ')';
 			}
 		}
 	}
@@ -83,18 +83,15 @@ module.exports = DatasetController.extend({
 	updateElement: function(point, index, reset) {
 		var me = this;
 		var meta = me.getMeta();
-		var custom = point.custom || {};
 		var xScale = me.getScaleForId(meta.xAxisID);
 		var yScale = me.getScaleForId(meta.yAxisID);
-		var options = me._resolveDataElementOptions(point, index);
+		var options = me._resolveDataElementOptions(index);
 		var data = me.getDataset().data[index];
 		var dsIndex = me.index;
 
 		var x = reset ? xScale.getPixelForDecimal(0.5) : xScale.getPixelForValue(typeof data === 'object' ? data : NaN, index, dsIndex);
 		var y = reset ? yScale.getBasePixel() : yScale.getPixelForValue(data, index, dsIndex);
 
-		point._xScale = xScale;
-		point._yScale = yScale;
 		point._options = options;
 		point._datasetIndex = dsIndex;
 		point._index = index;
@@ -106,7 +103,7 @@ module.exports = DatasetController.extend({
 			pointStyle: options.pointStyle,
 			rotation: options.rotation,
 			radius: reset ? 0 : options.radius,
-			skip: custom.skip || isNaN(x) || isNaN(y),
+			skip: isNaN(x) || isNaN(y),
 			x: x,
 			y: y,
 		};
@@ -138,11 +135,10 @@ module.exports = DatasetController.extend({
 	/**
 	 * @private
 	 */
-	_resolveDataElementOptions: function(point, index) {
+	_resolveDataElementOptions: function(index) {
 		var me = this;
 		var chart = me.chart;
 		var dataset = me.getDataset();
-		var custom = point.custom || {};
 		var data = dataset.data[index] || {};
 		var values = DatasetController.prototype._resolveDataElementOptions.apply(me, arguments);
 
@@ -154,9 +150,13 @@ module.exports = DatasetController.extend({
 			datasetIndex: me.index
 		};
 
+		// In case values were cached (and thus frozen), we need to clone the values
+		if (me._cachedDataOpts === values) {
+			values = helpers.extend({}, values);
+		}
+
 		// Custom radius resolution
 		values.radius = resolve([
-			custom.radius,
 			data.r,
 			me._config.radius,
 			chart.options.elements.point.radius

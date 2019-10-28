@@ -209,7 +209,7 @@ helpers.extend(DatasetController.prototype, {
 		var me = this;
 		var type = me.datasetElementType;
 		return type && new type({
-			_chart: me.chart,
+			_ctx: me.chart.ctx,
 			_datasetIndex: me.index
 		});
 	},
@@ -218,7 +218,7 @@ helpers.extend(DatasetController.prototype, {
 		var me = this;
 		var type = me.dataElementType;
 		return type && new type({
-			_chart: me.chart,
+			_ctx: me.chart.ctx,
 			_datasetIndex: me.index,
 			_index: index
 		});
@@ -290,6 +290,7 @@ helpers.extend(DatasetController.prototype, {
 	_update: function(reset) {
 		var me = this;
 		me._configure();
+		me._cachedDataOpts = null;
 		me.update(reset);
 	},
 
@@ -339,10 +340,10 @@ helpers.extend(DatasetController.prototype, {
 
 		me._configure();
 		if (dataset && index === undefined) {
-			style = me._resolveDatasetElementOptions(dataset || {});
+			style = me._resolveDatasetElementOptions();
 		} else {
 			index = index || 0;
-			style = me._resolveDataElementOptions(meta.data[index] || {}, index);
+			style = me._resolveDataElementOptions(index);
 		}
 
 		if (style.fill === false || style.fill === null) {
@@ -355,29 +356,29 @@ helpers.extend(DatasetController.prototype, {
 	/**
 	 * @private
 	 */
-	_resolveDatasetElementOptions: function(element) {
+	_resolveDatasetElementOptions: function(hover) {
 		var me = this;
 		var chart = me.chart;
 		var datasetOpts = me._config;
-		var custom = element.custom || {};
 		var options = chart.options.elements[me.datasetElementType.prototype._type] || {};
 		var elementOptions = me._datasetElementOptions;
 		var values = {};
-		var i, ilen, key;
+		var i, ilen, key, readKey;
 
 		// Scriptable options
 		var context = {
 			chart: chart,
 			dataset: me.getDataset(),
-			datasetIndex: me.index
+			datasetIndex: me.index,
+			hover: hover
 		};
 
 		for (i = 0, ilen = elementOptions.length; i < ilen; ++i) {
 			key = elementOptions[i];
+			readKey = hover ? 'hover' + key.charAt(0).toUpperCase() + key.slice(1) : key;
 			values[key] = resolve([
-				custom[key],
-				datasetOpts[key],
-				options[key]
+				datasetOpts[readKey],
+				options[readKey]
 			], context);
 		}
 
@@ -387,15 +388,17 @@ helpers.extend(DatasetController.prototype, {
 	/**
 	 * @private
 	 */
-	_resolveDataElementOptions: function(element, index) {
+	_resolveDataElementOptions: function(index) {
 		var me = this;
+		var cached = me._cachedDataOpts;
+		if (cached) {
+			return cached;
+		}
 		var chart = me.chart;
 		var datasetOpts = me._config;
-		var custom = element.custom || {};
 		var options = chart.options.elements[me.dataElementType.prototype._type] || {};
 		var elementOptions = me._dataElementOptions;
 		var values = {};
-		var keys, i, ilen, key;
 
 		// Scriptable options
 		var context = {
@@ -405,26 +408,33 @@ helpers.extend(DatasetController.prototype, {
 			datasetIndex: me.index
 		};
 
+		// `resolve` sets cacheable to `false` if any option is indexed or scripted
+		var info = {cacheable: true};
+
+		var keys, i, ilen, key;
+
 		if (helpers.isArray(elementOptions)) {
 			for (i = 0, ilen = elementOptions.length; i < ilen; ++i) {
 				key = elementOptions[i];
 				values[key] = resolve([
-					custom[key],
 					datasetOpts[key],
 					options[key]
-				], context, index);
+				], context, index, info);
 			}
 		} else {
 			keys = Object.keys(elementOptions);
 			for (i = 0, ilen = keys.length; i < ilen; ++i) {
 				key = keys[i];
 				values[key] = resolve([
-					custom[key],
 					datasetOpts[elementOptions[key]],
 					datasetOpts[key],
 					options[key]
-				], context, index);
+				], context, index, info);
 			}
+		}
+
+		if (info.cacheable) {
+			me._cachedDataOpts = Object.freeze(values);
 		}
 
 		return values;
@@ -438,7 +448,6 @@ helpers.extend(DatasetController.prototype, {
 	setHoverStyle: function(element) {
 		var dataset = this.chart.data.datasets[element._datasetIndex];
 		var index = element._index;
-		var custom = element.custom || {};
 		var model = element._model;
 		var getHoverColor = helpers.getHoverColor;
 
@@ -448,9 +457,45 @@ helpers.extend(DatasetController.prototype, {
 			borderWidth: model.borderWidth
 		};
 
-		model.backgroundColor = resolve([custom.hoverBackgroundColor, dataset.hoverBackgroundColor, getHoverColor(model.backgroundColor)], undefined, index);
-		model.borderColor = resolve([custom.hoverBorderColor, dataset.hoverBorderColor, getHoverColor(model.borderColor)], undefined, index);
-		model.borderWidth = resolve([custom.hoverBorderWidth, dataset.hoverBorderWidth, model.borderWidth], undefined, index);
+		model.backgroundColor = resolve([dataset.hoverBackgroundColor, getHoverColor(model.backgroundColor)], undefined, index);
+		model.borderColor = resolve([dataset.hoverBorderColor, getHoverColor(model.borderColor)], undefined, index);
+		model.borderWidth = resolve([dataset.hoverBorderWidth, model.borderWidth], undefined, index);
+	},
+
+	/**
+	 * @private
+	 */
+	_removeDatasetHoverStyle: function() {
+		var element = this.getMeta().dataset;
+
+		if (element) {
+			this.removeHoverStyle(element);
+		}
+	},
+
+	/**
+	 * @private
+	 */
+	_setDatasetHoverStyle: function() {
+		var element = this.getMeta().dataset;
+		var prev = {};
+		var i, ilen, key, keys, hoverOptions, model;
+
+		if (!element) {
+			return;
+		}
+
+		model = element._model;
+		hoverOptions = this._resolveDatasetElementOptions(true);
+
+		keys = Object.keys(hoverOptions);
+		for (i = 0, ilen = keys.length; i < ilen; ++i) {
+			key = keys[i];
+			prev[key] = model[key];
+			model[key] = hoverOptions[key];
+		}
+
+		element.$previousStyle = prev;
 	},
 
 	/**

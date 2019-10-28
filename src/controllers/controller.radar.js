@@ -20,13 +20,6 @@ defaults._set('radar', {
 });
 
 module.exports = DatasetController.extend({
-	/**
-	 * @private
-	 */
-	_getValueScaleId: function() {
-		return this.chart.scale.id;
-	},
-
 	datasetElementType: elements.Line,
 
 	dataElementType: elements.Point,
@@ -64,12 +57,25 @@ module.exports = DatasetController.extend({
 		rotation: 'pointRotation'
 	},
 
+	/**
+	 * @private
+	 */
+	_getIndexScaleId: function() {
+		return this.chart.scale.id;
+	},
+
+	/**
+	 * @private
+	 */
+	_getValueScaleId: function() {
+		return this.chart.scale.id;
+	},
+
 	update: function(reset) {
 		var me = this;
 		var meta = me.getMeta();
 		var line = meta.dataset;
 		var points = meta.data || [];
-		var scale = me.chart.scale;
 		var config = me._config;
 		var i, ilen;
 
@@ -79,13 +85,12 @@ module.exports = DatasetController.extend({
 		}
 
 		// Utility
-		line._scale = scale;
 		line._datasetIndex = me.index;
 		// Data
 		line._children = points;
 		line._loop = true;
 		// Model
-		line._model = me._resolveDatasetElementOptions(line);
+		line._model = me._resolveDatasetElementOptions();
 
 		line.pivot();
 
@@ -105,17 +110,15 @@ module.exports = DatasetController.extend({
 
 	updateElement: function(point, index, reset) {
 		var me = this;
-		var custom = point.custom || {};
 		var dataset = me.getDataset();
 		var scale = me.chart.scale;
 		var pointPosition = scale.getPointPositionForValue(index, dataset.data[index]);
-		var options = me._resolveDataElementOptions(point, index);
+		var options = me._resolveDataElementOptions(index);
 		var lineModel = me.getMeta().dataset._model;
 		var x = reset ? scale.xCenter : pointPosition.x;
 		var y = reset ? scale.yCenter : pointPosition.y;
 
 		// Utility
-		point._scale = scale;
 		point._options = options;
 		point._datasetIndex = me.index;
 		point._index = index;
@@ -124,7 +127,7 @@ module.exports = DatasetController.extend({
 		point._model = {
 			x: x, // value not used in dataset scale, but we want a consistent API between scales
 			y: y,
-			skip: custom.skip || isNaN(x) || isNaN(y),
+			skip: isNaN(x) || isNaN(y),
 			// Appearance
 			radius: options.radius,
 			pointStyle: options.pointStyle,
@@ -132,7 +135,7 @@ module.exports = DatasetController.extend({
 			backgroundColor: options.backgroundColor,
 			borderColor: options.borderColor,
 			borderWidth: options.borderWidth,
-			tension: valueOrDefault(custom.tension, lineModel ? lineModel.tension : 0),
+			tension: lineModel ? lineModel.tension : 0,
 
 			// Tooltip
 			hitRadius: options.hitRadius

@@ -154,6 +154,14 @@ function positionIsHorizontal(position) {
 	return position === 'top' || position === 'bottom';
 }
 
+function compare2Level(l1, l2) {
+	return function(a, b) {
+		return a[l1] === b[l1]
+			? a[l2] - b[l2]
+			: a[l1] - b[l1];
+	};
+}
+
 var Chart = function(item, config) {
 	this.construct(item, config);
 	return this;
@@ -183,17 +191,6 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 		me.options = config.options;
 		me._bufferedRender = false;
 		me._layers = [];
-
-		/**
-		 * Provided for backward compatibility, Chart and Chart.Controller have been merged,
-		 * the "instance" still need to be defined since it might be called from plugins.
-		 * @prop Chart#chart
-		 * @deprecated since version 2.6.0
-		 * @todo remove at version 3
-		 * @private
-		 */
-		me.chart = me;
-		me.controller = me; // chart.chart.controller #inception
 
 		// Add the chart instance to the global namespace
 		Chart.instances[me.id] = me;
@@ -239,9 +236,6 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 			me.resize(true);
 		}
 
-		// Make sure scales have IDs and are built before we build any controllers.
-		me.ensureScalesHaveIDs();
-		me.buildOrUpdateScales();
 		me.initToolTip();
 
 		// After init plugin notification
@@ -388,8 +382,6 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 				scales[scale.id] = scale;
 			}
 
-			scale.mergeTicksOptions();
-
 			// TODO(SB): I think we should be able to remove this custom case (options.scale)
 			// and consider it as a regular scale part of the "scales"" map only! This would
 			// make the logic easier and remove some useless? custom code.
@@ -412,19 +404,24 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 	buildOrUpdateControllers: function() {
 		var me = this;
 		var newControllers = [];
+		var datasets = me.data.datasets;
+		var i, ilen;
 
-		helpers.each(me.data.datasets, function(dataset, datasetIndex) {
-			var meta = me.getDatasetMeta(datasetIndex);
+		for (i = 0, ilen = datasets.length; i < ilen; i++) {
+			var dataset = datasets[i];
+			var meta = me.getDatasetMeta(i);
 			var type = dataset.type || me.config.type;
 
 			if (meta.type && meta.type !== type) {
-				me.destroyDatasetMeta(datasetIndex);
-				meta = me.getDatasetMeta(datasetIndex);
+				me.destroyDatasetMeta(i);
+				meta = me.getDatasetMeta(i);
 			}
 			meta.type = type;
+			meta.order = dataset.order || 0;
+			meta.index = i;
 
 			if (meta.controller) {
-				meta.controller.updateIndex(datasetIndex);
+				meta.controller.updateIndex(i);
 				meta.controller.linkScales();
 			} else {
 				var ControllerClass = controllers[meta.type];
@@ -432,10 +429,10 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 					throw new Error('"' + meta.type + '" is not a chart type.');
 				}
 
-				meta.controller = new ControllerClass(me, datasetIndex);
+				meta.controller = new ControllerClass(me, i);
 				newControllers.push(meta.controller);
 			}
-		}, me);
+		}
 
 		return newControllers;
 	},
@@ -461,6 +458,7 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 
 	update: function(config) {
 		var me = this;
+		var i, ilen;
 
 		if (!config || typeof config !== 'object') {
 			// backwards compatibility
@@ -487,9 +485,9 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 		var newControllers = me.buildOrUpdateControllers();
 
 		// Make sure all dataset controllers have correct meta data counts
-		helpers.each(me.data.datasets, function(dataset, datasetIndex) {
-			me.getDatasetMeta(datasetIndex).controller.buildOrUpdateElements();
-		}, me);
+		for (i = 0, ilen = me.data.datasets.length; i < ilen; i++) {
+			me.getDatasetMeta(i).controller.buildOrUpdateElements();
+		}
 
 		me.updateLayout();
 
@@ -513,11 +511,7 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 		// Do this before render so that any plugins that need final scale updates can use it
 		plugins.notify(me, 'afterUpdate');
 
-		me._layers.sort(function(a, b) {
-			return a.z === b.z
-				? a._idx - b._idx
-				: a.z - b.z;
-		});
+		me._layers.sort(compare2Level('z', '_idx'));
 
 		if (me._bufferedRender) {
 			me._bufferedRequest = {
@@ -558,14 +552,6 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 			item._idx = index;
 		});
 
-		/**
-		 * Provided for backward compatibility, use `afterLayout` instead.
-		 * @method IPlugin#afterScaleUpdate
-		 * @deprecated since version 2.5.0
-		 * @todo remove at version 3
-		 * @private
-		 */
-		plugins.notify(me, 'afterScaleUpdate');
 		plugins.notify(me, 'afterLayout');
 	},
 
@@ -718,22 +704,48 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 	},
 
 	/**
+	 * @private
+	 */
+	_getSortedDatasetMetas: function(filterVisible) {
+		var me = this;
+		var datasets = me.data.datasets || [];
+		var result = [];
+		var i, ilen;
+
+		for (i = 0, ilen = datasets.length; i < ilen; ++i) {
+			if (!filterVisible || me.isDatasetVisible(i)) {
+				result.push(me.getDatasetMeta(i));
+			}
+		}
+
+		result.sort(compare2Level('order', 'index'));
+
+		return result;
+	},
+
+	/**
+	 * @private
+	 */
+	_getSortedVisibleDatasetMetas: function() {
+		return this._getSortedDatasetMetas(true);
+	},
+
+	/**
 	 * Draws all datasets unless a plugin returns `false` to the `beforeDatasetsDraw`
 	 * hook, in which case, plugins will not be called on `afterDatasetsDraw`.
 	 * @private
 	 */
 	drawDatasets: function(easingValue) {
 		var me = this;
+		var metasets, i;
 
 		if (plugins.notify(me, 'beforeDatasetsDraw', [easingValue]) === false) {
 			return;
 		}
 
-		// Draw datasets reversed to support proper line stacking
-		for (var i = (me.data.datasets || []).length - 1; i >= 0; --i) {
-			if (me.isDatasetVisible(i)) {
-				me.drawDataset(i, easingValue);
-			}
+		metasets = me._getSortedVisibleDatasetMetas();
+		for (i = metasets.length - 1; i >= 0; --i) {
+			me.drawDataset(metasets[i], easingValue);
 		}
 
 		plugins.notify(me, 'afterDatasetsDraw', [easingValue]);
@@ -744,12 +756,11 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 	 * hook, in which case, plugins will not be called on `afterDatasetDraw`.
 	 * @private
 	 */
-	drawDataset: function(index, easingValue) {
+	drawDataset: function(meta, easingValue) {
 		var me = this;
-		var meta = me.getDatasetMeta(index);
 		var args = {
 			meta: meta,
-			index: index,
+			index: meta.index,
 			easingValue: easingValue
 		};
 
@@ -829,7 +840,9 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 				controller: null,
 				hidden: null,			// See isDatasetVisible() comment
 				xAxisID: null,
-				yAxisID: null
+				yAxisID: null,
+				order: dataset.order || 0,
+				index: datasetIndex
 			};
 		}
 
@@ -905,7 +918,6 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 		var me = this;
 		me.tooltip = new Tooltip({
 			_chart: me,
-			_chartInstance: me, // deprecated, backward compatibility
 			_data: me.data,
 			_options: me.options.tooltips
 		}, me);
@@ -955,14 +967,18 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 	},
 
 	updateHoverStyle: function(elements, mode, enabled) {
-		var method = enabled ? 'setHoverStyle' : 'removeHoverStyle';
+		var prefix = enabled ? 'set' : 'remove';
 		var element, i, ilen;
 
 		for (i = 0, ilen = elements.length; i < ilen; ++i) {
 			element = elements[i];
 			if (element) {
-				this.getDatasetMeta(element._datasetIndex).controller[method](element);
+				this.getDatasetMeta(element._datasetIndex).controller[prefix + 'HoverStyle'](element);
 			}
+		}
+
+		if (mode === 'dataset') {
+			this.getDatasetMeta(elements[0]._datasetIndex).controller['_' + prefix + 'DatasetHoverStyle']();
 		}
 	},
 
@@ -1042,7 +1058,7 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 		helpers.callback(options.onHover || options.hover.onHover, [e.native, me.active], me);
 
 		if (e.type === 'mouseup' || e.type === 'click') {
-			if (options.onClick) {
+			if (options.onClick && helpers.canvas._isPointInArea(e, me.chartArea)) {
 				// Use e.native here for backwards compatibility
 				options.onClick.call(me, e.native, me.active);
 			}
@@ -1075,41 +1091,3 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 Chart.instances = {};
 
 module.exports = Chart;
-
-// DEPRECATIONS
-
-/**
- * Provided for backward compatibility, use Chart instead.
- * @class Chart.Controller
- * @deprecated since version 2.6
- * @todo remove at version 3
- * @private
- */
-Chart.Controller = Chart;
-
-/**
- * Provided for backward compatibility, not available anymore.
- * @namespace Chart
- * @deprecated since version 2.8
- * @todo remove at version 3
- * @private
- */
-Chart.types = {};
-
-/**
- * Provided for backward compatibility, not available anymore.
- * @namespace Chart.helpers.configMerge
- * @deprecated since version 2.8.0
- * @todo remove at version 3
- * @private
- */
-helpers.configMerge = mergeConfig;
-
-/**
- * Provided for backward compatibility, not available anymore.
- * @namespace Chart.helpers.scaleMerge
- * @deprecated since version 2.8.0
- * @todo remove at version 3
- * @private
- */
-helpers.scaleMerge = mergeScaleConfig;

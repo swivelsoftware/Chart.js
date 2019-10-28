@@ -98,7 +98,7 @@ defaults._set('polarArea', {
 				return '';
 			},
 			label: function(item, data) {
-				return data.labels[item.index] + ': ' + item.yLabel;
+				return data.labels[item.index] + ': ' + item.value;
 			}
 		}
 	}
@@ -123,6 +123,20 @@ module.exports = DatasetController.extend({
 		'hoverBorderWidth',
 	],
 
+	/**
+	 * @private
+	 */
+	_getIndexScaleId: function() {
+		return this.chart.scale.id;
+	},
+
+	/**
+	 * @private
+	 */
+	_getValueScaleId: function() {
+		return this.chart.scale.id;
+	},
+
 	update: function(reset) {
 		var me = this;
 		var dataset = me.getDataset();
@@ -145,7 +159,7 @@ module.exports = DatasetController.extend({
 		}
 
 		for (i = 0, ilen = arcs.length; i < ilen; ++i) {
-			arcs[i]._options = me._resolveDataElementOptions(arcs[i], i);
+			arcs[i]._options = me._resolveDataElementOptions(i);
 			me.updateElement(arcs[i], i, reset);
 		}
 	},
@@ -193,7 +207,6 @@ module.exports = DatasetController.extend({
 			// Utility
 			_datasetIndex: me.index,
 			_index: index,
-			_scale: scale,
 
 			// Desired view properties
 			_model: {

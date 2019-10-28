@@ -5,6 +5,8 @@ var defaults = require('../core/core.defaults');
 var elements = require('../elements/index');
 var helpers = require('../helpers/index');
 
+var valueOrDefault = helpers.valueOrDefault;
+
 defaults._set('bar', {
 	hover: {
 		mode: 'label'
@@ -13,8 +15,6 @@ defaults._set('bar', {
 	scales: {
 		xAxes: [{
 			type: 'category',
-			categoryPercentage: 0.8,
-			barPercentage: 0.9,
 			offset: true,
 			gridLines: {
 				offsetGridLines: true
@@ -24,6 +24,15 @@ defaults._set('bar', {
 		yAxes: [{
 			type: 'linear'
 		}]
+	}
+});
+
+defaults._set('global', {
+	datasets: {
+		bar: {
+			categoryPercentage: 0.8,
+			barPercentage: 0.9
+		}
 	}
 });
 
@@ -58,10 +67,13 @@ function computeFitCategoryTraits(index, ruler, options) {
 	var thickness = options.barThickness;
 	var count = ruler.stackCount;
 	var curr = ruler.pixels[index];
+	var min = helpers.isNullOrUndef(thickness)
+		? computeMinSampleSize(ruler.scale, ruler.pixels)
+		: -1;
 	var size, ratio;
 
 	if (helpers.isNullOrUndef(thickness)) {
-		size = ruler.min * options.categoryPercentage;
+		size = min * options.categoryPercentage;
 		ratio = options.barPercentage;
 	} else {
 		// When bar thickness is enforced, category and bar percentages are ignored.
@@ -124,7 +136,12 @@ module.exports = DatasetController.extend({
 		'backgroundColor',
 		'borderColor',
 		'borderSkipped',
-		'borderWidth'
+		'borderWidth',
+		'barPercentage',
+		'barThickness',
+		'categoryPercentage',
+		'maxBarThickness',
+		'minBarLength'
 	],
 
 	initialize: function() {
@@ -152,12 +169,9 @@ module.exports = DatasetController.extend({
 
 	updateElement: function(rectangle, index, reset) {
 		var me = this;
-		var meta = me.getMeta();
 		var dataset = me.getDataset();
-		var options = me._resolveDataElementOptions(rectangle, index);
+		var options = me._resolveDataElementOptions(index);
 
-		rectangle._xScale = me.getScaleForId(meta.xAxisID);
-		rectangle._yScale = me.getScaleForId(meta.yAxisID);
 		rectangle._datasetIndex = me.index;
 		rectangle._index = index;
 		rectangle._model = {
@@ -173,7 +187,7 @@ module.exports = DatasetController.extend({
 			rectangle._model.borderSkipped = null;
 		}
 
-		me._updateElementGeometry(rectangle, index, reset);
+		me._updateElementGeometry(rectangle, index, reset, options);
 
 		rectangle.pivot();
 	},
@@ -181,15 +195,15 @@ module.exports = DatasetController.extend({
 	/**
 	 * @private
 	 */
-	_updateElementGeometry: function(rectangle, index, reset) {
+	_updateElementGeometry: function(rectangle, index, reset, options) {
 		var me = this;
 		var model = rectangle._model;
 		var vscale = me._getValueScale();
 		var base = vscale.getBasePixel();
 		var horizontal = vscale.isHorizontal();
 		var ruler = me._ruler || me.getRuler();
-		var vpixels = me.calculateBarValuePixels(me.index, index);
-		var ipixels = me.calculateBarIndexPixels(me.index, index, ruler);
+		var vpixels = me.calculateBarValuePixels(me.index, index, options);
+		var ipixels = me.calculateBarIndexPixels(me.index, index, ruler, options);
 
 		model.horizontal = horizontal;
 		model.base = reset ? base : vpixels.base;
@@ -207,20 +221,26 @@ module.exports = DatasetController.extend({
 	 */
 	_getStacks: function(last) {
 		var me = this;
-		var chart = me.chart;
 		var scale = me._getIndexScale();
+		var metasets = scale._getMatchingVisibleMetas(me._type);
 		var stacked = scale.options.stacked;
-		var ilen = last === undefined ? chart.data.datasets.length : last + 1;
+		var ilen = metasets.length;
 		var stacks = [];
 		var i, meta;
 
 		for (i = 0; i < ilen; ++i) {
-			meta = chart.getDatasetMeta(i);
-			if (meta.bar && chart.isDatasetVisible(i) &&
-				(stacked === false ||
-				(stacked === true && stacks.indexOf(meta.stack) === -1) ||
-				(stacked === undefined && (meta.stack === undefined || stacks.indexOf(meta.stack) === -1)))) {
+			meta = metasets[i];
+			// stacked   | meta.stack
+			//           | found | not found | undefined
+			// false     |   x   |     x     |     x
+			// true      |       |     x     |
+			// undefined |       |     x     |     x
+			if (stacked === false || stacks.indexOf(meta.stack) === -1 ||
+				(stacked === undefined && meta.stack === undefined)) {
 				stacks.push(meta.stack);
+			}
+			if (meta.index === last) {
+				break;
 			}
 		}
 
@@ -260,18 +280,13 @@ module.exports = DatasetController.extend({
 		var me = this;
 		var scale = me._getIndexScale();
 		var pixels = [];
-		var i, ilen, min;
+		var i, ilen;
 
 		for (i = 0, ilen = me.getMeta().data.length; i < ilen; ++i) {
 			pixels.push(scale.getPixelForValue(null, i, me.index));
 		}
 
-		min = helpers.isNullOrUndef(scale.options.barThickness)
-			? computeMinSampleSize(scale, pixels)
-			: -1;
-
 		return {
-			min: min,
 			pixels: pixels,
 			start: scale._startPixel,
 			end: scale._endPixel,
@@ -284,30 +299,32 @@ module.exports = DatasetController.extend({
 	 * Note: pixel values are not clamped to the scale area.
 	 * @private
 	 */
-	calculateBarValuePixels: function(datasetIndex, index) {
+	calculateBarValuePixels: function(datasetIndex, index, options) {
 		var me = this;
 		var chart = me.chart;
 		var scale = me._getValueScale();
 		var isHorizontal = scale.isHorizontal();
 		var datasets = chart.data.datasets;
+		var metasets = scale._getMatchingVisibleMetas(me._type);
 		var value = scale._parseValue(datasets[datasetIndex].data[index]);
-		var minBarLength = scale.options.minBarLength;
+		var minBarLength = options.minBarLength;
 		var stacked = scale.options.stacked;
 		var stack = me.getMeta().stack;
 		var start = value.start === undefined ? 0 : value.max >= 0 && value.min >= 0 ? value.min : value.max;
 		var length = value.start === undefined ? value.end : value.max >= 0 && value.min >= 0 ? value.max - value.min : value.min - value.max;
+		var ilen = metasets.length;
 		var i, imeta, ivalue, base, head, size, stackLength;
 
 		if (stacked || (stacked === undefined && stack !== undefined)) {
-			for (i = 0; i < datasetIndex; ++i) {
-				imeta = chart.getDatasetMeta(i);
+			for (i = 0; i < ilen; ++i) {
+				imeta = metasets[i];
 
-				if (imeta.bar &&
-					imeta.stack === stack &&
-					imeta.controller._getValueScaleId() === scale.id &&
-					chart.isDatasetVisible(i)) {
+				if (imeta.index === datasetIndex) {
+					break;
+				}
 
-					stackLength = scale._parseValue(datasets[i].data[index]);
+				if (imeta.stack === stack) {
+					stackLength = scale._parseValue(datasets[imeta.index].data[index]);
 					ivalue = stackLength.start === undefined ? stackLength.end : stackLength.min >= 0 && stackLength.max >= 0 ? stackLength.max : stackLength.min;
 
 					if ((value.min < 0 && ivalue < 0) || (value.max >= 0 && ivalue > 0)) {
@@ -341,9 +358,8 @@ module.exports = DatasetController.extend({
 	/**
 	 * @private
 	 */
-	calculateBarIndexPixels: function(datasetIndex, index, ruler) {
+	calculateBarIndexPixels: function(datasetIndex, index, ruler, options) {
 		var me = this;
-		var options = ruler.scale.options;
 		var range = options.barThickness === 'flex'
 			? computeFlexCategoryTraits(index, ruler, options)
 			: computeFitCategoryTraits(index, ruler, options);
@@ -351,7 +367,7 @@ module.exports = DatasetController.extend({
 		var stackIndex = me.getStackIndex(datasetIndex, me.getMeta().stack);
 		var center = range.start + (range.chunk * stackIndex) + (range.chunk / 2);
 		var size = Math.min(
-			helpers.valueOrDefault(options.maxBarThickness, Infinity),
+			valueOrDefault(options.maxBarThickness, Infinity),
 			range.chunk * range.ratio);
 
 		return {
@@ -382,4 +398,5 @@ module.exports = DatasetController.extend({
 
 		helpers.canvas.unclipArea(chart.ctx);
 	}
+
 });
