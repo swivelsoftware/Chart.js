@@ -8781,6 +8781,8 @@ function (_Element) {
   }, {
     key: "drawBody",
     value: function drawBody(pt, vm, ctx) {
+      var me = this;
+      var ci = me._chart;
       var bodyFontSize = vm.bodyFontSize;
       var bodySpacing = vm.bodySpacing;
       var bodyAlign = vm._bodyAlign;
