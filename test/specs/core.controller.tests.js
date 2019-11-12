@@ -8,7 +8,6 @@ describe('Chart', function() {
 		expect(Chart instanceof Object).toBeTruthy();
 		expect(chart.constructor).toBe(Chart);
 		expect(chart instanceof Chart).toBeTruthy();
-		expect(Chart.prototype.isPrototypeOf(chart)).toBeTruthy();
 	});
 
 	describe('config initialization', function() {
@@ -87,7 +86,7 @@ describe('Chart', function() {
 			defaults.global.responsiveAnimationDuration = 0;
 			defaults.global.hover.onHover = null;
 			defaults.line.spanGaps = false;
-			defaults.line.hover.mode = 'label';
+			defaults.line.hover.mode = 'index';
 		});
 
 		it('should override default options', function() {
@@ -122,7 +121,7 @@ describe('Chart', function() {
 
 			defaults.global.responsiveAnimationDuration = 0;
 			defaults.global.hover.onHover = null;
-			defaults.line.hover.mode = 'label';
+			defaults.line.hover.mode = 'index';
 			defaults.line.spanGaps = false;
 		});
 
@@ -1142,7 +1141,7 @@ describe('Chart', function() {
 			expect(chart.tooltip._options).toEqual(jasmine.objectContaining(newTooltipConfig));
 		});
 
-		it ('should reset the tooltip on update', function() {
+		it ('should update the tooltip on update', function() {
 			var chart = acquireChart({
 				type: 'line',
 				data: {
@@ -1169,13 +1168,13 @@ describe('Chart', function() {
 			// Check and see if tooltip was displayed
 			var tooltip = chart.tooltip;
 
-			expect(chart.lastActive).toEqual([point]);
-			expect(tooltip._lastActive).toEqual([point]);
+			expect(chart.lastActive[0].element).toEqual(point);
+			expect(tooltip._lastActive[0].element).toEqual(point);
 
-			// Update and confirm tooltip is reset
+			// Update and confirm tooltip is updated
 			chart.update();
-			expect(chart.lastActive).toEqual([]);
-			expect(tooltip._lastActive).toEqual([]);
+			expect(chart.lastActive[0].element).toEqual(point);
+			expect(tooltip._lastActive[0].element).toEqual(point);
 		});
 
 		it ('should update the metadata', function() {

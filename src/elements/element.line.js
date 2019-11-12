@@ -1,12 +1,12 @@
 'use strict';
 
-var defaults = require('../core/core.defaults');
-var Element = require('../core/core.element');
-var helpers = require('../helpers/index');
+const defaults = require('../core/core.defaults');
+const Element = require('../core/core.element');
+const helpers = require('../helpers/index');
 
-var valueOrDefault = helpers.valueOrDefault;
+const valueOrDefault = helpers.valueOrDefault;
 
-var defaultColor = defaults.global.defaultColor;
+const defaultColor = defaults.global.defaultColor;
 
 defaults._set('global', {
 	elements: {
@@ -25,15 +25,18 @@ defaults._set('global', {
 	}
 });
 
-module.exports = Element.extend({
-	_type: 'line',
+class Line extends Element {
 
-	draw: function() {
+	constructor(props) {
+		super(props);
+	}
+
+	draw() {
 		var me = this;
 		var vm = me._view;
 		var ctx = me._ctx;
 		var spanGaps = vm.spanGaps;
-		var points = me._children.slice(); // clone array
+		var points = me._children;
 		var globalDefaults = defaults.global;
 		var globalOptionLineElements = globalDefaults.elements.line;
 		var lastDrawnIndex = -1;
@@ -45,6 +48,7 @@ module.exports = Element.extend({
 		}
 
 		if (me._loop) {
+			points = points.slice(); // clone array
 			for (index = 0; index < points.length; ++index) {
 				previous = helpers.previousItem(points, index);
 				// If the line has an open path, shift the point array
@@ -108,4 +112,8 @@ module.exports = Element.extend({
 		ctx.stroke();
 		ctx.restore();
 	}
-});
+}
+
+Line.prototype._type = 'line';
+
+module.exports = Line;

@@ -14,7 +14,7 @@ defaults._set('line', {
 	spanGaps: false,
 
 	hover: {
-		mode: 'label'
+		mode: 'index'
 	},
 
 	scales: {
@@ -82,13 +82,6 @@ module.exports = DatasetController.extend({
 
 		// Update Line
 		if (showLine) {
-			// Compatibility: If the properties are defined with only the old name, use those values
-			if (config.tension !== undefined && config.lineTension === undefined) {
-				config.lineTension = config.tension;
-			}
-
-			// Utility
-			line._datasetIndex = me.index;
 			// Data
 			line._children = points;
 			// Model
@@ -108,28 +101,24 @@ module.exports = DatasetController.extend({
 
 		// Now pivot the point for animation
 		for (i = 0, ilen = points.length; i < ilen; ++i) {
-			points[i].pivot();
+			points[i].pivot(me.chart._animationsDisabled);
 		}
 	},
 
 	updateElement: function(point, index, reset) {
 		var me = this;
 		var meta = me.getMeta();
-		var dataset = me.getDataset();
-		var datasetIndex = me.index;
-		var value = dataset.data[index];
+		var xScale = me._xScale;
+		var yScale = me._yScale;
 		var lineModel = meta.dataset._model;
-		var x, y;
-
+		var stacked = meta._stacked;
+		var parsed = me._getParsed(index);
 		var options = me._resolveDataElementOptions(index);
-
-		x = me._xScale.getPixelForValue(typeof value === 'object' ? value : NaN, index, datasetIndex);
-		y = reset ? me._yScale.getBasePixel() : me.calculatePointY(value, index, datasetIndex);
+		var x = xScale.getPixelForValue(parsed[xScale.id]);
+		var y = reset ? yScale.getBasePixel() : yScale.getPixelForValue(stacked ? me._applyStack(yScale, parsed) : parsed[yScale.id]);
 
 		// Utility
 		point._options = options;
-		point._datasetIndex = datasetIndex;
-		point._index = index;
 
 		// Desired view properties
 		point._model = {
@@ -170,41 +159,20 @@ module.exports = DatasetController.extend({
 		return values;
 	},
 
-	calculatePointY: function(value, index, datasetIndex) {
+	/**
+	 * @private
+	 */
+	_getMaxOverflow: function() {
 		var me = this;
-		var chart = me.chart;
-		var yScale = me._yScale;
-		var sumPos = 0;
-		var sumNeg = 0;
-		var rightValue = +yScale.getRightValue(value);
-		var metasets = chart._getSortedVisibleDatasetMetas();
-		var ilen = metasets.length;
-		var i, ds, dsMeta, stackedRightValue;
-
-		if (yScale.options.stacked) {
-			for (i = 0; i < ilen; ++i) {
-				dsMeta = metasets[i];
-				if (dsMeta.index === datasetIndex) {
-					break;
-				}
-
-				ds = chart.data.datasets[dsMeta.index];
-				if (dsMeta.type === 'line' && dsMeta.yAxisID === yScale.id) {
-					stackedRightValue = +yScale.getRightValue(ds.data[index]);
-					if (stackedRightValue < 0) {
-						sumNeg += stackedRightValue || 0;
-					} else {
-						sumPos += stackedRightValue || 0;
-					}
-				}
-			}
-
-			if (rightValue < 0) {
-				return yScale.getPixelForValue(sumNeg + rightValue);
-			}
-			return yScale.getPixelForValue(sumPos + rightValue);
+		var meta = me._cachedMeta;
+		var data = meta.data || [];
+		if (!data.length) {
+			return false;
 		}
-		return yScale.getPixelForValue(value);
+		var border = me._showLine ? meta.dataset._model.borderWidth : 0;
+		var firstPoint = data[0].size();
+		var lastPoint = data[data.length - 1].size();
+		return Math.max(border, firstPoint, lastPoint) / 2;
 	},
 
 	updateBezierControlPoints: function() {
@@ -270,21 +238,10 @@ module.exports = DatasetController.extend({
 		var area = chart.chartArea;
 		var i = 0;
 		var ilen = points.length;
-		var halfBorderWidth;
 
 		if (me._showLine) {
-			halfBorderWidth = (meta.dataset._model.borderWidth || 0) / 2;
-
-			helpers.canvas.clipArea(chart.ctx, {
-				left: area.left - halfBorderWidth,
-				right: area.right + halfBorderWidth,
-				top: area.top - halfBorderWidth,
-				bottom: area.bottom + halfBorderWidth
-			});
 
 			meta.dataset.draw();
-
-			helpers.canvas.unclipArea(chart.ctx);
 		}
 
 		// Draw the points

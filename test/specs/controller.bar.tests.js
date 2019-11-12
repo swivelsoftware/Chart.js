@@ -746,8 +746,6 @@ describe('Chart.controllers.bar', function() {
 			expect(meta.data[i]._model.base).toBeCloseToPixel(1024);
 			expect(meta.data[i]._model.width).toBeCloseToPixel(46);
 			expect(meta.data[i]._model).toEqual(jasmine.objectContaining({
-				datasetLabel: chart.data.datasets[1].label,
-				label: chart.data.labels[i],
 				backgroundColor: 'red',
 				borderSkipped: 'top',
 				borderColor: 'blue',
@@ -1381,7 +1379,7 @@ describe('Chart.controllers.bar', function() {
 		var meta = chart.getDatasetMeta(1);
 		var bar = meta.data[0];
 
-		meta.controller.setHoverStyle(bar);
+		meta.controller.setHoverStyle(bar, 1, 0);
 		expect(bar._model.backgroundColor).toBe('rgb(230, 0, 0)');
 		expect(bar._model.borderColor).toBe('rgb(0, 0, 230)');
 		expect(bar._model.borderWidth).toBe(2);
@@ -1391,7 +1389,7 @@ describe('Chart.controllers.bar', function() {
 		chart.data.datasets[1].hoverBorderColor = 'rgb(0, 0, 0)';
 		chart.data.datasets[1].hoverBorderWidth = 5;
 
-		meta.controller.setHoverStyle(bar);
+		meta.controller.setHoverStyle(bar, 1, 0);
 		expect(bar._model.backgroundColor).toBe('rgb(128, 128, 128)');
 		expect(bar._model.borderColor).toBe('rgb(0, 0, 0)');
 		expect(bar._model.borderWidth).toBe(5);
@@ -1401,7 +1399,7 @@ describe('Chart.controllers.bar', function() {
 		chart.data.datasets[1].hoverBorderColor = ['rgb(9, 9, 9)', 'rgb(0, 0, 0)'];
 		chart.data.datasets[1].hoverBorderWidth = [2.5, 5];
 
-		meta.controller.setHoverStyle(bar);
+		meta.controller.setHoverStyle(bar, 1, 0);
 		expect(bar._model.backgroundColor).toBe('rgb(255, 255, 255)');
 		expect(bar._model.borderColor).toBe('rgb(9, 9, 9)');
 		expect(bar._model.borderWidth).toBe(2.5);
@@ -1443,7 +1441,7 @@ describe('Chart.controllers.bar', function() {
 		expect(bar._model.backgroundColor).toBe('rgb(128, 128, 128)');
 		expect(bar._model.borderColor).toBe('rgb(15, 15, 15)');
 		expect(bar._model.borderWidth).toBe(3.14);
-		meta.controller.setHoverStyle(bar);
+		meta.controller.setHoverStyle(bar, 1, 0);
 		expect(bar._model.backgroundColor).toBe(helpers.getHoverColor('rgb(128, 128, 128)'));
 		expect(bar._model.borderColor).toBe(helpers.getHoverColor('rgb(15, 15, 15)'));
 		expect(bar._model.borderWidth).toBe(3.14);
@@ -1461,7 +1459,7 @@ describe('Chart.controllers.bar', function() {
 		expect(bar._model.backgroundColor).toBe('rgb(255, 255, 255)');
 		expect(bar._model.borderColor).toBe('rgb(9, 9, 9)');
 		expect(bar._model.borderWidth).toBe(2.5);
-		meta.controller.setHoverStyle(bar);
+		meta.controller.setHoverStyle(bar, 1, 0);
 		expect(bar._model.backgroundColor).toBe(helpers.getHoverColor('rgb(255, 255, 255)'));
 		expect(bar._model.borderColor).toBe(helpers.getHoverColor('rgb(9, 9, 9)'));
 		expect(bar._model.borderWidth).toBe(2.5);

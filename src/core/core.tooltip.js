@@ -1,11 +1,11 @@
 'use strict';
 
-var defaults = require('./core.defaults');
-var Element = require('./core.element');
-var helpers = require('../helpers/index');
+const defaults = require('./core.defaults');
+const Element = require('./core.element');
+const helpers = require('../helpers/index');
 
-var valueOrDefault = helpers.valueOrDefault;
-var getRtlHelper = helpers.rtl.getRtlAdapter;
+const valueOrDefault = helpers.valueOrDefault;
+const getRtlHelper = helpers.rtl.getRtlAdapter;
 
 defaults._set('global', {
 	tooltips: {
@@ -77,7 +77,7 @@ defaults._set('global', {
 			labelColor: function(tooltipItem, chart) {
 				var meta = chart.getDatasetMeta(tooltipItem.datasetIndex);
 				var activeElement = meta.data[tooltipItem.index];
-				var view = activeElement._view;
+				var view = activeElement.$previousStyle || activeElement._view;
 				return {
 					borderColor: view.borderColor,
 					backgroundColor: view.backgroundColor
@@ -117,7 +117,7 @@ var positioners = {
 		var count = 0;
 
 		for (i = 0, len = elements.length; i < len; ++i) {
-			var el = elements[i];
+			var el = elements[i].element;
 			if (el && el.hasValue()) {
 				var pos = el.tooltipPosition();
 				x += pos.x;
@@ -146,7 +146,7 @@ var positioners = {
 		var i, len, nearestElement;
 
 		for (i = 0, len = elements.length; i < len; ++i) {
-			var el = elements[i];
+			var el = elements[i].element;
 			if (el && el.hasValue()) {
 				var center = el.getCenterPoint();
 				var d = helpers.distanceBetweenPoints(eventPosition, center);
@@ -201,19 +201,19 @@ function splitNewlines(str) {
 
 /**
  * Private helper to create a tooltip item model
- * @param element - the chart element (point, arc, bar) to create the tooltip item for
+ * @param item - the chart element (point, arc, bar) to create the tooltip item for
  * @return new tooltip item
  */
-function createTooltipItem(chart, element) {
-	var datasetIndex = element._datasetIndex;
-	var index = element._index;
-	var controller = chart.getDatasetMeta(datasetIndex).controller;
-	var indexScale = controller._getIndexScale();
-	var valueScale = controller._getValueScale();
+function createTooltipItem(chart, item) {
+	const {datasetIndex, element, index} = item;
+	const controller = chart.getDatasetMeta(datasetIndex).controller;
+	const indexScale = controller._getIndexScale();
+	const valueScale = controller._getValueScale();
+	const parsed = controller._getParsed(index);
 
 	return {
-		label: indexScale ? '' + indexScale.getLabelForIndex(index, datasetIndex) : '',
-		value: valueScale ? '' + valueScale.getLabelForIndex(index, datasetIndex) : '',
+		label: indexScale ? '' + indexScale.getLabelForValue(parsed[indexScale.id]) : '',
+		value: valueScale ? '' + valueScale.getLabelForValue(parsed[valueScale.id]) : '',
 		index: index,
 		datasetIndex: datasetIndex,
 		x: element._model.x,
@@ -487,15 +487,32 @@ function getBeforeAfterBodyLines(callback) {
 	return pushOrConcat([], splitNewlines(callback));
 }
 
-var exports = Element.extend({
-	initialize: function() {
-		this._model = getBaseModel(this._options);
-		this._lastActive = [];
-	},
+class Tooltip extends Element {
+	initialize() {
+		var me = this;
+		me._model = getBaseModel(me._options);
+		me._view = {};
+		me._lastActive = [];
+	}
+
+	transition(easingValue) {
+		var me = this;
+		var options = me._options;
+
+		if (me._lastEvent && me._chart.animating) {
+			// Let's react to changes during animation
+			me._active = me._chart.getElementsAtEventForMode(me._lastEvent, options.mode, options);
+			me.update(true);
+			me.pivot();
+			me._lastActive = me.active;
+		}
+
+		Element.prototype.transition.call(me, easingValue);
+	}
 
 	// Get the title
 	// Args are: (tooltipItem, data)
-	getTitle: function() {
+	getTitle() {
 		var me = this;
 		var opts = me._options;
 		var callbacks = opts.callbacks;
@@ -510,15 +527,15 @@ var exports = Element.extend({
 		lines = pushOrConcat(lines, splitNewlines(afterTitle));
 
 		return lines;
-	},
+	}
 
 	// Args are: (tooltipItem, data)
-	getBeforeBody: function() {
+	getBeforeBody() {
 		return getBeforeAfterBodyLines(this._options.callbacks.beforeBody.apply(this, arguments));
-	},
+	}
 
 	// Args are: (tooltipItem, data)
-	getBody: function(tooltipItems, data) {
+	getBody(tooltipItems, data) {
 		var me = this;
 		var callbacks = me._options.callbacks;
 		var bodyItems = [];
@@ -537,16 +554,16 @@ var exports = Element.extend({
 		});
 
 		return bodyItems;
-	},
+	}
 
 	// Args are: (tooltipItem, data)
-	getAfterBody: function() {
+	getAfterBody() {
 		return getBeforeAfterBodyLines(this._options.callbacks.afterBody.apply(this, arguments));
-	},
+	}
 
 	// Get the footer and beforeFooter and afterFooter lines
 	// Args are: (tooltipItem, data)
-	getFooter: function() {
+	getFooter() {
 		var me = this;
 		var callbacks = me._options.callbacks;
 
@@ -560,9 +577,9 @@ var exports = Element.extend({
 		lines = pushOrConcat(lines, splitNewlines(afterFooter));
 
 		return lines;
-	},
+	}
 
-	update: function(changed) {
+	update(changed) {
 		var me = this;
 		var opts = me._options;
 
@@ -672,9 +689,9 @@ var exports = Element.extend({
 		}
 
 		return me;
-	},
+	}
 
-	drawCaret: function(tooltipPoint, size) {
+	drawCaret(tooltipPoint, size) {
 		var ctx = this._chart.ctx;
 		var vm = this._view;
 		var caretPosition = this.getCaretPosition(tooltipPoint, size, vm);
@@ -682,8 +699,9 @@ var exports = Element.extend({
 		ctx.lineTo(caretPosition.x1, caretPosition.y1);
 		ctx.lineTo(caretPosition.x2, caretPosition.y2);
 		ctx.lineTo(caretPosition.x3, caretPosition.y3);
-	},
-	getCaretPosition: function(tooltipPoint, size, vm) {
+	}
+
+	getCaretPosition(tooltipPoint, size, vm) {
 		var x1, x2, x3, y1, y2, y3;
 		var caretSize = vm.caretSize;
 		var cornerRadius = vm.cornerRadius;
@@ -741,9 +759,9 @@ var exports = Element.extend({
 			}
 		}
 		return {x1: x1, x2: x2, x3: x3, y1: y1, y2: y2, y3: y3};
-	},
+	}
 
-	drawTitle: function(pt, vm, ctx) {
+	drawTitle(pt, vm, ctx) {
 		var title = vm.title;
 		var length = title.length;
 		var titleFontSize, titleSpacing, i;
@@ -771,11 +789,9 @@ var exports = Element.extend({
 				}
 			}
 		}
-	},
+	}
 
-	drawBody: function(pt, vm, ctx) {
-		var me = this;
-		var ci = me._chart;
+	drawBody(pt, vm, ctx) {
 		var bodyFontSize = vm.bodyFontSize;
 		var bodySpacing = vm.bodySpacing;
 		var bodyAlign = vm._bodyAlign;
@@ -874,9 +890,9 @@ var exports = Element.extend({
 		// After body lines
 		helpers.each(vm.afterBody, fillLineOfText);
 		pt.y -= bodySpacing; // Remove last body spacing
-	},
+	}
 
-	drawFooter: function(pt, vm, ctx) {
+	drawFooter(pt, vm, ctx) {
 		var footer = vm.footer;
 		var length = footer.length;
 		var footerFontSize, i;
@@ -900,9 +916,9 @@ var exports = Element.extend({
 				pt.y += footerFontSize + vm.footerSpacing;
 			}
 		}
-	},
+	}
 
-	drawBackground: function(pt, vm, ctx, tooltipSize) {
+	drawBackground(pt, vm, ctx, tooltipSize) {
 		ctx.fillStyle = vm.backgroundColor;
 		ctx.strokeStyle = vm.borderColor;
 		ctx.lineWidth = vm.borderWidth;
@@ -943,9 +959,9 @@ var exports = Element.extend({
 		if (vm.borderWidth > 0) {
 			ctx.stroke();
 		}
-	},
+	}
 
-	draw: function() {
+	draw() {
 		var ctx = this._chart.ctx;
 		var vm = this._view;
 
@@ -993,7 +1009,7 @@ var exports = Element.extend({
 
 			ctx.restore();
 		}
-	},
+	}
 
 	/**
 	 * Handle an event
@@ -1001,7 +1017,7 @@ var exports = Element.extend({
 	 * @param {IEvent} event - The event to handle
 	 * @returns {boolean} true if the tooltip changed
 	 */
-	handleEvent: function(e) {
+	handleEvent(e) {
 		var me = this;
 		var options = me._options;
 		var changed = false;
@@ -1011,15 +1027,19 @@ var exports = Element.extend({
 		// Find Active Elements for tooltips
 		if (e.type === 'mouseout') {
 			me._active = [];
+			me._lastEvent = null;
 		} else {
 			me._active = me._chart.getElementsAtEventForMode(e, options.mode, options);
+			if (e.type !== 'click') {
+				me._lastEvent = e.type === 'click' ? null : e;
+			}
 			if (options.reverse) {
 				me._active.reverse();
 			}
 		}
 
 		// Remember Last Actives
-		changed = !helpers.arrayEquals(me._active, me._lastActive);
+		changed = !helpers._elementsEqual(me._active, me._lastActive);
 
 		// Only handle target event on tooltip change
 		if (changed) {
@@ -1038,11 +1058,11 @@ var exports = Element.extend({
 
 		return changed;
 	}
-});
+}
 
 /**
  * @namespace Chart.Tooltip.positioners
  */
-exports.positioners = positioners;
+Tooltip.positioners = positioners;
 
-module.exports = exports;
+module.exports = Tooltip;

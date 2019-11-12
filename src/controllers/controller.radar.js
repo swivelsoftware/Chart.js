@@ -24,8 +24,6 @@ module.exports = DatasetController.extend({
 
 	dataElementType: elements.Point,
 
-	linkScales: helpers.noop,
-
 	/**
 	 * @private
 	 */
@@ -77,6 +75,7 @@ module.exports = DatasetController.extend({
 		var line = meta.dataset;
 		var points = meta.data || [];
 		var config = me._config;
+		var animationsDisabled = me.chart._animationsDisabled;
 		var i, ilen;
 
 		// Compatibility: If the properties are defined with only the old name, use those values
@@ -84,15 +83,13 @@ module.exports = DatasetController.extend({
 			config.lineTension = config.tension;
 		}
 
-		// Utility
-		line._datasetIndex = me.index;
 		// Data
 		line._children = points;
 		line._loop = true;
 		// Model
 		line._model = me._resolveDatasetElementOptions();
 
-		line.pivot();
+		line.pivot(animationsDisabled);
 
 		// Update Points
 		for (i = 0, ilen = points.length; i < ilen; ++i) {
@@ -104,7 +101,7 @@ module.exports = DatasetController.extend({
 
 		// Now pivot the point for animation
 		for (i = 0, ilen = points.length; i < ilen; ++i) {
-			points[i].pivot();
+			points[i].pivot(animationsDisabled);
 		}
 	},
 
@@ -120,8 +117,6 @@ module.exports = DatasetController.extend({
 
 		// Utility
 		point._options = options;
-		point._datasetIndex = me.index;
-		point._index = index;
 
 		// Desired view properties
 		point._model = {

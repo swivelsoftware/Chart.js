@@ -116,6 +116,14 @@ function initConfig(config) {
 	return config;
 }
 
+function isAnimationDisabled(config) {
+	return !config.animation || !(
+		config.animation.duration ||
+		(config.hover && config.hover.animationDuration) ||
+		config.responsiveAnimationDuration
+	);
+}
+
 function updateConfig(chart) {
 	var newOptions = chart.options;
 
@@ -129,6 +137,7 @@ function updateConfig(chart) {
 		newOptions);
 
 	chart.options = chart.config.options = newOptions;
+	chart._animationsDisabled = isAnimationDisabled(newOptions);
 	chart.ensureScalesHaveIDs();
 	chart.buildOrUpdateScales();
 
@@ -449,7 +458,7 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 	},
 
 	/**
-	* Resets the chart back to it's state before the initial animation
+	* Resets the chart back to its state before the initial animation
 	*/
 	reset: function() {
 		this.resetElements();
@@ -460,13 +469,7 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 		var me = this;
 		var i, ilen;
 
-		if (!config || typeof config !== 'object') {
-			// backwards compatibility
-			config = {
-				duration: config,
-				lazy: arguments[1]
-			};
-		}
+		config = config || {};
 
 		updateConfig(me);
 
@@ -504,8 +507,7 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 		// after update.
 		me.tooltip.initialize();
 
-		// Last active contains items that were previously in the tooltip.
-		// When we reset the tooltip, we need to clear it
+		// Last active contains items that were previously hovered.
 		me.lastActive = [];
 
 		// Do this before render so that any plugins that need final scale updates can use it
@@ -521,6 +523,11 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 			};
 		} else {
 			me.render(config);
+		}
+
+		// Replay last event from before update
+		if (me._lastEvent) {
+			me.eventHandler(me._lastEvent);
 		}
 	},
 
@@ -626,11 +633,10 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 				easing: config.easing || animationOptions.easing,
 
 				render: function(chart, animationObject) {
-					var easingFunction = helpers.easing.effects[animationObject.easing];
-					var currentStep = animationObject.currentStep;
-					var stepDecimal = currentStep / animationObject.numSteps;
+					const easingFunction = helpers.easing.effects[animationObject.easing];
+					const stepDecimal = animationObject.currentStep / animationObject.numSteps;
 
-					chart.draw(easingFunction(stepDecimal), stepDecimal, currentStep);
+					chart.draw(easingFunction(stepDecimal));
 				},
 
 				onAnimationProgress: animationOptions.onProgress,
@@ -693,14 +699,22 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 	 */
 	transition: function(easingValue) {
 		var me = this;
+		var i, ilen;
 
-		for (var i = 0, ilen = (me.data.datasets || []).length; i < ilen; ++i) {
-			if (me.isDatasetVisible(i)) {
-				me.getDatasetMeta(i).controller.transition(easingValue);
+		if (!me._animationsDisabled) {
+			for (i = 0, ilen = (me.data.datasets || []).length; i < ilen; ++i) {
+				if (me.isDatasetVisible(i)) {
+					me.getDatasetMeta(i).controller.transition(easingValue);
+				}
 			}
 		}
 
 		me.tooltip.transition(easingValue);
+
+		if (me._lastEvent && me.animating) {
+			// If, during animation, element under mouse changes, let's react to that.
+			me.handleEvent(me._lastEvent);
+		}
 	},
 
 	/**
@@ -758,6 +772,10 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 	 */
 	drawDataset: function(meta, easingValue) {
 		var me = this;
+		var ctx = me.ctx;
+		var clip = meta._clip;
+		var canvas = me.canvas;
+		var area = me.chartArea;
 		var args = {
 			meta: meta,
 			index: meta.index,
@@ -768,7 +786,16 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 			return;
 		}
 
+		helpers.canvas.clipArea(ctx, {
+			left: clip.left === false ? 0 : area.left - clip.left,
+			right: clip.right === false ? canvas.width : area.right + clip.right,
+			top: clip.top === false ? 0 : area.top - clip.top,
+			bottom: clip.bottom === false ? canvas.height : area.bottom + clip.bottom
+		});
+
 		meta.controller.draw(easingValue);
+
+		helpers.canvas.unclipArea(ctx);
 
 		plugins.notify(me, 'afterDatasetDraw', [args]);
 	},
@@ -800,15 +827,15 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 	 * @return An object containing the dataset index and element index of the matching element. Also contains the rectangle that was draw
 	 */
 	getElementAtEvent: function(e) {
-		return Interaction.modes.single(this, e);
+		return Interaction.modes.nearest(this, e, {intersect: true});
 	},
 
 	getElementsAtEvent: function(e) {
-		return Interaction.modes.label(this, e, {intersect: true});
+		return Interaction.modes.index(this, e, {intersect: true});
 	},
 
 	getElementsAtXAxis: function(e) {
-		return Interaction.modes['x-axis'](this, e, {intersect: true});
+		return Interaction.modes.index(this, e, {intersect: false});
 	},
 
 	getElementsAtEventForMode: function(e, mode, options) {
@@ -966,19 +993,43 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 		});
 	},
 
-	updateHoverStyle: function(elements, mode, enabled) {
+	updateHoverStyle: function(items, mode, enabled) {
 		var prefix = enabled ? 'set' : 'remove';
-		var element, i, ilen;
-
-		for (i = 0, ilen = elements.length; i < ilen; ++i) {
-			element = elements[i];
-			if (element) {
-				this.getDatasetMeta(element._datasetIndex).controller[prefix + 'HoverStyle'](element);
-			}
-		}
+		var meta, item, i, ilen;
 
 		if (mode === 'dataset') {
-			this.getDatasetMeta(elements[0]._datasetIndex).controller['_' + prefix + 'DatasetHoverStyle']();
+			meta = this.getDatasetMeta(items[0].datasetIndex);
+			meta.controller['_' + prefix + 'DatasetHoverStyle']();
+			for (i = 0, ilen = meta.data.length; i < ilen; ++i) {
+				meta.controller[prefix + 'HoverStyle'](meta.data[i], items[0].datasetIndex, i);
+			}
+			return;
+		}
+
+		for (i = 0, ilen = items.length; i < ilen; ++i) {
+			item = items[i];
+			if (item) {
+				this.getDatasetMeta(item.datasetIndex).controller[prefix + 'HoverStyle'](item.element, item.datasetIndex, item.index);
+			}
+		}
+	},
+
+	/**
+	 * @private
+	 */
+	_updateHoverStyles: function() {
+		var me = this;
+		var options = me.options || {};
+		var hoverOptions = options.hover;
+
+		// Remove styling for last active (even if it may still be active)
+		if (me.lastActive.length) {
+			me.updateHoverStyle(me.lastActive, hoverOptions.mode, false);
+		}
+
+		// Built-in hover styling
+		if (me.active.length && hoverOptions.mode) {
+			me.updateHoverStyle(me.active, hoverOptions.mode, true);
 		}
 	},
 
@@ -1049,8 +1100,10 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 		// Find Active Elements for hover and tooltips
 		if (e.type === 'mouseout') {
 			me.active = [];
+			me._lastEvent = null;
 		} else {
 			me.active = me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions);
+			me._lastEvent = e.type === 'click' ? null : e;
 		}
 
 		// Invoke onHover hook
@@ -1064,17 +1117,8 @@ helpers.extend(Chart.prototype, /** @lends Chart */ {
 			}
 		}
 
-		// Remove styling for last active (even if it may still be active)
-		if (me.lastActive.length) {
-			me.updateHoverStyle(me.lastActive, hoverOptions.mode, false);
-		}
-
-		// Built in hover styling
-		if (me.active.length && hoverOptions.mode) {
-			me.updateHoverStyle(me.active, hoverOptions.mode, true);
-		}
-
-		changed = !helpers.arrayEquals(me.active, me.lastActive);
+		me._updateHoverStyles();
+		changed = !helpers._elementsEqual(me.active, me.lastActive);
 
 		// Remember Last Actives
 		me.lastActive = me.active;

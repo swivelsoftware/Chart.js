@@ -1,7 +1,7 @@
 'use strict';
 
-var color = require('chartjs-color');
-var helpers = require('../helpers/index');
+const color = require('chartjs-color');
+const helpers = require('../helpers/index');
 
 function interpolate(start, view, model, ease) {
 	var keys = Object.keys(model);
@@ -14,7 +14,7 @@ function interpolate(start, view, model, ease) {
 
 		// if a value is added to the model after pivot() has been called, the view
 		// doesn't contain it, so let's initialize the view to the target value.
-		if (!view.hasOwnProperty(key)) {
+		if (!Object.prototype.hasOwnProperty.call(view, key)) {
 			view[key] = target;
 		}
 
@@ -24,7 +24,7 @@ function interpolate(start, view, model, ease) {
 			continue;
 		}
 
-		if (!start.hasOwnProperty(key)) {
+		if (!Object.prototype.hasOwnProperty.call(start, key)) {
 			start[key] = actual;
 		}
 
@@ -52,28 +52,33 @@ function interpolate(start, view, model, ease) {
 	}
 }
 
-var Element = function(configuration) {
-	helpers.extend(this, configuration);
-	this.initialize.apply(this, arguments);
-};
+class Element {
 
-helpers.extend(Element.prototype, {
-	_type: undefined,
+	constructor(configuration) {
+		helpers.extend(this, configuration);
 
-	initialize: function() {
-		this.hidden = false;
-	},
+		// this.hidden = false; we assume Element has an attribute called hidden, but do not initialize to save memory
 
-	pivot: function() {
+		this.initialize.apply(this, arguments);
+	}
+
+	initialize() {}
+
+	pivot(animationsDisabled) {
 		var me = this;
+		if (animationsDisabled) {
+			me._view = me._model;
+			return me;
+		}
+
 		if (!me._view) {
 			me._view = helpers.extend({}, me._model);
 		}
 		me._start = {};
 		return me;
-	},
+	}
 
-	transition: function(ease) {
+	transition(ease) {
 		var me = this;
 		var model = me._model;
 		var start = me._start;
@@ -81,6 +86,8 @@ helpers.extend(Element.prototype, {
 
 		// No animation -> No Transition
 		if (!model || ease === 1) {
+			// _model has to be cloned to _view
+			// Otherwise, when _model properties are set on hover, _view.* is also set to the same value, and hover animation doesn't occur
 			me._view = helpers.extend({}, model);
 			me._start = null;
 			return me;
@@ -97,19 +104,19 @@ helpers.extend(Element.prototype, {
 		interpolate(start, view, model, ease);
 
 		return me;
-	},
+	}
 
-	tooltipPosition: function() {
+	tooltipPosition() {
 		return {
 			x: this._model.x,
 			y: this._model.y
 		};
-	},
+	}
 
-	hasValue: function() {
+	hasValue() {
 		return helpers.isNumber(this._model.x) && helpers.isNumber(this._model.y);
 	}
-});
+}
 
 Element.extend = helpers.inherits;
 

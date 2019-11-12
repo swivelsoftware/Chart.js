@@ -3,6 +3,7 @@
 var defaults = require('../core/core.defaults');
 var helpers = require('../helpers/index');
 var Scale = require('../core/core.scale');
+var LinearScaleBase = require('./scale.linearbase');
 var Ticks = require('../core/core.ticks');
 
 var valueOrDefault = helpers.valueOrDefault;
@@ -27,7 +28,7 @@ function generateTicks(generationOptions, dataRange) {
 		exp = Math.floor(log10(dataRange.minNotZero));
 		significand = Math.floor(dataRange.minNotZero / Math.pow(10, exp));
 
-		ticks.push(tickVal);
+		ticks.push({value: tickVal});
 		tickVal = significand * Math.pow(10, exp);
 	} else {
 		exp = Math.floor(log10(tickVal));
@@ -36,7 +37,7 @@ function generateTicks(generationOptions, dataRange) {
 	var precision = exp < 0 ? Math.pow(10, Math.abs(exp)) : 1;
 
 	do {
-		ticks.push(tickVal);
+		ticks.push({value: tickVal});
 
 		++significand;
 		if (significand === 10) {
@@ -49,7 +50,7 @@ function generateTicks(generationOptions, dataRange) {
 	} while (exp < endExp || (exp === endExp && significand < endSignificand));
 
 	var lastTick = valueOrDefault(generationOptions.max, tickVal);
-	ticks.push(lastTick);
+	ticks.push({value: lastTick});
 
 	return ticks;
 }
@@ -69,103 +70,20 @@ function nonNegativeOrDefault(value, defaultValue) {
 }
 
 module.exports = Scale.extend({
+	_parse: LinearScaleBase.prototype._parse,
+
 	determineDataLimits: function() {
 		var me = this;
-		var opts = me.options;
-		var chart = me.chart;
-		var datasets = chart.data.datasets;
-		var isHorizontal = me.isHorizontal();
-		function IDMatches(meta) {
-			return isHorizontal ? meta.xAxisID === me.id : meta.yAxisID === me.id;
-		}
-		var datasetIndex, meta, value, data, i, ilen;
+		var minmax = me._getMinMax(true);
+		var min = minmax.min;
+		var max = minmax.max;
+		var minPositive = minmax.minPositive;
 
-		// Calculate Range
-		me.min = Number.POSITIVE_INFINITY;
-		me.max = Number.NEGATIVE_INFINITY;
-		me.minNotZero = Number.POSITIVE_INFINITY;
+		me.min = helpers.isFinite(min) ? Math.max(0, min) : null;
+		me.max = helpers.isFinite(max) ? Math.max(0, max) : null;
+		me.minNotZero = helpers.isFinite(minPositive) ? minPositive : null;
 
-		var hasStacks = opts.stacked;
-		if (hasStacks === undefined) {
-			for (datasetIndex = 0; datasetIndex < datasets.length; datasetIndex++) {
-				meta = chart.getDatasetMeta(datasetIndex);
-				if (chart.isDatasetVisible(datasetIndex) && IDMatches(meta) &&
-					meta.stack !== undefined) {
-					hasStacks = true;
-					break;
-				}
-			}
-		}
-
-		if (opts.stacked || hasStacks) {
-			var valuesPerStack = {};
-
-			for (datasetIndex = 0; datasetIndex < datasets.length; datasetIndex++) {
-				meta = chart.getDatasetMeta(datasetIndex);
-				var key = [
-					meta.type,
-					// we have a separate stack for stack=undefined datasets when the opts.stacked is undefined
-					((opts.stacked === undefined && meta.stack === undefined) ? datasetIndex : ''),
-					meta.stack
-				].join('.');
-
-				if (chart.isDatasetVisible(datasetIndex) && IDMatches(meta)) {
-					if (valuesPerStack[key] === undefined) {
-						valuesPerStack[key] = [];
-					}
-
-					data = datasets[datasetIndex].data;
-					for (i = 0, ilen = data.length; i < ilen; i++) {
-						var values = valuesPerStack[key];
-						value = me._parseValue(data[i]);
-						// invalid, hidden and negative values are ignored
-						if (isNaN(value.min) || isNaN(value.max) || meta.data[i].hidden || value.min < 0 || value.max < 0) {
-							continue;
-						}
-						values[i] = values[i] || 0;
-						values[i] += value.max;
-					}
-				}
-			}
-
-			helpers.each(valuesPerStack, function(valuesForType) {
-				if (valuesForType.length > 0) {
-					var minVal = helpers.min(valuesForType);
-					var maxVal = helpers.max(valuesForType);
-					me.min = Math.min(me.min, minVal);
-					me.max = Math.max(me.max, maxVal);
-				}
-			});
-
-		} else {
-			for (datasetIndex = 0; datasetIndex < datasets.length; datasetIndex++) {
-				meta = chart.getDatasetMeta(datasetIndex);
-				if (chart.isDatasetVisible(datasetIndex) && IDMatches(meta)) {
-					data = datasets[datasetIndex].data;
-					for (i = 0, ilen = data.length; i < ilen; i++) {
-						value = me._parseValue(data[i]);
-						// invalid, hidden and negative values are ignored
-						if (isNaN(value.min) || isNaN(value.max) || meta.data[i].hidden || value.min < 0 || value.max < 0) {
-							continue;
-						}
-
-						me.min = Math.min(value.min, me.min);
-						me.max = Math.max(value.max, me.max);
-
-						if (value.min !== 0) {
-							me.minNotZero = Math.min(value.min, me.minNotZero);
-						}
-					}
-				}
-			}
-		}
-
-		me.min = helpers.isFinite(me.min) ? me.min : null;
-		me.max = helpers.isFinite(me.max) ? me.max : null;
-		me.minNotZero = helpers.isFinite(me.minNotZero) ? me.minNotZero : null;
-
-		// Common base implementation to handle ticks.min, ticks.max
-		this.handleTickRangeOptions();
+		me.handleTickRangeOptions();
 	},
 
 	handleTickRangeOptions: function() {
@@ -214,12 +132,11 @@ module.exports = Scale.extend({
 			min: nonNegativeOrDefault(tickOpts.min),
 			max: nonNegativeOrDefault(tickOpts.max)
 		};
-		var ticks = me.ticks = generateTicks(generationOptions, me);
+		var ticks = generateTicks(generationOptions, me);
 
 		// At this point, we need to update our max and min given the tick values since we have expanded the
 		// range of the scale
-		me.max = helpers.max(ticks);
-		me.min = helpers.min(ticks);
+		helpers._setMinAndMaxByKey(ticks, me, 'value');
 
 		if (tickOpts.reverse) {
 			reverse = !reverse;
@@ -232,21 +149,17 @@ module.exports = Scale.extend({
 		if (reverse) {
 			ticks.reverse();
 		}
+		return ticks;
 	},
 
-	convertTicksToLabels: function() {
-		this.tickValues = this.ticks.slice();
+	generateTickLabels: function(ticks) {
+		this._tickValues = ticks.map(t => t.value);
 
-		Scale.prototype.convertTicksToLabels.call(this);
-	},
-
-	// Get the correct tooltip label
-	getLabelForIndex: function(index, datasetIndex) {
-		return this._getScaleLabel(this.chart.data.datasets[datasetIndex].data[index]);
+		return Scale.prototype.generateTickLabels.call(this, ticks);
 	},
 
 	getPixelForTick: function(index) {
-		var ticks = this.tickValues;
+		var ticks = this._tickValues;
 		if (index < 0 || index > ticks.length - 1) {
 			return null;
 		}
@@ -286,8 +199,6 @@ module.exports = Scale.extend({
 	getPixelForValue: function(value) {
 		var me = this;
 		var decimal = 0;
-
-		value = +me.getRightValue(value);
 
 		if (value > me.min && value > 0) {
 			decimal = (log10(value) - me._startValue) / me._valueRange + me._valueOffset;

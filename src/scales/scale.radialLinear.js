@@ -305,28 +305,12 @@ module.exports = LinearScaleBase.extend({
 
 	determineDataLimits: function() {
 		var me = this;
-		var chart = me.chart;
-		var min = Number.POSITIVE_INFINITY;
-		var max = Number.NEGATIVE_INFINITY;
+		var minmax = me._getMinMax(false);
+		var min = minmax.min;
+		var max = minmax.max;
 
-		helpers.each(chart.data.datasets, function(dataset, datasetIndex) {
-			if (chart.isDatasetVisible(datasetIndex)) {
-				var meta = chart.getDatasetMeta(datasetIndex);
-
-				helpers.each(dataset.data, function(rawValue, index) {
-					var value = +me.getRightValue(rawValue);
-					if (isNaN(value) || meta.data[index].hidden) {
-						return;
-					}
-
-					min = Math.min(value, min);
-					max = Math.max(value, max);
-				});
-			}
-		});
-
-		me.min = (min === Number.POSITIVE_INFINITY ? 0 : min);
-		me.max = (max === Number.NEGATIVE_INFINITY ? 0 : max);
+		me.min = helpers.isFinite(min) && !isNaN(min) ? min : 0;
+		me.max = helpers.isFinite(max) && !isNaN(max) ? max : 0;
 
 		// Common base implementation to handle ticks.min, ticks.max, ticks.beginAtZero
 		me.handleTickRangeOptions();
@@ -337,20 +321,16 @@ module.exports = LinearScaleBase.extend({
 		return Math.ceil(this.drawingArea / getTickBackdropHeight(this.options));
 	},
 
-	convertTicksToLabels: function() {
+	generateTickLabels: function(ticks) {
 		var me = this;
 
-		LinearScaleBase.prototype.convertTicksToLabels.call(me);
+		LinearScaleBase.prototype.generateTickLabels.call(me, ticks);
 
 		// Point labels
 		me.pointLabels = me.chart.data.labels.map(function() {
 			var label = helpers.callback(me.options.pointLabels.callback, arguments, me);
 			return label || label === 0 ? label : '';
 		});
-	},
-
-	getLabelForIndex: function(index, datasetIndex) {
-		return +this.getRightValue(this.chart.data.datasets[datasetIndex].data[index]);
 	},
 
 	fit: function() {
@@ -467,9 +447,9 @@ module.exports = LinearScaleBase.extend({
 		}
 
 		if (gridLineOpts.display) {
-			helpers.each(me.ticks, function(label, index) {
+			helpers.each(me.ticks, function(tick, index) {
 				if (index !== 0) {
-					offset = me.getDistanceFromCenterForValue(me.ticksAsNumbers[index]);
+					offset = me.getDistanceFromCenterForValue(me._tickValues[index]);
 					drawRadiusLine(me, gridLineOpts, offset, index);
 				}
 			});
@@ -522,15 +502,15 @@ module.exports = LinearScaleBase.extend({
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
 
-		helpers.each(me.ticks, function(label, index) {
+		helpers.each(me.ticks, function(tick, index) {
 			if (index === 0 && !tickOpts.reverse) {
 				return;
 			}
 
-			offset = me.getDistanceFromCenterForValue(me.ticksAsNumbers[index]);
+			offset = me.getDistanceFromCenterForValue(me._tickValues[index]);
 
 			if (tickOpts.showLabelBackdrop) {
-				width = ctx.measureText(label).width;
+				width = ctx.measureText(tick.label).width;
 				ctx.fillStyle = tickOpts.backdropColor;
 
 				ctx.fillRect(
@@ -542,7 +522,7 @@ module.exports = LinearScaleBase.extend({
 			}
 
 			ctx.fillStyle = tickFontColor;
-			ctx.fillText(label, 0, -offset);
+			ctx.fillText(tick.label, 0, -offset);
 		});
 
 		ctx.restore();

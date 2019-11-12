@@ -11,108 +11,22 @@ var defaultConfig = {
 	}
 };
 
-var DEFAULT_MIN = 0;
-var DEFAULT_MAX = 1;
-
-function getOrCreateStack(stacks, stacked, meta) {
-	var key = [
-		meta.type,
-		// we have a separate stack for stack=undefined datasets when the opts.stacked is undefined
-		stacked === undefined && meta.stack === undefined ? meta.index : '',
-		meta.stack
-	].join('.');
-
-	if (stacks[key] === undefined) {
-		stacks[key] = {
-			pos: [],
-			neg: []
-		};
-	}
-
-	return stacks[key];
-}
-
-function stackData(scale, stacks, meta, data) {
-	var opts = scale.options;
-	var stacked = opts.stacked;
-	var stack = getOrCreateStack(stacks, stacked, meta);
-	var pos = stack.pos;
-	var neg = stack.neg;
-	var ilen = data.length;
-	var i, value;
-
-	for (i = 0; i < ilen; ++i) {
-		value = scale._parseValue(data[i]);
-		if (isNaN(value.min) || isNaN(value.max) || meta.data[i].hidden) {
-			continue;
-		}
-
-		pos[i] = pos[i] || 0;
-		neg[i] = neg[i] || 0;
-
-		if (value.min < 0 || value.max < 0) {
-			neg[i] += value.min;
-		} else {
-			pos[i] += value.max;
-		}
-	}
-}
-
-function updateMinMax(scale, meta, data) {
-	var ilen = data.length;
-	var i, value;
-
-	for (i = 0; i < ilen; ++i) {
-		value = scale._parseValue(data[i]);
-		if (isNaN(value.min) || isNaN(value.max) || meta.data[i].hidden) {
-			continue;
-		}
-
-		scale.min = Math.min(scale.min, value.min);
-		scale.max = Math.max(scale.max, value.max);
-	}
-}
-
 module.exports = LinearScaleBase.extend({
 	determineDataLimits: function() {
 		var me = this;
-		var opts = me.options;
-		var chart = me.chart;
-		var datasets = chart.data.datasets;
-		var metasets = me._getMatchingVisibleMetas();
-		var hasStacks = opts.stacked;
-		var stacks = {};
-		var ilen = metasets.length;
-		var i, meta, data, values;
+		var DEFAULT_MIN = 0;
+		var DEFAULT_MAX = 1;
+		var minmax = me._getMinMax(true);
+		var min = minmax.min;
+		var max = minmax.max;
 
-		me.min = Number.POSITIVE_INFINITY;
-		me.max = Number.NEGATIVE_INFINITY;
+		me.min = helpers.isFinite(min) && !isNaN(min) ? min : DEFAULT_MIN;
+		me.max = helpers.isFinite(max) && !isNaN(max) ? max : DEFAULT_MAX;
 
-		if (hasStacks === undefined) {
-			for (i = 0; !hasStacks && i < ilen; ++i) {
-				meta = metasets[i];
-				hasStacks = meta.stack !== undefined;
-			}
+		// Backward compatible inconsistent min for stacked
+		if (me.options.stacked && min > 0) {
+			me.min = 0;
 		}
-
-		for (i = 0; i < ilen; ++i) {
-			meta = metasets[i];
-			data = datasets[meta.index].data;
-			if (hasStacks) {
-				stackData(me, stacks, meta, data);
-			} else {
-				updateMinMax(me, meta, data);
-			}
-		}
-
-		helpers.each(stacks, function(stackValues) {
-			values = stackValues.pos.concat(stackValues.neg);
-			me.min = Math.min(me.min, helpers.min(values));
-			me.max = Math.max(me.max, helpers.max(values));
-		});
-
-		me.min = helpers.isFinite(me.min) && !isNaN(me.min) ? me.min : DEFAULT_MIN;
-		me.max = helpers.isFinite(me.max) && !isNaN(me.max) ? me.max : DEFAULT_MAX;
 
 		// Common base implementation to handle ticks.min, ticks.max, ticks.beginAtZero
 		me.handleTickRangeOptions();
@@ -130,22 +44,19 @@ module.exports = LinearScaleBase.extend({
 		return Math.ceil(me.height / tickFont.lineHeight);
 	},
 
-	// Called after the ticks are built. We need
-	handleDirectionalChanges: function() {
-		if (!this.isHorizontal()) {
-			// We are in a vertical orientation. The top value is the highest. So reverse the array
-			this.ticks.reverse();
-		}
-	},
-
-	getLabelForIndex: function(index, datasetIndex) {
-		return this._getScaleLabel(this.chart.data.datasets[datasetIndex].data[index]);
+	/**
+	 * Called after the ticks are built
+	 * @private
+	 */
+	_handleDirectionalChanges: function(ticks) {
+		// If we are in a vertical orientation the top value is the highest so reverse the array
+		return this.isHorizontal() ? ticks : ticks.reverse();
 	},
 
 	// Utils
 	getPixelForValue: function(value) {
 		var me = this;
-		return me.getPixelForDecimal((+me.getRightValue(value) - me._startValue) / me._valueRange);
+		return me.getPixelForDecimal((value - me._startValue) / me._valueRange);
 	},
 
 	getValueForPixel: function(pixel) {
@@ -153,7 +64,7 @@ module.exports = LinearScaleBase.extend({
 	},
 
 	getPixelForTick: function(index) {
-		var ticks = this.ticksAsNumbers;
+		var ticks = this._tickValues;
 		if (index < 0 || index > ticks.length - 1) {
 			return null;
 		}

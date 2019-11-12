@@ -48,6 +48,53 @@ function listenArrayEvents(array, listener) {
 	});
 }
 
+
+function scaleClip(scale, allowedOverflow) {
+	var tickOpts = scale && scale.options.ticks || {};
+	var reverse = tickOpts.reverse;
+	var min = tickOpts.min === undefined ? allowedOverflow : 0;
+	var max = tickOpts.max === undefined ? allowedOverflow : 0;
+	return {
+		start: reverse ? max : min,
+		end: reverse ? min : max
+	};
+}
+
+function defaultClip(xScale, yScale, allowedOverflow) {
+	if (allowedOverflow === false) {
+		return false;
+	}
+	var x = scaleClip(xScale, allowedOverflow);
+	var y = scaleClip(yScale, allowedOverflow);
+
+	return {
+		top: y.end,
+		right: x.end,
+		bottom: y.start,
+		left: x.start
+	};
+}
+
+function toClip(value) {
+	var t, r, b, l;
+
+	if (helpers.isObject(value)) {
+		t = value.top;
+		r = value.right;
+		b = value.bottom;
+		l = value.left;
+	} else {
+		t = r = b = l = value;
+	}
+
+	return {
+		top: t,
+		right: r,
+		bottom: b,
+		left: l
+	};
+}
+
 /**
  * Removes the given array event listener and cleanup extra attached properties (such as
  * the _chartjs stub and overridden methods) if array doesn't have any more listeners.
@@ -73,6 +120,69 @@ function unlistenArrayEvents(array, listener) {
 	});
 
 	delete array._chartjs;
+}
+
+function getSortedDatasetIndices(chart, filterVisible) {
+	var keys = [];
+	var metasets = chart._getSortedDatasetMetas(filterVisible);
+	var i, ilen;
+
+	for (i = 0, ilen = metasets.length; i < ilen; ++i) {
+		keys.push(metasets[i].index);
+	}
+	return keys;
+}
+
+function applyStack(stack, value, dsIndex, allOther) {
+	var keys = stack.keys;
+	var i, ilen, datasetIndex, otherValue;
+
+	for (i = 0, ilen = keys.length; i < ilen; ++i) {
+		datasetIndex = +keys[i];
+		if (datasetIndex === dsIndex) {
+			if (allOther) {
+				continue;
+			}
+			break;
+		}
+		otherValue = stack.values[datasetIndex];
+		if (!isNaN(otherValue) && (value === 0 || Math.sign(value) === Math.sign(otherValue))) {
+			value += otherValue;
+		}
+	}
+	return value;
+}
+
+function convertObjectDataToArray(data) {
+	var keys = Object.keys(data);
+	var adata = [];
+	var i, ilen, key;
+	for (i = 0, ilen = keys.length; i < ilen; ++i) {
+		key = keys[i];
+		adata.push({
+			x: key,
+			y: data[key]
+		});
+	}
+	return adata;
+}
+
+function isStacked(scale, meta) {
+	var stacked = scale && scale.options.stacked;
+	return stacked || (stacked === undefined && meta.stack !== undefined);
+}
+
+function getStackKey(xScale, yScale, meta) {
+	return isStacked(yScale, meta) && xScale.id + '.' + yScale.id + '.' + meta.stack + '.' + meta.type;
+}
+
+function getFirstScaleId(chart, axis) {
+	var scalesOpts = chart.options.scales;
+	var scale = chart.options.scale;
+	var scaleId = scale && scale.id;
+	var prop = axis + 'Axes';
+
+	return (scalesOpts && scalesOpts[prop] && scalesOpts[prop].length && scalesOpts[prop][0].id) || scaleId;
 }
 
 // Base class for all dataset controllers (line, bar, etc)
@@ -125,11 +235,14 @@ helpers.extend(DatasetController.prototype, {
 
 	initialize: function(chart, datasetIndex) {
 		var me = this;
+		var meta;
 		me.chart = chart;
 		me.index = datasetIndex;
+		me._cachedMeta = meta = me.getMeta();
+		me._type = meta.type;
 		me.linkScales();
+		meta._stacked = isStacked(me._getValueScale(), meta);
 		me.addElements();
-		me._type = me.getMeta().type;
 	},
 
 	updateIndex: function(datasetIndex) {
@@ -137,19 +250,12 @@ helpers.extend(DatasetController.prototype, {
 	},
 
 	linkScales: function() {
-		var me = this;
-		var meta = me.getMeta();
-		var chart = me.chart;
-		var scales = chart.scales;
-		var dataset = me.getDataset();
-		var scalesOpts = chart.options.scales;
+		var chart = this.chart;
+		var meta = this._cachedMeta;
+		var dataset = this.getDataset();
 
-		if (meta.xAxisID === null || !(meta.xAxisID in scales) || dataset.xAxisID) {
-			meta.xAxisID = dataset.xAxisID || scalesOpts.xAxes[0].id;
-		}
-		if (meta.yAxisID === null || !(meta.yAxisID in scales) || dataset.yAxisID) {
-			meta.yAxisID = dataset.yAxisID || scalesOpts.yAxes[0].id;
-		}
+		meta.xAxisID = dataset.xAxisID || getFirstScaleId(chart, 'x');
+		meta.yAxisID = dataset.yAxisID || getFirstScaleId(chart, 'y');
 	},
 
 	getDataset: function() {
@@ -168,14 +274,14 @@ helpers.extend(DatasetController.prototype, {
 	 * @private
 	 */
 	_getValueScaleId: function() {
-		return this.getMeta().yAxisID;
+		return this._cachedMeta.yAxisID;
 	},
 
 	/**
 	 * @private
 	 */
 	_getIndexScaleId: function() {
-		return this.getMeta().xAxisID;
+		return this._cachedMeta.xAxisID;
 	},
 
 	/**
@@ -220,16 +326,76 @@ helpers.extend(DatasetController.prototype, {
 		return type && new type({
 			_ctx: me.chart.ctx,
 			_datasetIndex: me.index,
-			_index: index
+			_index: index,
+			_parsed: {}
 		});
+	},
+
+	/**
+	 * @private
+	 */
+	_dataCheck: function() {
+		var me = this;
+		var dataset = me.getDataset();
+		var data = dataset.data || (dataset.data = []);
+
+		// In order to correctly handle data addition/deletion animation (an thus simulate
+		// real-time charts), we need to monitor these data modifications and synchronize
+		// the internal meta data accordingly.
+
+		if (helpers.isObject(data)) {
+			// Object data is currently monitored for replacement only
+			if (me._objectData === data) {
+				return false;
+			}
+			me._data = convertObjectDataToArray(data);
+			me._objectData = data;
+		} else {
+			if (me._data === data && helpers.arrayEquals(data, me._dataCopy)) {
+				return false;
+			}
+
+			if (me._data) {
+				// This case happens when the user replaced the data array instance.
+				unlistenArrayEvents(me._data, me);
+			}
+
+			// Store a copy to detect direct modifications.
+			// Note: This is suboptimal, but better than always parsing the data
+			me._dataCopy = data.slice(0);
+
+			if (data && Object.isExtensible(data)) {
+				listenArrayEvents(data, me);
+			}
+			me._data = data;
+		}
+		return true;
+	},
+
+	/**
+	 * @private
+	 */
+	_labelCheck: function() {
+		var me = this;
+		var scale = me._getIndexScale();
+		var labels = scale ? scale._getLabels() : me.chart.data.labels;
+
+		if (me._labels === labels) {
+			return false;
+		}
+
+		me._labels = labels;
+		return true;
 	},
 
 	addElements: function() {
 		var me = this;
-		var meta = me.getMeta();
-		var data = me.getDataset().data || [];
+		var meta = me._cachedMeta;
 		var metaData = meta.data;
-		var i, ilen;
+		var i, ilen, data;
+
+		me._dataCheck();
+		data = me._data;
 
 		for (i = 0, ilen = data.length; i < ilen; ++i) {
 			metaData[i] = metaData[i] || me.createMetaData(i);
@@ -240,33 +406,23 @@ helpers.extend(DatasetController.prototype, {
 
 	addElementAndReset: function(index) {
 		var element = this.createMetaData(index);
-		this.getMeta().data.splice(index, 0, element);
+		this._cachedMeta.data.splice(index, 0, element);
 		this.updateElement(element, index, true);
 	},
 
 	buildOrUpdateElements: function() {
 		var me = this;
-		var dataset = me.getDataset();
-		var data = dataset.data || (dataset.data = []);
+		var dataChanged = me._dataCheck();
+		var labelsChanged = me._labelCheck();
+		var scaleChanged = me._scaleCheck();
+		var meta = me._cachedMeta;
 
-		// In order to correctly handle data addition/deletion animation (an thus simulate
-		// real-time charts), we need to monitor these data modifications and synchronize
-		// the internal meta data accordingly.
-		if (me._data !== data) {
-			if (me._data) {
-				// This case happens when the user replaced the data array instance.
-				unlistenArrayEvents(me._data, me);
-			}
-
-			if (data && Object.isExtensible(data)) {
-				listenArrayEvents(data, me);
-			}
-			me._data = data;
-		}
+		// make sure cached _stacked status is current
+		meta._stacked = isStacked(me._getValueScale(), meta);
 
 		// Re-sync meta data in case the user replaced the data array or if we missed
 		// any updates and so make sure that we handle number of datapoints changing.
-		me.resyncElements();
+		me.resyncElements(dataChanged | labelsChanged | scaleChanged);
 	},
 
 	/**
@@ -287,17 +443,276 @@ helpers.extend(DatasetController.prototype, {
 		});
 	},
 
+	/**
+	 * @private
+	 */
+	_parse: function(start, count) {
+		var me = this;
+		var chart = me.chart;
+		var meta = me._cachedMeta;
+		var data = me._data;
+		var crossRef = chart._xref || (chart._xref = {});
+		var xScale = me._getIndexScale();
+		var yScale = me._getValueScale();
+		var xId = xScale.id;
+		var yId = yScale.id;
+		var xKey = getStackKey(xScale, yScale, meta);
+		var yKey = getStackKey(yScale, xScale, meta);
+		var stacks = xKey || yKey;
+		var i, ilen, parsed, stack, item, x, y;
+
+		if (helpers.isArray(data[start])) {
+			parsed = me._parseArrayData(meta, data, start, count);
+		} else if (helpers.isObject(data[start])) {
+			parsed = me._parseObjectData(meta, data, start, count);
+		} else {
+			parsed = me._parsePrimitiveData(meta, data, start, count);
+		}
+
+		function storeStack(stackKey, indexValue, scaleId, value) {
+			if (stackKey) {
+				stackKey += '.' + indexValue;
+				item._stackKeys[scaleId] = stackKey;
+				stack = crossRef[stackKey] || (crossRef[stackKey] = {});
+				stack[meta.index] = value;
+			}
+		}
+
+		for (i = 0, ilen = parsed.length; i < ilen; ++i) {
+			item = parsed[i];
+			meta.data[start + i]._parsed = item;
+
+			if (stacks) {
+				item._stackKeys = {};
+				x = item[xId];
+				y = item[yId];
+
+				storeStack(xKey, x, yId, y);
+				storeStack(yKey, y, xId, x);
+			}
+		}
+
+		xScale._invalidateCaches();
+		if (yScale !== xScale) {
+			yScale._invalidateCaches();
+		}
+	},
+
+	/**
+	 * Parse array of primitive values
+	 * @param {object} meta - dataset meta
+	 * @param {array} data - data array. Example [1,3,4]
+	 * @param {number} start - start index
+	 * @param {number} count - number of items to parse
+	 * @returns {object} parsed item - item containing index and a parsed value
+	 * for each scale id.
+	 * Example: {xScale0: 0, yScale0: 1}
+	 * @private
+	 */
+	_parsePrimitiveData: function(meta, data, start, count) {
+		var iScale = this._getIndexScale();
+		var vScale = this._getValueScale();
+		var labels = iScale._getLabels();
+		var singleScale = iScale === vScale;
+		var parsed = [];
+		var i, ilen, item;
+
+		for (i = start, ilen = start + count; i < ilen; ++i) {
+			item = {};
+			item[iScale.id] = singleScale || iScale._parse(labels[i], i);
+			item[vScale.id] = vScale._parse(data[i], i);
+			parsed.push(item);
+		}
+		return parsed;
+	},
+
+	/**
+	 * Parse array of arrays
+	 * @param {object} meta - dataset meta
+	 * @param {array} data - data array. Example [[1,2],[3,4]]
+	 * @param {number} start - start index
+	 * @param {number} count - number of items to parse
+	 * @returns {object} parsed item - item containing index and a parsed value
+	 * for each scale id.
+	 * Example: {xScale0: 0, yScale0: 1}
+	 * @private
+	 */
+	_parseArrayData: function(meta, data, start, count) {
+		var xScale = this.getScaleForId(meta.xAxisID);
+		var yScale = this.getScaleForId(meta.yAxisID);
+		var parsed = [];
+		var i, ilen, item, arr;
+		for (i = start, ilen = start + count; i < ilen; ++i) {
+			arr = data[i];
+			item = {};
+			item[xScale.id] = xScale._parse(arr[0], i);
+			item[yScale.id] = yScale._parse(arr[1], i);
+			parsed.push(item);
+		}
+		return parsed;
+	},
+
+	/**
+	 * Parse array of objects
+	 * @param {object} meta - dataset meta
+	 * @param {array} data - data array. Example [{x:1, y:5}, {x:2, y:10}]
+	 * @param {number} start - start index
+	 * @param {number} count - number of items to parse
+	 * @returns {object} parsed item - item containing index and a parsed value
+	 * for each scale id. _custom is optional
+	 * Example: {xScale0: 0, yScale0: 1, _custom: {r: 10, foo: 'bar'}}
+	 * @private
+	 */
+	_parseObjectData: function(meta, data, start, count) {
+		var xScale = this.getScaleForId(meta.xAxisID);
+		var yScale = this.getScaleForId(meta.yAxisID);
+		var parsed = [];
+		var i, ilen, item, obj;
+		for (i = start, ilen = start + count; i < ilen; ++i) {
+			obj = data[i];
+			item = {};
+			item[xScale.id] = xScale._parseObject(obj, 'x', i);
+			item[yScale.id] = yScale._parseObject(obj, 'y', i);
+			parsed.push(item);
+		}
+		return parsed;
+	},
+
+	/**
+	 * @private
+	 */
+	_getParsed: function(index) {
+		var data = this._cachedMeta.data;
+		if (index < 0 || index >= data.length) {
+			return;
+		}
+		return data[index]._parsed;
+	},
+
+	/**
+	 * @private
+	 */
+	_applyStack: function(scale, parsed) {
+		var chart = this.chart;
+		var meta = this._cachedMeta;
+		var value = parsed[scale.id];
+		var stack = {
+			keys: getSortedDatasetIndices(chart, true),
+			values: chart._xref[parsed._stackKeys[scale.id]]
+		};
+		return applyStack(stack, value, meta.index);
+	},
+
+	/**
+	 * @private
+	 */
+	_getMinMax: function(scale, canStack) {
+		var chart = this.chart;
+		var meta = this._cachedMeta;
+		var metaData = meta.data;
+		var ilen = metaData.length;
+		var crossRef = chart._xref || (chart._xref = {});
+		var max = Number.NEGATIVE_INFINITY;
+		var stacked = canStack && meta._stacked;
+		var indices = getSortedDatasetIndices(chart, true);
+		var i, item, value, parsed, stack, min, minPositive;
+
+		min = minPositive = Number.POSITIVE_INFINITY;
+
+		for (i = 0; i < ilen; ++i) {
+			item = metaData[i];
+			parsed = item._parsed;
+			value = parsed[scale.id];
+			if (item.hidden || isNaN(value)) {
+				continue;
+			}
+			if (stacked) {
+				stack = {
+					keys: indices,
+					values: crossRef[parsed._stackKeys[scale.id]]
+				};
+				value = applyStack(stack, value, meta.index, true);
+			}
+			min = Math.min(min, value);
+			max = Math.max(max, value);
+			if (value > 0) {
+				minPositive = Math.min(minPositive, value);
+			}
+		}
+		return {
+			min: min,
+			max: max,
+			minPositive: minPositive
+		};
+	},
+
+	/**
+	 * @private
+	 */
+	_getAllParsedValues: function(scale) {
+		var meta = this._cachedMeta;
+		var metaData = meta.data;
+		var values = [];
+		var i, ilen, value;
+
+		for (i = 0, ilen = metaData.length; i < ilen; ++i) {
+			value = metaData[i]._parsed[scale.id];
+			if (!isNaN(value)) {
+				values.push(value);
+			}
+		}
+		return values;
+	},
+
+	/**
+	 * @private
+	 */
+	_cacheScaleStackStatus: function() {
+		var me = this;
+		var indexScale = me._getIndexScale();
+		var valueScale = me._getValueScale();
+		var cache = me._scaleStacked = {};
+		if (indexScale && valueScale) {
+			cache[indexScale.id] = indexScale.options.stacked;
+			cache[valueScale.id] = valueScale.options.stacked;
+		}
+	},
+
+	/**
+	 * @private
+	 */
+	_scaleCheck: function() {
+		var me = this;
+		var indexScale = me._getIndexScale();
+		var valueScale = me._getValueScale();
+		var cache = me._scaleStacked;
+		return !cache ||
+			!indexScale ||
+			!valueScale ||
+			cache[indexScale.id] !== indexScale.options.stacked ||
+			cache[valueScale.id] !== valueScale.options.stacked;
+	},
+
+	/**
+	 * @private
+	 */
+	_getMaxOverflow: function() {
+		return false;
+	},
+
 	_update: function(reset) {
 		var me = this;
 		me._configure();
 		me._cachedDataOpts = null;
 		me.update(reset);
+		me._cachedMeta._clip = toClip(helpers.valueOrDefault(me._config.clip, defaultClip(me._xScale, me._yScale, me._getMaxOverflow())));
+		me._cacheScaleStackStatus();
 	},
 
 	update: helpers.noop,
 
 	transition: function(easingValue) {
-		var meta = this.getMeta();
+		var meta = this._cachedMeta;
 		var elements = meta.data || [];
 		var ilen = elements.length;
 		var i = 0;
@@ -312,7 +727,7 @@ helpers.extend(DatasetController.prototype, {
 	},
 
 	draw: function() {
-		var meta = this.getMeta();
+		var meta = this._cachedMeta;
 		var elements = meta.data || [];
 		var ilen = elements.length;
 		var i = 0;
@@ -334,7 +749,7 @@ helpers.extend(DatasetController.prototype, {
 	 */
 	getStyle: function(index) {
 		var me = this;
-		var meta = me.getMeta();
+		var meta = me._cachedMeta;
 		var dataset = meta.dataset;
 		var style;
 
@@ -347,7 +762,7 @@ helpers.extend(DatasetController.prototype, {
 		}
 
 		if (style.fill === false || style.fill === null) {
-			style.backgroundColor = 'rgba(0,0,0,0)';
+			style.backgroundColor = style.borderColor;
 		}
 
 		return style;
@@ -356,7 +771,7 @@ helpers.extend(DatasetController.prototype, {
 	/**
 	 * @private
 	 */
-	_resolveDatasetElementOptions: function(hover) {
+	_resolveDatasetElementOptions: function(active) {
 		var me = this;
 		var chart = me.chart;
 		var datasetOpts = me._config;
@@ -367,15 +782,15 @@ helpers.extend(DatasetController.prototype, {
 
 		// Scriptable options
 		var context = {
-			chart: chart,
+			chart,
 			dataset: me.getDataset(),
 			datasetIndex: me.index,
-			hover: hover
+			active
 		};
 
 		for (i = 0, ilen = elementOptions.length; i < ilen; ++i) {
 			key = elementOptions[i];
-			readKey = hover ? 'hover' + key.charAt(0).toUpperCase() + key.slice(1) : key;
+			readKey = active ? 'hover' + key.charAt(0).toUpperCase() + key.slice(1) : key;
 			values[key] = resolve([
 				datasetOpts[readKey],
 				options[readKey]
@@ -445,9 +860,8 @@ helpers.extend(DatasetController.prototype, {
 		delete element.$previousStyle;
 	},
 
-	setHoverStyle: function(element) {
-		var dataset = this.chart.data.datasets[element._datasetIndex];
-		var index = element._index;
+	setHoverStyle: function(element, datasetIndex, index) {
+		var dataset = this.chart.data.datasets[datasetIndex];
 		var model = element._model;
 		var getHoverColor = helpers.getHoverColor;
 
@@ -501,17 +915,19 @@ helpers.extend(DatasetController.prototype, {
 	/**
 	 * @private
 	 */
-	resyncElements: function() {
+	resyncElements: function(changed) {
 		var me = this;
-		var meta = me.getMeta();
-		var data = me.getDataset().data;
+		var meta = me._cachedMeta;
 		var numMeta = meta.data.length;
-		var numData = data.length;
+		var numData = me._data.length;
 
-		if (numData < numMeta) {
-			meta.data.splice(numData, numMeta - numData);
-		} else if (numData > numMeta) {
+		if (numData > numMeta) {
 			me.insertElements(numMeta, numData - numMeta);
+		} else if (numData < numMeta) {
+			meta.data.splice(numData, numMeta - numData);
+			me._parse(0, numData);
+		} else if (changed) {
+			me._parse(0, numData);
 		}
 	},
 
@@ -522,6 +938,7 @@ helpers.extend(DatasetController.prototype, {
 		for (var i = 0; i < count; ++i) {
 			this.addElementAndReset(start + i);
 		}
+		this._parse(start, count);
 	},
 
 	/**
@@ -536,21 +953,21 @@ helpers.extend(DatasetController.prototype, {
 	 * @private
 	 */
 	onDataPop: function() {
-		this.getMeta().data.pop();
+		this._cachedMeta.data.pop();
 	},
 
 	/**
 	 * @private
 	 */
 	onDataShift: function() {
-		this.getMeta().data.shift();
+		this._cachedMeta.data.shift();
 	},
 
 	/**
 	 * @private
 	 */
 	onDataSplice: function(start, count) {
-		this.getMeta().data.splice(start, count);
+		this._cachedMeta.data.splice(start, count);
 		this.insertElements(start, arguments.length - 2);
 	},
 

@@ -124,7 +124,8 @@
 
 	window.onload = function() {
 		var ctx = document.getElementById('canvas').getContext('2d');
-		window.myScatter = Chart.Scatter(ctx, {
+		window.myScatter = new Chart(ctx, {
+			type: 'scatter',
 			data: scatterChartData,
 			options: {
 				title: {
@@ -137,7 +138,7 @@
 						position: 'bottom',
 						ticks: {
 							userCallback: function(tick) {
-								var remain = tick / (Math.pow(10, Math.floor(Chart.helpers.log10(tick))));
+								var remain = tick / (Math.pow(10, Math.floor(Chart.helpers.math.log10(tick))));
 								if (remain === 1 || remain === 2 || remain === 5) {
 									return tick.toString() + 'Hz';
 								}

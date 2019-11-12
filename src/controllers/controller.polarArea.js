@@ -108,8 +108,6 @@ module.exports = DatasetController.extend({
 
 	dataElementType: elements.Arc,
 
-	linkScales: helpers.noop,
-
 	/**
 	 * @private
 	 */
@@ -189,7 +187,6 @@ module.exports = DatasetController.extend({
 		var opts = chart.options;
 		var animationOpts = opts.animation;
 		var scale = chart.scale;
-		var labels = chart.data.labels;
 
 		var centerX = scale.xCenter;
 		var centerY = scale.yCenter;
@@ -204,10 +201,6 @@ module.exports = DatasetController.extend({
 		var options = arc._options || {};
 
 		helpers.extend(arc, {
-			// Utility
-			_datasetIndex: me.index,
-			_index: index,
-
 			// Desired view properties
 			_model: {
 				backgroundColor: options.backgroundColor,
@@ -219,12 +212,11 @@ module.exports = DatasetController.extend({
 				innerRadius: 0,
 				outerRadius: reset ? resetRadius : distance,
 				startAngle: reset && animationOpts.animateRotate ? datasetStartAngle : startAngle,
-				endAngle: reset && animationOpts.animateRotate ? datasetStartAngle : endAngle,
-				label: helpers.valueAtIndexOrDefault(labels, index, labels[index])
+				endAngle: reset && animationOpts.animateRotate ? datasetStartAngle : endAngle
 			}
 		});
 
-		arc.pivot();
+		arc.pivot(chart._animationsDisabled);
 	},
 
 	countVisibleElements: function() {

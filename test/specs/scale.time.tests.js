@@ -1,26 +1,29 @@
 // Time scale tests
 describe('Time scale tests', function() {
 	function createScale(data, options, dimensions) {
-		var scaleID = 'myScale';
-		var mockContext = window.createMockContext();
-		var Constructor = Chart.scaleService.getScaleConstructor('time');
-		var scale = new Constructor({
-			ctx: mockContext,
-			options: options,
-			chart: {
-				data: data
-			},
-			id: scaleID
-		});
-
 		var width = (dimensions && dimensions.width) || 400;
 		var height = (dimensions && dimensions.height) || 50;
-		scale.update(width, height);
-		return scale;
+
+		options = options || {};
+		options.type = 'time';
+		options.id = 'xScale0';
+
+		var chart = window.acquireChart({
+			type: 'line',
+			data: data,
+			options: {
+				scales: {
+					xAxes: [options]
+				}
+			}
+		}, {canvas: {width: width, height: height}});
+
+
+		return chart.scales.xScale0;
 	}
 
-	function getTicksLabels(scale) {
-		return scale.ticks;
+	function getLabels(scale) {
+		return scale.ticks.map(t => t.label);
 	}
 
 	beforeEach(function() {
@@ -66,10 +69,6 @@ describe('Time scale tests', function() {
 				lineWidth: 1,
 				offsetGridLines: false,
 				display: true,
-				zeroLineColor: 'rgba(0,0,0,0.25)',
-				zeroLineWidth: 1,
-				zeroLineBorderDash: [],
-				zeroLineBorderDashOffset: 0.0,
 				borderDash: [],
 				borderDashOffset: 0.0
 			},
@@ -124,7 +123,7 @@ describe('Time scale tests', function() {
 
 			var scaleOptions = Chart.scaleService.getScaleDefaults('time');
 			var scale = createScale(mockData, scaleOptions, {width: 1000, height: 200});
-			var ticks = getTicksLabels(scale);
+			var ticks = getLabels(scale);
 
 			// `bounds === 'data'`: first and last ticks removed since outside the data range
 			expect(ticks.length).toEqual(217);
@@ -135,7 +134,7 @@ describe('Time scale tests', function() {
 				labels: [newDateFromRef(0), newDateFromRef(1), newDateFromRef(2), newDateFromRef(4), newDateFromRef(6), newDateFromRef(7), newDateFromRef(9)], // days
 			};
 			var scale = createScale(mockData, Chart.scaleService.getScaleDefaults('time'), {width: 1000, height: 200});
-			var ticks = getTicksLabels(scale);
+			var ticks = getLabels(scale);
 
 			// `bounds === 'data'`: first and last ticks removed since outside the data range
 			expect(ticks.length).toEqual(217);
@@ -183,7 +182,7 @@ describe('Time scale tests', function() {
 			}, {canvas: {width: 800, height: 200}});
 
 			var xScale = chart.scales.xScale0;
-			var ticks = getTicksLabels(xScale);
+			var ticks = getLabels(xScale);
 
 			// `bounds === 'data'`: first and last ticks removed since outside the data range
 			expect(ticks.length).toEqual(217);
@@ -231,7 +230,7 @@ describe('Time scale tests', function() {
 			}, {canvas: {width: 800, height: 200}});
 
 			var tScale = chart.scales.tScale0;
-			var ticks = getTicksLabels(tScale);
+			var ticks = getLabels(tScale);
 
 			// `bounds === 'data'`: first and last ticks removed since outside the data range
 			expect(ticks.length).toEqual(217);
@@ -272,11 +271,11 @@ describe('Time scale tests', function() {
 		});
 
 		// Counts down because the lines are drawn top to bottom
-		var xScale = chart.scales.xScale0;
+		var labels = getLabels(chart.scales.xScale0);
 
 		// Counts down because the lines are drawn top to bottom
-		expect(xScale.ticks[0]).toBe('Jan 2');
-		expect(xScale.ticks[1]).toBe('May 8');
+		expect(labels[0]).toBe('Jan 2');
+		expect(labels[1]).toBe('May 8');
 	});
 
 	it('should build ticks using the config unit', function() {
@@ -288,7 +287,7 @@ describe('Time scale tests', function() {
 		config.time.unit = 'hour';
 
 		var scale = createScale(mockData, config, {width: 2500, height: 200});
-		var ticks = getTicksLabels(scale);
+		var ticks = getLabels(scale);
 
 		expect(ticks).toEqual(['8PM', '9PM', '10PM', '11PM', '12AM', '1AM', '2AM', '3AM', '4AM', '5AM', '6AM', '7AM', '8AM', '9AM', '10AM', '11AM', '12PM', '1PM', '2PM', '3PM', '4PM', '5PM', '6PM', '7PM', '8PM', '9PM']);
 	});
@@ -306,7 +305,7 @@ describe('Time scale tests', function() {
 		}, Chart.scaleService.getScaleDefaults('time'));
 
 		var scale = createScale(mockData, config);
-		var ticks = getTicksLabels(scale);
+		var ticks = getLabels(scale);
 
 		expect(ticks).toEqual(['Jan 1', 'Jan 2', 'Jan 3']);
 	});
@@ -361,7 +360,7 @@ describe('Time scale tests', function() {
 		}, Chart.scaleService.getScaleDefaults('time'));
 
 		var scale = createScale(mockData, config);
-		var ticks = getTicksLabels(scale);
+		var ticks = getLabels(scale);
 
 		expect(ticks).toEqual(['2012', '2013', '2014', '2015', '2016', '2017', '2018', '2019']);
 	});
@@ -380,7 +379,7 @@ describe('Time scale tests', function() {
 		}, Chart.scaleService.getScaleDefaults('time'));
 
 		var scale = createScale(mockData, config, {width: 800, height: 200});
-		var ticks = getTicksLabels(scale);
+		var ticks = getLabels(scale);
 
 		// last date is feb 15 because we round to start of week
 		expect(ticks).toEqual(['Dec 28, 2014', 'Jan 4, 2015', 'Jan 11, 2015', 'Jan 18, 2015', 'Jan 25, 2015', 'Feb 1, 2015', 'Feb 8, 2015', 'Feb 15, 2015']);
@@ -401,7 +400,7 @@ describe('Time scale tests', function() {
 			}, Chart.scaleService.getScaleDefaults('time'));
 
 			var scale = createScale(mockData, config, {width: 2500, height: 200});
-			var ticks = getTicksLabels(scale);
+			var ticks = getLabels(scale);
 
 			expect(ticks).toEqual(['8PM', '10PM']);
 		});
@@ -422,29 +421,29 @@ describe('Time scale tests', function() {
 		it('should use the min option when less than first label for building ticks', function() {
 			config.ticks.min = '2014-12-29T04:00:00';
 
-			var scale = createScale(mockData, config);
-			expect(scale.ticks[0]).toEqual('Jan 1');
+			var labels = getLabels(createScale(mockData, config));
+			expect(labels[0]).toEqual('Jan 1');
 		});
 
 		it('should use the min option when greater than first label for building ticks', function() {
 			config.ticks.min = '2015-01-02T04:00:00';
 
-			var scale = createScale(mockData, config);
-			expect(scale.ticks[0]).toEqual('Jan 2');
+			var labels = getLabels(createScale(mockData, config));
+			expect(labels[0]).toEqual('Jan 2');
 		});
 
 		it('should use the max option when greater than last label for building ticks', function() {
 			config.ticks.max = '2015-01-05T06:00:00';
 
-			var scale = createScale(mockData, config);
-			expect(scale.ticks[scale.ticks.length - 1]).toEqual('Jan 3');
+			var labels = getLabels(createScale(mockData, config));
+			expect(labels[labels.length - 1]).toEqual('Jan 3');
 		});
 
 		it('should use the max option when less than last label for building ticks', function() {
 			config.ticks.max = '2015-01-02T23:00:00';
 
-			var scale = createScale(mockData, config);
-			expect(scale.ticks[scale.ticks.length - 1]).toEqual('Jan 2');
+			var labels = getLabels(createScale(mockData, config));
+			expect(labels[labels.length - 1]).toEqual('Jan 2');
 		});
 	});
 
@@ -463,29 +462,29 @@ describe('Time scale tests', function() {
 		it('should use the min option when less than first label for building ticks', function() {
 			config.ticks.min = '2014-12-29T04:00:00';
 
-			var scale = createScale(mockData, config);
-			expect(scale.ticks[0]).toEqual('Jan 1');
+			var labels = getLabels(createScale(mockData, config));
+			expect(labels[0]).toEqual('Jan 1');
 		});
 
 		it('should use the min option when greater than first label for building ticks', function() {
 			config.ticks.min = '2015-01-02T04:00:00';
 
-			var scale = createScale(mockData, config);
-			expect(scale.ticks[0]).toEqual('Jan 2');
+			var labels = getLabels(createScale(mockData, config));
+			expect(labels[0]).toEqual('Jan 2');
 		});
 
 		it('should use the max option when greater than last label for building ticks', function() {
 			config.ticks.max = '2015-01-05T06:00:00';
 
-			var scale = createScale(mockData, config);
-			expect(scale.ticks[scale.ticks.length - 1]).toEqual('Jan 3');
+			var labels = getLabels(createScale(mockData, config));
+			expect(labels[labels.length - 1]).toEqual('Jan 3');
 		});
 
 		it('should use the max option when less than last label for building ticks', function() {
 			config.ticks.max = '2015-01-02T23:00:00';
 
-			var scale = createScale(mockData, config);
-			expect(scale.ticks[scale.ticks.length - 1]).toEqual('Jan 2');
+			var labels = getLabels(createScale(mockData, config));
+			expect(labels[labels.length - 1]).toEqual('Jan 2');
 		});
 	});
 
@@ -507,7 +506,7 @@ describe('Time scale tests', function() {
 		}, Chart.scaleService.getScaleDefaults('time'));
 
 		var scale = createScale(mockData, config);
-		var ticks = getTicksLabels(scale);
+		var ticks = getLabels(scale);
 
 		expect(ticks).toEqual(['Dec 31, 2014', 'Jan 7, 2015']);
 	});
@@ -536,7 +535,7 @@ describe('Time scale tests', function() {
 						xAxes: [{
 							id: 'xScale0',
 							type: 'time',
-							position: 'bottom'
+							position: 'bottom',
 						}],
 					}
 				}
@@ -562,14 +561,14 @@ describe('Time scale tests', function() {
 			var lastPointOffsetMs = moment(chart.config.data.labels[chart.config.data.labels.length - 1]).valueOf() - scale.min;
 			var lastPointPixel = scale.left + lastPointOffsetMs / msPerPix;
 
-			expect(scale.getPixelForValue('', 0, 0)).toBeCloseToPixel(firstPointPixel);
+			expect(scale.getPixelForValue('2015-01-01T20:00:00')).toBeCloseToPixel(firstPointPixel);
 			expect(scale.getPixelForValue(chart.data.labels[0])).toBeCloseToPixel(firstPointPixel);
 			expect(scale.getValueForPixel(firstPointPixel)).toBeCloseToTime({
 				value: moment(chart.data.labels[0]),
 				unit: 'hour',
 			});
 
-			expect(scale.getPixelForValue('', 6, 0)).toBeCloseToPixel(lastPointPixel);
+			expect(scale.getPixelForValue('2015-01-10T12:00')).toBeCloseToPixel(lastPointPixel);
 			expect(scale.getValueForPixel(lastPointPixel)).toBeCloseToTime({
 				value: moment(chart.data.labels[6]),
 				unit: 'hour'
@@ -616,7 +615,7 @@ describe('Time scale tests', function() {
 		});
 
 		it('should build the correct ticks', function() {
-			expect(getTicksLabels(this.scale)).toEqual(['2005', '2006', '2007', '2008', '2009', '2010', '2011', '2012', '2013', '2014', '2015', '2016', '2017', '2018']);
+			expect(getLabels(this.scale)).toEqual(['2005', '2006', '2007', '2008', '2009', '2010', '2011', '2012', '2013', '2014', '2015', '2016', '2017', '2018']);
 		});
 
 		it('should have ticks with accurate labels', function() {
@@ -652,16 +651,21 @@ describe('Time scale tests', function() {
 					xAxes: [{
 						id: 'xScale0',
 						type: 'time',
-						position: 'bottom'
+						position: 'bottom',
+						ticks: {
+							source: 'labels',
+							autoSkip: false
+						}
 					}],
 				}
 			}
 		});
 
 		var xScale = chart.scales.xScale0;
-		expect(xScale.getLabelForIndex(0, 0)).toBeTruthy();
-		expect(xScale.getLabelForIndex(0, 0)).toBe('2015-01-01T20:00:00');
-		expect(xScale.getLabelForIndex(6, 0)).toBe('2015-01-10T12:00');
+		var controller = chart.getDatasetMeta(0).controller;
+		expect(xScale.getLabelForValue(controller._getParsed(0)[xScale.id])).toBeTruthy();
+		expect(xScale.getLabelForValue(controller._getParsed(0)[xScale.id])).toBe('Jan 1, 2015, 8:00:00 pm');
+		expect(xScale.getLabelForValue(xScale.getValueForPixel(xScale.getPixelForTick(6)))).toBe('Jan 10, 2015, 12:00:00 pm');
 	});
 
 	describe('when ticks.callback is specified', function() {
@@ -698,24 +702,24 @@ describe('Time scale tests', function() {
 		});
 
 		it('should get the correct labels for ticks', function() {
-			var scale = this.scale;
+			var labels = getLabels(this.scale);
 
-			expect(scale.ticks.length).toEqual(61);
-			expect(scale.ticks[0]).toEqual('<8:00:00>');
-			expect(scale.ticks[scale.ticks.length - 1]).toEqual('<8:01:00>');
+			expect(labels.length).toEqual(61);
+			expect(labels[0]).toEqual('<8:00:00>');
+			expect(labels[labels.length - 1]).toEqual('<8:01:00>');
 		});
 
 		it('should update ticks.callback correctly', function() {
 			var chart = this.chart;
-			var scale = this.scale;
-
 			chart.options.scales.xAxes[0].ticks.callback = function(value) {
 				return '{' + value + '}';
 			};
 			chart.update();
-			expect(scale.ticks.length).toEqual(61);
-			expect(scale.ticks[0]).toEqual('{8:00:00}');
-			expect(scale.ticks[scale.ticks.length - 1]).toEqual('{8:01:00}');
+
+			var labels = getLabels(this.scale);
+			expect(labels.length).toEqual(61);
+			expect(labels[0]).toEqual('{8:00:00}');
+			expect(labels[labels.length - 1]).toEqual('{8:01:00}');
 		});
 	});
 
@@ -759,46 +763,46 @@ describe('Time scale tests', function() {
 		});
 
 		it('should get the correct labels for major and minor ticks', function() {
-			var scale = this.scale;
+			var labels = getLabels(this.scale);
 
-			expect(scale.ticks.length).toEqual(61);
-			expect(scale.ticks[0]).toEqual('[[8:00 pm]]');
-			expect(scale.ticks[Math.floor(scale.ticks.length / 2)]).toEqual('(8:00:30 pm)');
-			expect(scale.ticks[scale.ticks.length - 1]).toEqual('[[8:01 pm]]');
+			expect(labels.length).toEqual(61);
+			expect(labels[0]).toEqual('[[8:00 pm]]');
+			expect(labels[Math.floor(labels.length / 2)]).toEqual('(8:00:30 pm)');
+			expect(labels[labels.length - 1]).toEqual('[[8:01 pm]]');
 		});
 
 		it('should only use ticks.minor callback if ticks.major.enabled is false', function() {
 			var chart = this.chart;
-			var scale = this.scale;
-
 			chart.options.scales.xAxes[0].ticks.major.enabled = false;
 			chart.update();
-			expect(scale.ticks.length).toEqual(61);
-			expect(scale.ticks[0]).toEqual('(8:00:00 pm)');
-			expect(scale.ticks[scale.ticks.length - 1]).toEqual('(8:01:00 pm)');
+
+			var labels = getLabels(this.scale);
+			expect(labels.length).toEqual(61);
+			expect(labels[0]).toEqual('(8:00:00 pm)');
+			expect(labels[labels.length - 1]).toEqual('(8:01:00 pm)');
 		});
 
 		it('should use ticks.callback if ticks.major.callback is omitted', function() {
 			var chart = this.chart;
-			var scale = this.scale;
-
 			chart.options.scales.xAxes[0].ticks.major.callback = undefined;
 			chart.update();
-			expect(scale.ticks.length).toEqual(61);
-			expect(scale.ticks[0]).toEqual('<8:00 pm>');
-			expect(scale.ticks[scale.ticks.length - 1]).toEqual('<8:01 pm>');
+
+			var labels = getLabels(this.scale);
+			expect(labels.length).toEqual(61);
+			expect(labels[0]).toEqual('<8:00 pm>');
+			expect(labels[labels.length - 1]).toEqual('<8:01 pm>');
 		});
 
 		it('should use ticks.callback if ticks.minor.callback is omitted', function() {
 			var chart = this.chart;
-			var scale = this.scale;
-
 			chart.options.scales.xAxes[0].ticks.minor.callback = undefined;
 			chart.update();
-			expect(scale.ticks.length).toEqual(61);
-			expect(scale.ticks[0]).toEqual('[[8:00 pm]]');
-			expect(scale.ticks[Math.floor(scale.ticks.length / 2)]).toEqual('<8:00:30 pm>');
-			expect(scale.ticks[scale.ticks.length - 1]).toEqual('[[8:01 pm]]');
+
+			var labels = getLabels(this.scale);
+			expect(labels.length).toEqual(61);
+			expect(labels[0]).toEqual('[[8:00 pm]]');
+			expect(labels[Math.floor(labels.length / 2)]).toEqual('<8:00:30 pm>');
+			expect(labels[labels.length - 1]).toEqual('[[8:01 pm]]');
 		});
 	});
 
@@ -823,8 +827,10 @@ describe('Time scale tests', function() {
 		});
 
 		var xScale = chart.scales.xScale0;
-		expect(xScale.getLabelForIndex(0, 0)).toBeTruthy();
-		expect(xScale.getLabelForIndex(0, 0)).toBe('2015-01-01T20:00:00');
+		var controller = chart.getDatasetMeta(0).controller;
+		var value = controller._getParsed(0)[xScale.id];
+		expect(xScale.getLabelForValue(value)).toBeTruthy();
+		expect(xScale.getLabelForValue(value)).toBe('Jan 1, 2015, 8:00:00 pm');
 	});
 
 	it('should get the correct label for a timestamp', function() {
@@ -851,7 +857,8 @@ describe('Time scale tests', function() {
 		});
 
 		var xScale = chart.scales.xScale0;
-		var label = xScale.getLabelForIndex(0, 0);
+		var controller = chart.getDatasetMeta(0).controller;
+		var label = xScale.getLabelForValue(controller._getParsed(0)[xScale.id]);
 		expect(label).toEqual('Jan 8, 2018, 5:14:23 am');
 	});
 
@@ -877,9 +884,9 @@ describe('Time scale tests', function() {
 		});
 
 		var xScale = chart.scales.xScale0;
-		var pixel = xScale.getPixelForValue('', 0, 0);
+		var pixel = xScale.getPixelForValue('2016-05-27');
 
-		expect(xScale.getValueForPixel(pixel).valueOf()).toEqual(moment(chart.data.labels[0]).valueOf());
+		expect(xScale.getValueForPixel(pixel)).toEqual(moment(chart.data.labels[0]).valueOf());
 	});
 
 	it('does not create a negative width chart when hidden', function() {
@@ -943,7 +950,7 @@ describe('Time scale tests', function() {
 
 				expect(scale.min).toEqual(+moment('2017', 'YYYY'));
 				expect(scale.max).toEqual(+moment('2042', 'YYYY'));
-				expect(getTicksLabels(scale)).toEqual([
+				expect(getLabels(scale)).toEqual([
 					'2017', '2019', '2020', '2025', '2042']);
 			});
 			it ('should not add ticks for min and max if they extend the labels range', function() {
@@ -957,7 +964,7 @@ describe('Time scale tests', function() {
 
 				expect(scale.min).toEqual(+moment('2012', 'YYYY'));
 				expect(scale.max).toEqual(+moment('2051', 'YYYY'));
-				expect(getTicksLabels(scale)).toEqual([
+				expect(getLabels(scale)).toEqual([
 					'2017', '2019', '2020', '2025', '2042']);
 			});
 			it ('should not duplicate ticks if min and max are the labels limits', function() {
@@ -971,7 +978,7 @@ describe('Time scale tests', function() {
 
 				expect(scale.min).toEqual(+moment('2017', 'YYYY'));
 				expect(scale.max).toEqual(+moment('2042', 'YYYY'));
-				expect(getTicksLabels(scale)).toEqual([
+				expect(getLabels(scale)).toEqual([
 					'2017', '2019', '2020', '2025', '2042']);
 			});
 			it ('should correctly handle empty `data.labels` using "day" if `time.unit` is undefined`', function() {
@@ -983,7 +990,7 @@ describe('Time scale tests', function() {
 
 				expect(scale.min).toEqual(+moment().startOf('day'));
 				expect(scale.max).toEqual(+moment().endOf('day') + 1);
-				expect(getTicksLabels(scale)).toEqual([]);
+				expect(getLabels(scale)).toEqual([]);
 			});
 			it ('should correctly handle empty `data.labels` using `time.unit`', function() {
 				var chart = this.chart;
@@ -996,7 +1003,7 @@ describe('Time scale tests', function() {
 
 				expect(scale.min).toEqual(+moment().startOf('year'));
 				expect(scale.max).toEqual(+moment().endOf('year') + 1);
-				expect(getTicksLabels(scale)).toEqual([]);
+				expect(getLabels(scale)).toEqual([]);
 			});
 		});
 
@@ -1037,7 +1044,7 @@ describe('Time scale tests', function() {
 
 				expect(scale.min).toEqual(+moment('2017', 'YYYY'));
 				expect(scale.max).toEqual(+moment('2043', 'YYYY'));
-				expect(getTicksLabels(scale)).toEqual([
+				expect(getLabels(scale)).toEqual([
 					'2017', '2018', '2019', '2020', '2025', '2042', '2043']);
 			});
 			it ('should not add ticks for min and max if they extend the labels range', function() {
@@ -1051,7 +1058,7 @@ describe('Time scale tests', function() {
 
 				expect(scale.min).toEqual(+moment('2012', 'YYYY'));
 				expect(scale.max).toEqual(+moment('2051', 'YYYY'));
-				expect(getTicksLabels(scale)).toEqual([
+				expect(getLabels(scale)).toEqual([
 					'2017', '2018', '2019', '2020', '2025', '2042', '2043']);
 			});
 			it ('should not duplicate ticks if min and max are the labels limits', function() {
@@ -1065,7 +1072,7 @@ describe('Time scale tests', function() {
 
 				expect(scale.min).toEqual(+moment('2017', 'YYYY'));
 				expect(scale.max).toEqual(+moment('2043', 'YYYY'));
-				expect(getTicksLabels(scale)).toEqual([
+				expect(getLabels(scale)).toEqual([
 					'2017', '2018', '2019', '2020', '2025', '2042', '2043']);
 			});
 			it ('should correctly handle empty `data.labels` using "day" if `time.unit` is undefined`', function() {
@@ -1077,7 +1084,7 @@ describe('Time scale tests', function() {
 
 				expect(scale.min).toEqual(+moment('2018', 'YYYY'));
 				expect(scale.max).toEqual(+moment('2043', 'YYYY'));
-				expect(getTicksLabels(scale)).toEqual([
+				expect(getLabels(scale)).toEqual([
 					'2018', '2020', '2043']);
 			});
 			it ('should correctly handle empty `data.labels` and hidden datasets using `time.unit`', function() {
@@ -1093,7 +1100,7 @@ describe('Time scale tests', function() {
 
 				expect(scale.min).toEqual(+moment().startOf('year'));
 				expect(scale.max).toEqual(+moment().endOf('year') + 1);
-				expect(getTicksLabels(scale)).toEqual([]);
+				expect(getLabels(scale)).toEqual([]);
 			});
 		});
 	});
@@ -1277,7 +1284,7 @@ describe('Time scale tests', function() {
 				expect(scale.max).toEqual(+moment('02/23 11:00', 'MM/DD HH:mm'));
 				expect(scale.getPixelForValue('02/20 08:00')).toBeCloseToPixel(scale.left);
 				expect(scale.getPixelForValue('02/23 11:00')).toBeCloseToPixel(scale.left + scale.width);
-				expect(getTicksLabels(scale)).toEqual([
+				expect(getLabels(scale)).toEqual([
 					'Feb 21', 'Feb 22', 'Feb 23']);
 			});
 		});
@@ -1315,7 +1322,7 @@ describe('Time scale tests', function() {
 				expect(scale.max).toEqual(ticks[ticks.length - 1].value);
 				expect(scale.getPixelForValue('02/20 08:00')).toBeCloseToPixel(60);
 				expect(scale.getPixelForValue('02/23 11:00')).toBeCloseToPixel(426);
-				expect(getTicksLabels(scale)).toEqual([
+				expect(getLabels(scale)).toEqual([
 					'Feb 20', 'Feb 21', 'Feb 22', 'Feb 23', 'Feb 24']);
 			});
 		});
@@ -1767,10 +1774,10 @@ describe('Time scale tests', function() {
 				}
 			});
 
-			expect(getTicksLabels(chart.scales.x)).toEqual(['2015', '2016', '2017']);
-			expect(getTicksLabels(chart.scales.x2)).toEqual(['1985', '1986', '1987']);
-			expect(getTicksLabels(chart.scales.y)).toEqual(['1995', '1996', '1997']);
-			expect(getTicksLabels(chart.scales.y2)).toEqual(['2005', '2006', '2007']);
+			expect(getLabels(chart.scales.x)).toEqual(['2015', '2016', '2017']);
+			expect(getLabels(chart.scales.x2)).toEqual(['1985', '1986', '1987']);
+			expect(getLabels(chart.scales.y)).toEqual(['1995', '1996', '1997']);
+			expect(getLabels(chart.scales.y2)).toEqual(['2005', '2006', '2007']);
 		});
 	});
 
