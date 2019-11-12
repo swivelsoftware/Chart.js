@@ -2,12 +2,11 @@
   "name": "@swivelsoftware/chart.js",
   "homepage": "https://www.chartjs.org",
   "description": "Customized version of chart.js. Simple HTML5 charts using the canvas element.",
-  "version": "2.9.1-4",
+  "version": "2.9.2",
   "license": "MIT",
   "jsdelivr": "dist/Chart.min.js",
   "unpkg": "dist/Chart.min.js",
   "main": "src/index.js",
-  "types": "index.d.ts",
   "module": "dist/Chart.esm.js",
   "keywords": [
     "canvas",
@@ -33,7 +32,6 @@
   "devDependencies": {
     "@babel/core": "^7.6.2",
     "@babel/preset-env": "^7.6.2",
-    "@types/chart.js": "^2.8.9",
     "babel-preset-es2015-rollup": "^3.0.0",
     "clean-css": "^4.2.1",
     "coveralls": "^3.0.0",

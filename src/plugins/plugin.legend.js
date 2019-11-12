@@ -26,6 +26,12 @@ defaults._set('global', {
 			var metas = datasets.map(function(dataset, i) {
 				return ci.getDatasetMeta(i);
 			});
+
+			/**
+			 * Customized. Avoid disabling all datasets
+			 * by kennysng@hotmail.com.hk
+			 */
+
 			var hiddens = metas.map(function(meta) {
 				return meta.hidden || ci.data.datasets[index].hidden;
 			});

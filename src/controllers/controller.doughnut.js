@@ -74,6 +74,11 @@ defaults._set('doughnut', {
 				return m.hidden;
 			});
 
+			/**
+			 * Customized. Avoid disabling all datasets
+			 * by kennysng@hotmail.com.hk
+			 */
+
 			var allHidden = hiddens.reduce(function(result, flag, i) {
 				if (i !== index && (flag || false) === false) {
 					result += 1;
