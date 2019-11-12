@@ -5468,16 +5468,34 @@ core_defaults._set('doughnut', {
       var index = legendItem.index;
       var chart = this.chart;
       var i, ilen, meta;
+      meta = chart.getDatasetMeta(0);
+      var hiddens = meta.data.map(function (m) {
+        return m.hidden;
+      });
+      /**
+       * Customized. Avoid disabling all datasets
+       * by kennysng@hotmail.com.hk
+       */
 
-      for (i = 0, ilen = (chart.data.datasets || []).length; i < ilen; ++i) {
-        meta = chart.getDatasetMeta(i); // toggle visibility of index if exists
-
-        if (meta.data[index]) {
-          meta.data[index].hidden = !meta.data[index].hidden;
+      var allHidden = hiddens.reduce(function (result, flag, i) {
+        if (i !== index && (flag || false) === false) {
+          result += 1;
         }
-      }
 
-      chart.update();
+        return result;
+      }, 0);
+
+      if (allHidden > 1) {
+        for (i = 0, ilen = (chart.data.datasets || []).length; i < ilen; ++i) {
+          meta = chart.getDatasetMeta(i); // toggle visibility of index if exists
+
+          if (meta.data[index]) {
+            meta.data[index].hidden = !meta.data[index].hidden;
+          }
+        }
+
+        chart.update();
+      }
     }
   },
   // The percentage of the chart that we cut out of the middle.
@@ -8783,6 +8801,9 @@ function (_Element) {
       xLinePadding = drawColorBoxes && bodyAlignForCalculation !== 'right' ? bodyAlign === 'center' ? bodyFontSize / 2 + 1 : bodyFontSize + 2 : 0; // Draw body lines now
 
       for (i = 0, ilen = body.length; i < ilen; ++i) {
+        var point = vm.dataPoints[i];
+        var meta = ci.getDatasetMeta(point.datasetIndex);
+        var style = meta.controller.getStyle(undefined);
         bodyItem = body[i];
         textColor = vm.labelTextColors[i];
         labelColors = vm.labelColors[i];
@@ -8793,17 +8814,35 @@ function (_Element) {
         for (j = 0, jlen = lines.length; j < jlen; ++j) {
           // Draw Legend-like boxes if needed
           if (drawColorBoxes) {
-            var rtlColorX = rtlHelper.x(colorX); // Fill a white rect so that colours merge nicely if the opacity is < 1
+            if (meta.type === 'line') {
+              var x = colorX;
+              var y = pt.y;
+              var fontSize = bodyFontSize;
+              var boxWidth = bodyFontSize;
+              ctx.fillStyle = 'transparent';
+              ctx.strokeStyle = labelColors.borderColor; // Draw line as legend symbol
 
-            ctx.fillStyle = vm.legendColorBackground;
-            ctx.fillRect(rtlHelper.leftForLtr(rtlColorX, bodyFontSize), pt.y, bodyFontSize, bodyFontSize); // Border
+              ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0); // Draw point at center
 
-            ctx.lineWidth = 1;
-            ctx.strokeStyle = labelColors.borderColor;
-            ctx.strokeRect(rtlHelper.leftForLtr(rtlColorX, bodyFontSize), pt.y, bodyFontSize, bodyFontSize); // Inner square
+              var radius = fontSize * Math.sqrt(5) / 5;
+              var centerX = x + boxWidth / 2;
+              var centerY = y + fontSize / 2;
+              ctx.lineWidth *= Math.SQRT2 / 2;
+              helpers$1.canvas.drawPoint(ctx, style.pointStyle, radius, centerX, centerY, style.rotation);
+            } else {
+              var rtlColorX = rtlHelper.x(colorX); // Fill a white rect so that colours merge nicely if the opacity is < 1
 
-            ctx.fillStyle = labelColors.backgroundColor;
-            ctx.fillRect(rtlHelper.leftForLtr(rtlHelper.xPlus(rtlColorX, 1), bodyFontSize - 2), pt.y + 1, bodyFontSize - 2, bodyFontSize - 2);
+              ctx.fillStyle = vm.legendColorBackground;
+              ctx.fillRect(rtlHelper.leftForLtr(rtlColorX, bodyFontSize), pt.y, bodyFontSize, bodyFontSize); // Border
+
+              ctx.lineWidth = 1;
+              ctx.strokeStyle = labelColors.borderColor;
+              ctx.strokeRect(rtlHelper.leftForLtr(rtlColorX, bodyFontSize), pt.y, bodyFontSize, bodyFontSize); // Inner square
+
+              ctx.fillStyle = labelColors.backgroundColor;
+              ctx.fillRect(rtlHelper.leftForLtr(rtlHelper.xPlus(rtlColorX, 1), bodyFontSize - 2), pt.y + 1, bodyFontSize - 2, bodyFontSize - 2);
+            }
+
             ctx.fillStyle = textColor;
           }
 
@@ -14685,11 +14724,33 @@ core_defaults._set('global', {
     onClick: function onClick(e, legendItem) {
       var index = legendItem.datasetIndex;
       var ci = this.chart;
-      var meta = ci.getDatasetMeta(index); // See controller.isDatasetVisible comment
+      var datasets = ci.data.datasets || [];
+      var metas = datasets.map(function (dataset, i) {
+        return ci.getDatasetMeta(i);
+      });
+      /**
+       * Customized. Avoid disabling all datasets
+       * by kennysng@hotmail.com.hk
+       */
 
-      meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null; // We hid a dataset ... rerender the chart
+      var hiddens = metas.map(function (meta) {
+        return meta.hidden || ci.data.datasets[index].hidden;
+      });
+      var allHidden = hiddens.reduce(function (result, flag, i) {
+        if (i === index) {
+          return result;
+        }
 
-      ci.update();
+        return result && (flag || false);
+      }, true);
+
+      if (!allHidden) {
+        var meta = ci.getDatasetMeta(index); // See controller.isDatasetVisible comment
+
+        meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null; // We hid a dataset ... rerender the chart
+
+        ci.update();
+      }
     },
     onHover: null,
     onLeave: null,
@@ -15042,6 +15103,10 @@ function (_Element) {
       var hitboxes = me.legendHitBoxes; // current position
 
       var drawLegendBox = function drawLegendBox(x, y, legendItem) {
+        var index = legendItem.datasetIndex || 0;
+        var ci = me.chart;
+        var meta = ci.getDatasetMeta(index);
+
         if (isNaN(boxWidth) || boxWidth <= 0) {
           return;
         } // Set the ctx for the box
@@ -15068,6 +15133,16 @@ function (_Element) {
           var centerX = rtlHelper.xPlus(x, boxWidth / 2);
           var centerY = y + fontSize / 2; // Draw pointStyle as legend symbol
 
+          helpers$1.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY, legendItem.rotation);
+        } else if (meta.type === 'line') {
+          // Draw line as legend symbol
+          ctx.fillStyle = 'transparent';
+          ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0); // Draw point at center
+
+          var radius = fontSize * Math.sqrt(5) / 5;
+          var centerX = x + boxWidth / 2;
+          var centerY = y + fontSize / 2;
+          ctx.lineWidth *= Math.SQRT2 / 2;
           helpers$1.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY, legendItem.rotation);
         } else {
           // Draw box as legend symbol

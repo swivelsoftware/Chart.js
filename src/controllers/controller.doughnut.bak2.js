@@ -69,34 +69,15 @@ defaults._set('doughnut', {
 			var chart = this.chart;
 			var i, ilen, meta;
 
-			meta = chart.getDatasetMeta(0);
-			var hiddens = meta.data.map(function(m) {
-				return m.hidden;
-			});
-
-			/**
-			 * Customized. Avoid disabling all datasets
-			 * by kennysng@hotmail.com.hk
-			 */
-
-			var allHidden = hiddens.reduce(function(result, flag, i) {
-				if (i !== index && (flag || false) === false) {
-					result += 1;
+			for (i = 0, ilen = (chart.data.datasets || []).length; i < ilen; ++i) {
+				meta = chart.getDatasetMeta(i);
+				// toggle visibility of index if exists
+				if (meta.data[index]) {
+					meta.data[index].hidden = !meta.data[index].hidden;
 				}
-				return result;
-			}, 0);
-
-			if (allHidden > 1) {
-				for (i = 0, ilen = (chart.data.datasets || []).length; i < ilen; ++i) {
-					meta = chart.getDatasetMeta(i);
-					// toggle visibility of index if exists
-					if (meta.data[index]) {
-						meta.data[index].hidden = !meta.data[index].hidden;
-					}
-				}
-
-				chart.update();
 			}
+
+			chart.update();
 		}
 	},
 

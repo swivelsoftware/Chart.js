@@ -21,36 +21,13 @@ defaults._set('global', {
 		onClick: function(e, legendItem) {
 			var index = legendItem.datasetIndex;
 			var ci = this.chart;
+			var meta = ci.getDatasetMeta(index);
 
-			var datasets = ci.data.datasets || [];
-			var metas = datasets.map(function(dataset, i) {
-				return ci.getDatasetMeta(i);
-			});
+			// See controller.isDatasetVisible comment
+			meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
 
-			/**
-			 * Customized. Avoid disabling all datasets
-			 * by kennysng@hotmail.com.hk
-			 */
-
-			var hiddens = metas.map(function(meta) {
-				return meta.hidden || ci.data.datasets[index].hidden;
-			});
-			var allHidden = hiddens.reduce(function(result, flag, i) {
-				if (i === index) {
-					return result;
-				}
-				return result && (flag || false);
-			}, true);
-
-			if (!allHidden) {
-				var meta = ci.getDatasetMeta(index);
-
-				// See controller.isDatasetVisible comment
-				meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
-
-				// We hid a dataset ... rerender the chart
-				ci.update();
-			}
+			// We hid a dataset ... rerender the chart
+			ci.update();
 		},
 
 		onHover: null,
@@ -405,10 +382,6 @@ class Legend extends Element {
 
 		// current position
 		var drawLegendBox = function(x, y, legendItem) {
-			var index = legendItem.datasetIndex || 0;
-			var ci = me.chart;
-			var meta = ci.getDatasetMeta(index);
-
 			if (isNaN(boxWidth) || boxWidth <= 0) {
 				return;
 			}
@@ -437,17 +410,6 @@ class Legend extends Element {
 				var centerY = y + fontSize / 2;
 
 				// Draw pointStyle as legend symbol
-				helpers.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY, legendItem.rotation);
-			} else if (meta.type === 'line') {
-				// Draw line as legend symbol
-				ctx.fillStyle = 'transparent';
-				ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
-
-				// Draw point at center
-				var radius = fontSize * Math.sqrt(5) / 5;
-				var centerX = x + boxWidth / 2;
-				var centerY = y + fontSize / 2;
-				ctx.lineWidth *= Math.SQRT2 / 2;
 				helpers.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY, legendItem.rotation);
 			} else {
 				// Draw box as legend symbol
