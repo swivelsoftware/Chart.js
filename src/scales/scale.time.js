@@ -1,17 +1,17 @@
 'use strict';
 
-var adapters = require('../core/core.adapters');
-var defaults = require('../core/core.defaults');
-var helpers = require('../helpers/index');
-var Scale = require('../core/core.scale');
+const adapters = require('../core/core.adapters');
+const defaults = require('../core/core.defaults');
+const helpers = require('../helpers/index');
+const Scale = require('../core/core.scale');
 
-var resolve = helpers.options.resolve;
-var valueOrDefault = helpers.valueOrDefault;
+const resolve = helpers.options.resolve;
+const valueOrDefault = helpers.valueOrDefault;
 
 // Integer constants are from the ES6 spec.
-var MAX_INTEGER = Number.MAX_SAFE_INTEGER || 9007199254740991;
+const MAX_INTEGER = Number.MAX_SAFE_INTEGER || 9007199254740991;
 
-var INTERVALS = {
+const INTERVALS = {
 	millisecond: {
 		common: true,
 		size: 1,
@@ -58,7 +58,7 @@ var INTERVALS = {
 	}
 };
 
-var UNITS = Object.keys(INTERVALS);
+const UNITS = Object.keys(INTERVALS);
 
 function sorter(a, b) {
 	return a - b;
@@ -177,7 +177,11 @@ function interpolate(table, skey, sval, tkey) {
 	return prev[tkey] + offset;
 }
 
-function toTimestamp(scale, input) {
+function parse(scale, input) {
+	if (helpers.isNullOrUndef(input)) {
+		return null;
+	}
+
 	var adapter = scale._adapter;
 	var options = scale.options.time;
 	var parser = options.parser;
@@ -194,25 +198,15 @@ function toTimestamp(scale, input) {
 			: adapter.parse(value);
 	}
 
-	return value !== null ? +value : value;
-}
-
-function parse(scale, input) {
-	if (helpers.isNullOrUndef(input)) {
-		return null;
-	}
-
-	var options = scale.options.time;
-	var value = toTimestamp(scale, input);
 	if (value === null) {
 		return value;
 	}
 
 	if (options.round) {
-		value = +scale._adapter.startOf(value, options.round);
+		value = scale._adapter.startOf(value, options.round);
 	}
 
-	return value;
+	return +value;
 }
 
 /**
@@ -364,42 +358,60 @@ function ticksFromTimestamps(scale, values, majorUnit) {
 	return (ilen === 0 || !majorUnit) ? ticks : setMajorTicks(scale, ticks, map, majorUnit);
 }
 
-
 function getDataTimestamps(scale) {
 	var timestamps = scale._cache.data || [];
 	var i, ilen, metas;
 
-	if (!timestamps.length) {
-		metas = scale._getMatchingVisibleMetas();
-		for (i = 0, ilen = metas.length; i < ilen; ++i) {
-			timestamps = timestamps.concat(metas[i].controller._getAllParsedValues(scale));
-		}
-		timestamps = scale._cache.data = arrayUnique(timestamps).sort(sorter);
+	if (timestamps.length) {
+		return timestamps;
 	}
-	return timestamps;
+
+	metas = scale._getMatchingVisibleMetas();
+	for (i = 0, ilen = metas.length; i < ilen; ++i) {
+		timestamps = timestamps.concat(metas[i].controller._getAllParsedValues(scale));
+	}
+
+	// We can not assume data is in order or unique - not even for single dataset
+	// It seems to be somewhat faster to do sorting first
+	return (scale._cache.data = arrayUnique(timestamps.sort(sorter)));
 }
 
 function getLabelTimestamps(scale) {
 	var timestamps = scale._cache.labels || [];
 	var i, ilen, labels;
 
-	if (!timestamps.length) {
-		labels = scale._getLabels();
-		for (i = 0, ilen = labels.length; i < ilen; ++i) {
-			timestamps.push(parse(scale, labels[i]));
-		}
-		timestamps = scale._cache.labels = arrayUnique(timestamps).sort(sorter);
+	if (timestamps.length) {
+		return timestamps;
 	}
-	return timestamps;
+
+	labels = scale._getLabels();
+	for (i = 0, ilen = labels.length; i < ilen; ++i) {
+		timestamps.push(parse(scale, labels[i]));
+	}
+
+	// We could assume labels are in order and unique - but let's not
+	return (scale._cache.labels = arrayUnique(timestamps.sort(sorter)));
 }
 
 function getAllTimestamps(scale) {
 	var timestamps = scale._cache.all || [];
+	var label, data;
 
-	if (!timestamps.length) {
-		timestamps = getDataTimestamps(scale).concat(getLabelTimestamps(scale));
-		timestamps = scale._cache.all = arrayUnique(timestamps).sort(sorter);
+	if (timestamps.length) {
+		return timestamps;
 	}
+
+	data = getDataTimestamps(scale);
+	label = getLabelTimestamps(scale);
+	if (data.length && label.length) {
+		// If combining labels and data (data might not contain all labels),
+		// we need to recheck uniqueness and sort
+		timestamps = arrayUnique(data.concat(label).sort(sorter));
+	} else {
+		timestamps = data.length ? data : label;
+	}
+	timestamps = scale._cache.all = timestamps;
+
 	return timestamps;
 }
 
@@ -421,6 +433,24 @@ function getTimestampsForTicks(scale) {
 	}
 
 	return timestamps;
+}
+
+function getTimestampsForTable(scale) {
+	return scale.options.distribution === 'series'
+		? getAllTimestamps(scale)
+		: [scale.min, scale.max];
+}
+
+function getLabelBounds(scale) {
+	var min = Number.POSITIVE_INFINITY;
+	var max = Number.NEGATIVE_INFINITY;
+	var arr = getLabelTimestamps(scale);
+
+	if (arr.length) {
+		min = arr[0];
+		max = arr[arr.length - 1];
+	}
+	return {min, max};
 }
 
 /**
@@ -447,7 +477,7 @@ function filterBetween(timestamps, min, max) {
 		: timestamps;
 }
 
-var defaultConfig = {
+const defaultConfig = {
 	position: 'bottom',
 
 	/**
@@ -496,15 +526,15 @@ var defaultConfig = {
 	}
 };
 
-module.exports = Scale.extend({
-	_parse: function(raw, index) { // eslint-disable-line no-unused-vars
+class TimeScale extends Scale {
+	_parse(raw, index) { // eslint-disable-line no-unused-vars
 		if (raw === undefined) {
 			return NaN;
 		}
-		return toTimestamp(this, raw);
-	},
+		return parse(this, raw);
+	}
 
-	_parseObject: function(obj, axis, index) {
+	_parseObject(obj, axis, index) {
 		if (obj && obj.t) {
 			return this._parse(obj.t, index);
 		}
@@ -512,13 +542,15 @@ module.exports = Scale.extend({
 			return this._parse(obj[axis], index);
 		}
 		return null;
-	},
+	}
 
-	_invalidateCaches: function() {
+	_invalidateCaches() {
 		this._cache = {};
-	},
+	}
 
-	initialize: function() {
+	constructor(props) {
+		super(props);
+
 		var me = this;
 		var options = me.options;
 		var time = options.time || (options.time = {});
@@ -533,42 +565,45 @@ module.exports = Scale.extend({
 		// missing formats on update
 
 		helpers.mergeIf(time.displayFormats, adapter.formats());
+	}
 
-		Scale.prototype.initialize.call(me);
-	},
-
-	determineDataLimits: function() {
+	determineDataLimits() {
 		var me = this;
-		var adapter = me._adapter;
 		var options = me.options;
-		var tickOpts = options.ticks;
+		var adapter = me._adapter;
 		var unit = options.time.unit || 'day';
-		var min = Number.POSITIVE_INFINITY;
-		var max = Number.NEGATIVE_INFINITY;
-		var minmax = me._getMinMax(false);
-		var i, ilen, labels;
+		var {min, max, minDefined, maxDefined} = me._getUserBounds();
 
-		min = Math.min(min, minmax.min);
-		max = Math.max(max, minmax.max);
+		function _applyBounds(bounds) {
+			if (!minDefined && !isNaN(bounds.min)) {
+				min = Math.min(min, bounds.min);
+			}
+			if (!maxDefined && !isNaN(bounds.max)) {
+				max = Math.max(max, bounds.max);
+			}
+		}
 
-		labels = getLabelTimestamps(me);
-		for (i = 0, ilen = labels.length; i < ilen; ++i) {
-			min = Math.min(min, labels[i]);
-			max = Math.max(max, labels[i]);
+		// If we have user provided `min` and `max` labels / data bounds can be ignored
+		if (!minDefined || !maxDefined) {
+			// Labels are always considered, when user did not force bounds
+			_applyBounds(getLabelBounds(me));
+
+			// If `bounds` is `'ticks'` and `ticks.source` is `'labels'`,
+			// data bounds are ignored (and don't need to be determined)
+			if (options.bounds !== 'ticks' || options.ticks.source !== 'labels') {
+				_applyBounds(me._getMinMax(false));
+			}
 		}
 
 		min = helpers.isFinite(min) && !isNaN(min) ? min : +adapter.startOf(Date.now(), unit);
 		max = helpers.isFinite(max) && !isNaN(max) ? max : +adapter.endOf(Date.now(), unit) + 1;
 
-		min = parse(me, tickOpts.min) || min;
-		max = parse(me, tickOpts.max) || max;
-
 		// Make sure that max is strictly higher than min (required by the lookup table)
 		me.min = Math.min(min, max);
 		me.max = Math.max(min + 1, max);
-	},
+	}
 
-	buildTicks: function() {
+	buildTicks() {
 		var me = this;
 		var options = me.options;
 		var timeOpts = options.time;
@@ -580,8 +615,8 @@ module.exports = Scale.extend({
 		timestamps = getTimestampsForTicks(me);
 
 		if (options.bounds === 'ticks' && timestamps.length) {
-			me.min = parse(me, tickOpts.min) || timestamps[0];
-			me.max = parse(me, tickOpts.max) || timestamps[timestamps.length - 1];
+			me.min = me._userMin || timestamps[0];
+			me.max = me._userMax || timestamps[timestamps.length - 1];
 		}
 
 		min = me.min;
@@ -597,17 +632,17 @@ module.exports = Scale.extend({
 			: determineUnitForFormatting(me, ticks.length, timeOpts.minUnit, me.min, me.max));
 		me._majorUnit = !tickOpts.major.enabled || me._unit === 'year' ? undefined
 			: determineMajorUnit(me._unit);
-		me._table = buildLookupTable(getAllTimestamps(me), min, max, distribution);
+		me._table = buildLookupTable(getTimestampsForTable(me), min, max, distribution);
 		me._offsets = computeOffsets(me._table, ticks, min, max, options);
 
-		if (tickOpts.reverse) {
+		if (options.reverse) {
 			ticks.reverse();
 		}
 
 		return ticksFromTimestamps(me, ticks, me._majorUnit);
-	},
+	}
 
-	getLabelForValue: function(value) {
+	getLabelForValue(value) {
 		var me = this;
 		var adapter = me._adapter;
 		var timeOpts = me.options.time;
@@ -616,13 +651,13 @@ module.exports = Scale.extend({
 			return adapter.format(value, timeOpts.tooltipFormat);
 		}
 		return adapter.format(value, timeOpts.displayFormats.datetime);
-	},
+	}
 
 	/**
 	 * Function to format an individual tick mark
 	 * @private
 	 */
-	_tickFormatFunction: function(time, index, ticks, format) {
+	_tickFormatFunction(time, index, ticks, format) {
 		var me = this;
 		var adapter = me._adapter;
 		var options = me.options;
@@ -641,28 +676,28 @@ module.exports = Scale.extend({
 		]);
 
 		return formatter ? formatter(label, index, ticks) : label;
-	},
+	}
 
-	generateTickLabels: function(ticks) {
+	generateTickLabels(ticks) {
 		var i, ilen, tick;
 
 		for (i = 0, ilen = ticks.length; i < ilen; ++i) {
 			tick = ticks[i];
 			tick.label = this._tickFormatFunction(tick.value, i, ticks);
 		}
-	},
+	}
 
 	/**
 	 * @private
 	 */
-	_getPixelForOffset: function(time) {
+	_getPixelForOffset(time) {
 		var me = this;
 		var offsets = me._offsets;
 		var pos = interpolate(me._table, 'time', time, 'pos');
 		return me.getPixelForDecimal((offsets.start + pos) * offsets.factor);
-	},
+	}
 
-	getPixelForValue: function(value) {
+	getPixelForValue(value) {
 		var me = this;
 
 		if (typeof value !== 'number') {
@@ -672,26 +707,26 @@ module.exports = Scale.extend({
 		if (value !== null) {
 			return me._getPixelForOffset(value);
 		}
-	},
+	}
 
-	getPixelForTick: function(index) {
+	getPixelForTick(index) {
 		var ticks = this.getTicks();
 		return index >= 0 && index < ticks.length ?
 			this._getPixelForOffset(ticks[index].value) :
 			null;
-	},
+	}
 
-	getValueForPixel: function(pixel) {
+	getValueForPixel(pixel) {
 		var me = this;
 		var offsets = me._offsets;
 		var pos = me.getDecimalForPixel(pixel) / offsets.factor - offsets.end;
 		return interpolate(me._table, 'pos', pos, 'time');
-	},
+	}
 
 	/**
 	 * @private
 	 */
-	_getLabelSize: function(label) {
+	_getLabelSize(label) {
 		var me = this;
 		var ticksOpts = me.options.ticks;
 		var tickLabelWidth = me.ctx.measureText(label).width;
@@ -704,12 +739,12 @@ module.exports = Scale.extend({
 			w: (tickLabelWidth * cosRotation) + (tickFontSize * sinRotation),
 			h: (tickLabelWidth * sinRotation) + (tickFontSize * cosRotation)
 		};
-	},
+	}
 
 	/**
 	 * @private
 	 */
-	_getLabelCapacity: function(exampleTime) {
+	_getLabelCapacity(exampleTime) {
 		var me = this;
 		var timeOpts = me.options.time;
 		var displayFormats = timeOpts.displayFormats;
@@ -726,7 +761,8 @@ module.exports = Scale.extend({
 
 		return capacity > 0 ? capacity : 1;
 	}
-});
+}
 
+module.exports = TimeScale;
 // INTERNAL: static default options, registered in src/index.js
 module.exports._defaults = defaultConfig;

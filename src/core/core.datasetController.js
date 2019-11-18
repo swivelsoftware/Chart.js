@@ -50,10 +50,10 @@ function listenArrayEvents(array, listener) {
 
 
 function scaleClip(scale, allowedOverflow) {
-	var tickOpts = scale && scale.options.ticks || {};
-	var reverse = tickOpts.reverse;
-	var min = tickOpts.min === undefined ? allowedOverflow : 0;
-	var max = tickOpts.max === undefined ? allowedOverflow : 0;
+	var opts = scale && scale.options || {};
+	var reverse = opts.reverse;
+	var min = opts.min === undefined ? allowedOverflow : 0;
+	var max = opts.max === undefined ? allowedOverflow : 0;
 	return {
 		start: reverse ? max : min,
 		end: reverse ? min : max
@@ -146,7 +146,7 @@ function applyStack(stack, value, dsIndex, allOther) {
 			break;
 		}
 		otherValue = stack.values[datasetIndex];
-		if (!isNaN(otherValue) && (value === 0 || Math.sign(value) === Math.sign(otherValue))) {
+		if (!isNaN(otherValue) && (value === 0 || helpers.sign(value) === helpers.sign(otherValue))) {
 			value += otherValue;
 		}
 	}
@@ -172,8 +172,8 @@ function isStacked(scale, meta) {
 	return stacked || (stacked === undefined && meta.stack !== undefined);
 }
 
-function getStackKey(xScale, yScale, meta) {
-	return isStacked(yScale, meta) && xScale.id + '.' + yScale.id + '.' + meta.stack + '.' + meta.type;
+function getStackKey(indexScale, valueScale, meta) {
+	return indexScale.id + '.' + valueScale.id + '.' + meta.stack + '.' + meta.type;
 }
 
 function getFirstScaleId(chart, axis) {
@@ -185,6 +185,13 @@ function getFirstScaleId(chart, axis) {
 	return (scalesOpts && scalesOpts[prop] && scalesOpts[prop].length && scalesOpts[prop][0].id) || scaleId;
 }
 
+function getUserBounds(scale) {
+	var {min, max, minDefined, maxDefined} = scale._getUserBounds();
+	return {
+		min: minDefined ? min : Number.NEGATIVE_INFINITY,
+		max: maxDefined ? max : Number.POSITIVE_INFINITY
+	};
+}
 // Base class for all dataset controllers (line, bar, etc)
 var DatasetController = function(chart, datasetIndex) {
 	this.initialize(chart, datasetIndex);
@@ -298,6 +305,15 @@ helpers.extend(DatasetController.prototype, {
 		return this.getScaleForId(this._getIndexScaleId());
 	},
 
+	/**
+	 * @private
+	 */
+	_getOtherScale: function(scale) {
+		return scale.id === this._getIndexScaleId()
+			? this._getValueScale()
+			: this._getIndexScale();
+	},
+
 	reset: function() {
 		this._update(true);
 	},
@@ -311,23 +327,9 @@ helpers.extend(DatasetController.prototype, {
 		}
 	},
 
-	createMetaDataset: function() {
-		var me = this;
-		var type = me.datasetElementType;
+	createElement: function(type) {
 		return type && new type({
-			_ctx: me.chart.ctx,
-			_datasetIndex: me.index
-		});
-	},
-
-	createMetaData: function(index) {
-		var me = this;
-		var type = me.dataElementType;
-		return type && new type({
-			_ctx: me.chart.ctx,
-			_datasetIndex: me.index,
-			_index: index,
-			_parsed: {}
+			_ctx: this.chart.ctx
 		});
 	},
 
@@ -398,16 +400,10 @@ helpers.extend(DatasetController.prototype, {
 		data = me._data;
 
 		for (i = 0, ilen = data.length; i < ilen; ++i) {
-			metaData[i] = metaData[i] || me.createMetaData(i);
+			metaData[i] = metaData[i] || me.createElement(me.dataElementType);
 		}
 
-		meta.dataset = meta.dataset || me.createMetaDataset();
-	},
-
-	addElementAndReset: function(index) {
-		var element = this.createMetaData(index);
-		this._cachedMeta.data.splice(index, 0, element);
-		this.updateElement(element, index, true);
+		meta.dataset = meta.dataset || me.createElement(me.datasetElementType);
 	},
 
 	buildOrUpdateElements: function() {
@@ -447,18 +443,20 @@ helpers.extend(DatasetController.prototype, {
 	 * @private
 	 */
 	_parse: function(start, count) {
-		var me = this;
-		var chart = me.chart;
-		var meta = me._cachedMeta;
-		var data = me._data;
-		var crossRef = chart._xref || (chart._xref = {});
-		var xScale = me._getIndexScale();
-		var yScale = me._getValueScale();
-		var xId = xScale.id;
-		var yId = yScale.id;
-		var xKey = getStackKey(xScale, yScale, meta);
-		var yKey = getStackKey(yScale, xScale, meta);
-		var stacks = xKey || yKey;
+		const me = this;
+		const chart = me.chart;
+		const meta = me._cachedMeta;
+		const data = me._data;
+		const stacks = chart._stacks || (chart._stacks = {}); // map structure is {stackKey: {datasetIndex: value}}
+		const xScale = me._getIndexScale();
+		const yScale = me._getValueScale();
+		const xId = xScale.id;
+		const yId = yScale.id;
+		const xStacked = isStacked(xScale, meta);
+		const yStacked = isStacked(yScale, meta);
+		const xKey = yStacked && getStackKey(xScale, yScale, meta);
+		const yKey = xStacked && getStackKey(yScale, xScale, meta);
+		const stacked = xStacked || yStacked;
 		var i, ilen, parsed, stack, item, x, y;
 
 		if (helpers.isArray(data[start])) {
@@ -470,25 +468,27 @@ helpers.extend(DatasetController.prototype, {
 		}
 
 		function storeStack(stackKey, indexValue, scaleId, value) {
-			if (stackKey) {
-				stackKey += '.' + indexValue;
-				item._stackKeys[scaleId] = stackKey;
-				stack = crossRef[stackKey] || (crossRef[stackKey] = {});
-				stack[meta.index] = value;
-			}
+			stackKey += '.' + indexValue;
+			item._stackKeys[scaleId] = stackKey;
+			stack = stacks[stackKey] || (stacks[stackKey] = {});
+			stack[meta.index] = value;
 		}
 
 		for (i = 0, ilen = parsed.length; i < ilen; ++i) {
 			item = parsed[i];
 			meta.data[start + i]._parsed = item;
 
-			if (stacks) {
+			if (stacked) {
 				item._stackKeys = {};
 				x = item[xId];
 				y = item[yId];
 
-				storeStack(xKey, x, yId, y);
-				storeStack(yKey, y, xId, x);
+				if (yStacked) {
+					storeStack(xKey, x, yId, y);
+				}
+				if (xStacked) {
+					storeStack(yKey, y, xId, x);
+				}
 			}
 		}
 
@@ -598,7 +598,7 @@ helpers.extend(DatasetController.prototype, {
 		var value = parsed[scale.id];
 		var stack = {
 			keys: getSortedDatasetIndices(chart, true),
-			values: chart._xref[parsed._stackKeys[scale.id]]
+			values: chart._stacks[parsed._stackKeys[scale.id]]
 		};
 		return applyStack(stack, value, meta.index);
 	},
@@ -611,11 +611,13 @@ helpers.extend(DatasetController.prototype, {
 		var meta = this._cachedMeta;
 		var metaData = meta.data;
 		var ilen = metaData.length;
-		var crossRef = chart._xref || (chart._xref = {});
+		var stacks = chart._stacks || (chart._stacks = {});
 		var max = Number.NEGATIVE_INFINITY;
 		var stacked = canStack && meta._stacked;
 		var indices = getSortedDatasetIndices(chart, true);
-		var i, item, value, parsed, stack, min, minPositive;
+		var otherScale = this._getOtherScale(scale);
+		var {min: otherMin, max: otherMax} = getUserBounds(otherScale);
+		var i, item, value, parsed, stack, min, minPositive, otherValue;
 
 		min = minPositive = Number.POSITIVE_INFINITY;
 
@@ -623,13 +625,15 @@ helpers.extend(DatasetController.prototype, {
 			item = metaData[i];
 			parsed = item._parsed;
 			value = parsed[scale.id];
-			if (item.hidden || isNaN(value)) {
+			otherValue = parsed[otherScale.id];
+			if (item.hidden || isNaN(value) ||
+				otherMin > otherValue || otherMax < otherValue) {
 				continue;
 			}
 			if (stacked) {
 				stack = {
 					keys: indices,
-					values: crossRef[parsed._stackKeys[scale.id]]
+					values: stacks[parsed._stackKeys[scale.id]]
 				};
 				value = applyStack(stack, value, meta.index, true);
 			}
@@ -700,6 +704,23 @@ helpers.extend(DatasetController.prototype, {
 		return false;
 	},
 
+	/**
+	 * @private
+	 */
+	_getLabelAndValue: function(index) {
+		const me = this;
+		const indexScale = me._getIndexScale();
+		const valueScale = me._getValueScale();
+		const parsed = me._getParsed(index);
+		return {
+			label: indexScale ? '' + indexScale.getLabelForValue(parsed[indexScale.id]) : '',
+			value: valueScale ? '' + valueScale.getLabelForValue(parsed[valueScale.id]) : ''
+		};
+	},
+
+	/**
+	 * @private
+	 */
 	_update: function(reset) {
 		var me = this;
 		me._configure();
@@ -935,10 +956,17 @@ helpers.extend(DatasetController.prototype, {
 	 * @private
 	 */
 	insertElements: function(start, count) {
-		for (var i = 0; i < count; ++i) {
-			this.addElementAndReset(start + i);
+		const me = this;
+		const elements = [];
+		var i;
+		for (i = start; i < start + count; ++i) {
+			elements.push(me.createElement(me.dataElementType));
 		}
-		this._parse(start, count);
+		me._cachedMeta.data.splice(start, 0, ...elements);
+		me._parse(start, count);
+		for (i = 0; i < count; ++i) {
+			me.updateElement(elements[i], start + i, true);
+		}
 	},
 
 	/**

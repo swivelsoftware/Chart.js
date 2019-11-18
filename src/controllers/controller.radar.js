@@ -19,6 +19,14 @@ defaults._set('radar', {
 	}
 });
 
+function nextItem(collection, index) {
+	return index >= collection.length - 1 ? collection[0] : collection[index + 1];
+}
+
+function previousItem(collection, index) {
+	return index <= 0 ? collection[collection.length - 1] : collection[index - 1];
+}
+
 module.exports = DatasetController.extend({
 	datasetElementType: elements.Line,
 
@@ -69,19 +77,27 @@ module.exports = DatasetController.extend({
 		return this.chart.scale.id;
 	},
 
+	/**
+	 * @private
+	 */
+	_getLabelAndValue: function(index) {
+		const me = this;
+		const scale = me._getValueScale();
+		const parsed = me._getParsed(index);
+
+		return {
+			label: scale._getLabels()[index],
+			value: '' + scale.getLabelForValue(parsed[scale.id])
+		};
+	},
+
 	update: function(reset) {
 		var me = this;
 		var meta = me.getMeta();
 		var line = meta.dataset;
 		var points = meta.data || [];
-		var config = me._config;
 		var animationsDisabled = me.chart._animationsDisabled;
 		var i, ilen;
-
-		// Compatibility: If the properties are defined with only the old name, use those values
-		if (config.tension !== undefined && config.lineTension === undefined) {
-			config.lineTension = config.tension;
-		}
 
 		// Data
 		line._children = points;
@@ -111,7 +127,6 @@ module.exports = DatasetController.extend({
 		var scale = me.chart.scale;
 		var pointPosition = scale.getPointPositionForValue(index, dataset.data[index]);
 		var options = me._resolveDataElementOptions(index);
-		var lineModel = me.getMeta().dataset._model;
 		var x = reset ? scale.xCenter : pointPosition.x;
 		var y = reset ? scale.yCenter : pointPosition.y;
 
@@ -130,7 +145,6 @@ module.exports = DatasetController.extend({
 			backgroundColor: options.backgroundColor,
 			borderColor: options.borderColor,
 			borderWidth: options.borderWidth,
-			tension: lineModel ? lineModel.tension : 0,
 
 			// Tooltip
 			hitRadius: options.hitRadius
@@ -155,6 +169,7 @@ module.exports = DatasetController.extend({
 	updateBezierControlPoints: function() {
 		var me = this;
 		var meta = me.getMeta();
+		var lineModel = meta.dataset._model;
 		var area = me.chart.chartArea;
 		var points = meta.data || [];
 		var i, ilen, model, controlPoints;
@@ -173,10 +188,10 @@ module.exports = DatasetController.extend({
 		for (i = 0, ilen = points.length; i < ilen; ++i) {
 			model = points[i]._model;
 			controlPoints = helpers.splineCurve(
-				helpers.previousItem(points, i, true)._model,
+				previousItem(points, i)._model,
 				model,
-				helpers.nextItem(points, i, true)._model,
-				model.tension
+				nextItem(points, i)._model,
+				lineModel.tension
 			);
 
 			// Prevent the bezier going outside of the bounds of the graph

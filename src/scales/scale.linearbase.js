@@ -1,9 +1,9 @@
 'use strict';
 
-var helpers = require('../helpers/index');
-var Scale = require('../core/core.scale');
+const helpers = require('../helpers/index');
+const Scale = require('../core/core.scale');
 
-var isNullOrUndef = helpers.isNullOrUndef;
+const isNullOrUndef = helpers.isNullOrUndef;
 
 /**
  * Generate a set of linear ticks
@@ -83,8 +83,8 @@ function generateTicks(generationOptions, dataRange) {
 	return ticks;
 }
 
-module.exports = Scale.extend({
-	_parse: function(raw) {
+class LinearScaleBase extends Scale {
+	_parse(raw, index) { // eslint-disable-line no-unused-vars
 		if (helpers.isNullOrUndef(raw)) {
 			return NaN;
 		}
@@ -93,17 +93,16 @@ module.exports = Scale.extend({
 		}
 
 		return +raw;
-	},
+	}
 
-	handleTickRangeOptions: function() {
+	handleTickRangeOptions() {
 		var me = this;
 		var opts = me.options;
-		var tickOpts = opts.ticks;
 
 		// If we are forcing it to begin at 0, but 0 will already be rendered on the chart,
 		// do nothing since that would make the chart weird. If the user really wants a weird chart
 		// axis, they can manually override it
-		if (tickOpts.beginAtZero) {
+		if (opts.beginAtZero) {
 			var minSign = helpers.sign(me.min);
 			var maxSign = helpers.sign(me.max);
 
@@ -116,26 +115,26 @@ module.exports = Scale.extend({
 			}
 		}
 
-		var setMin = tickOpts.min !== undefined || tickOpts.suggestedMin !== undefined;
-		var setMax = tickOpts.max !== undefined || tickOpts.suggestedMax !== undefined;
+		var setMin = opts.min !== undefined || opts.suggestedMin !== undefined;
+		var setMax = opts.max !== undefined || opts.suggestedMax !== undefined;
 
-		if (tickOpts.min !== undefined) {
-			me.min = tickOpts.min;
-		} else if (tickOpts.suggestedMin !== undefined) {
+		if (opts.min !== undefined) {
+			me.min = opts.min;
+		} else if (opts.suggestedMin !== undefined) {
 			if (me.min === null) {
-				me.min = tickOpts.suggestedMin;
+				me.min = opts.suggestedMin;
 			} else {
-				me.min = Math.min(me.min, tickOpts.suggestedMin);
+				me.min = Math.min(me.min, opts.suggestedMin);
 			}
 		}
 
-		if (tickOpts.max !== undefined) {
-			me.max = tickOpts.max;
-		} else if (tickOpts.suggestedMax !== undefined) {
+		if (opts.max !== undefined) {
+			me.max = opts.max;
+		} else if (opts.suggestedMax !== undefined) {
 			if (me.max === null) {
-				me.max = tickOpts.suggestedMax;
+				me.max = opts.suggestedMax;
 			} else {
-				me.max = Math.max(me.max, tickOpts.suggestedMax);
+				me.max = Math.max(me.max, opts.suggestedMax);
 			}
 		}
 
@@ -143,7 +142,7 @@ module.exports = Scale.extend({
 			// We set the min or the max but not both.
 			// So ensure that our range is good
 			// Inverted or 0 length range can happen when
-			// ticks.min is set, and no datasets are visible
+			// min is set, and no datasets are visible
 			if (me.min >= me.max) {
 				if (setMin) {
 					me.max = me.min + 1;
@@ -156,13 +155,13 @@ module.exports = Scale.extend({
 		if (me.min === me.max) {
 			me.max++;
 
-			if (!tickOpts.beginAtZero) {
+			if (!opts.beginAtZero) {
 				me.min--;
 			}
 		}
-	},
+	}
 
-	getTickLimit: function() {
+	getTickLimit() {
 		var me = this;
 		var tickOpts = me.options.ticks;
 		var stepSize = tickOpts.stepSize;
@@ -181,17 +180,17 @@ module.exports = Scale.extend({
 		}
 
 		return maxTicks;
-	},
+	}
 
-	_computeTickLimit: function() {
+	_computeTickLimit() {
 		return Number.POSITIVE_INFINITY;
-	},
+	}
 
-	_handleDirectionalChanges: function(ticks) {
+	_handleDirectionalChanges(ticks) {
 		return ticks;
-	},
+	}
 
-	buildTicks: function() {
+	buildTicks() {
 		var me = this;
 		var opts = me.options;
 		var tickOpts = opts.ticks;
@@ -205,8 +204,8 @@ module.exports = Scale.extend({
 
 		var numericGeneratorOptions = {
 			maxTicks: maxTicks,
-			min: tickOpts.min,
-			max: tickOpts.max,
+			min: opts.min,
+			max: opts.max,
 			precision: tickOpts.precision,
 			stepSize: helpers.valueOrDefault(tickOpts.fixedStepSize, tickOpts.stepSize)
 		};
@@ -218,7 +217,7 @@ module.exports = Scale.extend({
 		// range of the scale
 		helpers._setMinAndMaxByKey(ticks, me, 'value');
 
-		if (tickOpts.reverse) {
+		if (opts.reverse) {
 			ticks.reverse();
 
 			me.start = me.max;
@@ -229,15 +228,15 @@ module.exports = Scale.extend({
 		}
 
 		return ticks;
-	},
+	}
 
-	generateTickLabels: function(ticks) {
+	generateTickLabels(ticks) {
 		var me = this;
 		me._tickValues = ticks.map(t => t.value);
 		Scale.prototype.generateTickLabels.call(me, ticks);
-	},
+	}
 
-	_configure: function() {
+	_configure() {
 		var me = this;
 		var ticks = me.getTicks();
 		var start = me.min;
@@ -255,4 +254,6 @@ module.exports = Scale.extend({
 		me._endValue = end;
 		me._valueRange = end - start;
 	}
-});
+}
+
+module.exports = LinearScaleBase;

@@ -1,64 +1,36 @@
 'use strict';
 
-var PI = Math.PI;
-var RAD_PER_DEG = PI / 180;
-var DOUBLE_PI = PI * 2;
-var HALF_PI = PI / 2;
-var QUARTER_PI = PI / 4;
-var TWO_THIRDS_PI = PI * 2 / 3;
+const PI = Math.PI;
+const RAD_PER_DEG = PI / 180;
+const DOUBLE_PI = PI * 2;
+const HALF_PI = PI / 2;
+const QUARTER_PI = PI / 4;
+const TWO_THIRDS_PI = PI * 2 / 3;
 
 /**
  * @namespace Chart.helpers.canvas
  */
-var exports = {
+module.exports = {
+	/**
+	 * Returns the aligned pixel value to avoid anti-aliasing blur
+	 * @param {Chart} chart - The chart instance.
+	 * @param {number} pixel - A pixel value.
+	 * @param {number} width - The width of the element.
+	 * @returns {number} The aligned pixel value.
+	 * @private
+	 */
+	_alignPixel: function(chart, pixel, width) {
+		const devicePixelRatio = chart.currentDevicePixelRatio;
+		const halfWidth = width / 2;
+		return Math.round((pixel - halfWidth) * devicePixelRatio) / devicePixelRatio + halfWidth;
+	},
+
 	/**
 	 * Clears the entire canvas associated to the given `chart`.
 	 * @param {Chart} chart - The chart for which to clear the canvas.
 	 */
 	clear: function(chart) {
 		chart.ctx.clearRect(0, 0, chart.width, chart.height);
-	},
-
-	/**
-	 * Creates a "path" for a rectangle with rounded corners at position (x, y) with a
-	 * given size (width, height) and the same `radius` for all corners.
-	 * @param {CanvasRenderingContext2D} ctx - The canvas 2D Context.
-	 * @param {number} x - The x axis of the coordinate for the rectangle starting point.
-	 * @param {number} y - The y axis of the coordinate for the rectangle starting point.
-	 * @param {number} width - The rectangle's width.
-	 * @param {number} height - The rectangle's height.
-	 * @param {number} radius - The rounded amount (in pixels) for the four corners.
-	 * @todo handle `radius` as top-left, top-right, bottom-right, bottom-left array/object?
-	 */
-	roundedRect: function(ctx, x, y, width, height, radius) {
-		if (radius) {
-			var r = Math.min(radius, height / 2, width / 2);
-			var left = x + r;
-			var top = y + r;
-			var right = x + width - r;
-			var bottom = y + height - r;
-
-			ctx.moveTo(x, top);
-			if (left < right && top < bottom) {
-				ctx.arc(left, top, r, -PI, -HALF_PI);
-				ctx.arc(right, top, r, -HALF_PI, 0);
-				ctx.arc(right, bottom, r, 0, HALF_PI);
-				ctx.arc(left, bottom, r, HALF_PI, PI);
-			} else if (left < right) {
-				ctx.moveTo(left, y);
-				ctx.arc(right, top, r, -HALF_PI, HALF_PI);
-				ctx.arc(left, top, r, HALF_PI, PI + HALF_PI);
-			} else if (top < bottom) {
-				ctx.arc(left, top, r, -PI, 0);
-				ctx.arc(left, bottom, r, 0, PI);
-			} else {
-				ctx.arc(left, top, r, -PI, PI);
-			}
-			ctx.closePath();
-			ctx.moveTo(x, y);
-		} else {
-			ctx.rect(x, y, width, height);
-		}
 	},
 
 	drawPoint: function(ctx, style, radius, x, y, rotation) {
@@ -199,27 +171,26 @@ var exports = {
 		ctx.restore();
 	},
 
-	lineTo: function(ctx, previous, target, flip) {
-		var stepped = target.steppedLine;
-		if (stepped) {
-			if (stepped === 'middle') {
-				var midpoint = (previous.x + target.x) / 2.0;
-				ctx.lineTo(midpoint, flip ? target.y : previous.y);
-				ctx.lineTo(midpoint, flip ? previous.y : target.y);
-			} else if ((stepped === 'after' && !flip) || (stepped !== 'after' && flip)) {
-				ctx.lineTo(previous.x, target.y);
-			} else {
-				ctx.lineTo(target.x, previous.y);
-			}
-			ctx.lineTo(target.x, target.y);
-			return;
+	/**
+	 * @private
+	 */
+	_steppedLineTo: function(ctx, previous, target, flip, mode) {
+		if (mode === 'middle') {
+			const midpoint = (previous.x + target.x) / 2.0;
+			ctx.lineTo(midpoint, flip ? target.y : previous.y);
+			ctx.lineTo(midpoint, flip ? previous.y : target.y);
+		} else if ((mode === 'after' && !flip) || (mode !== 'after' && flip)) {
+			ctx.lineTo(previous.x, target.y);
+		} else {
+			ctx.lineTo(target.x, previous.y);
 		}
+		ctx.lineTo(target.x, target.y);
+	},
 
-		if (!target.tension) {
-			ctx.lineTo(target.x, target.y);
-			return;
-		}
-
+	/**
+	 * @private
+	 */
+	_bezierCurveTo: function(ctx, previous, target, flip) {
 		ctx.bezierCurveTo(
 			flip ? previous.controlPointPreviousX : previous.controlPointNextX,
 			flip ? previous.controlPointPreviousY : previous.controlPointNextY,
@@ -229,5 +200,3 @@ var exports = {
 			target.y);
 	}
 };
-
-module.exports = exports;

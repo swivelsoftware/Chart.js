@@ -739,8 +739,6 @@ describe('Chart.controllers.bar', function() {
 			{x: 89, y: 512},
 			{x: 217, y: 0}
 		].forEach(function(expected, i) {
-			expect(meta.data[i]._datasetIndex).toBe(1);
-			expect(meta.data[i]._index).toBe(i);
 			expect(meta.data[i]._model.x).toBeCloseToPixel(expected.x);
 			expect(meta.data[i]._model.y).toBeCloseToPixel(expected.y);
 			expect(meta.data[i]._model.base).toBeCloseToPixel(1024);
@@ -888,10 +886,8 @@ describe('Chart.controllers.bar', function() {
 						type: 'linear',
 						display: false,
 						stacked: true,
-						ticks: {
-							min: 50,
-							max: 100
-						}
+						min: 50,
+						max: 100
 					}]
 				}
 			}
@@ -1495,7 +1491,7 @@ describe('Chart.controllers.bar', function() {
 			var totalBarWidth = 0;
 			for (var i = 0; i < chart.data.datasets.length; i++) {
 				var bars = chart.getDatasetMeta(i).data;
-				for (var j = xScale.minIndex; j <= xScale.maxIndex; j++) {
+				for (var j = xScale.min; j <= xScale.max; j++) {
 					totalBarWidth += bars[j]._model.width;
 				}
 				if (stacked) {
@@ -1516,10 +1512,8 @@ describe('Chart.controllers.bar', function() {
 				options: {
 					scales: {
 						xAxes: [{
-							ticks: {
-								min: 'March',
-								max: 'May',
-							},
+							min: 'March',
+							max: 'May',
 						}]
 					}
 				}
@@ -1533,10 +1527,8 @@ describe('Chart.controllers.bar', function() {
 				options: {
 					scales: {
 						xAxes: [{
-							ticks: {
-								min: 'March',
-								max: 'May',
-							}
+							min: 'March',
+							max: 'May',
 						}],
 						yAxes: [{
 							stacked: true
@@ -1573,7 +1565,7 @@ describe('Chart.controllers.bar', function() {
 			var totalBarHeight = 0;
 			for (var i = 0; i < chart.data.datasets.length; i++) {
 				var bars = chart.getDatasetMeta(i).data;
-				for (var j = yScale.minIndex; j <= yScale.maxIndex; j++) {
+				for (var j = yScale.min; j <= yScale.max; j++) {
 					totalBarHeight += bars[j]._model.height;
 				}
 				if (stacked) {
@@ -1594,10 +1586,8 @@ describe('Chart.controllers.bar', function() {
 				options: {
 					scales: {
 						yAxes: [{
-							ticks: {
-								min: 'March',
-								max: 'May',
-							},
+							min: 'March',
+							max: 'May',
 						}]
 					}
 				}
@@ -1614,10 +1604,8 @@ describe('Chart.controllers.bar', function() {
 							stacked: true
 						}],
 						yAxes: [{
-							ticks: {
-								min: 'March',
-								max: 'May',
-							}
+							min: 'March',
+							max: 'May',
 						}]
 					}
 				}

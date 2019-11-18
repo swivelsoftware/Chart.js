@@ -213,6 +213,51 @@ module.exports = DatasetController.extend({
 		return parseArrayOrPrimitive.apply(this, arguments);
 	},
 
+	/**
+	 * Overriding object data parsing since we support mixed primitive/array
+	 * value-scale data for float bars
+	 * @private
+	 */
+	_parseObjectData: function(meta, data, start, count) {
+		var iScale = this._getIndexScale();
+		var vScale = this._getValueScale();
+		var vProp = vScale._getAxis();
+		var parsed = [];
+		var i, ilen, item, obj, value;
+		for (i = start, ilen = start + count; i < ilen; ++i) {
+			obj = data[i];
+			item = {};
+			item[iScale.id] = iScale._parseObject(obj, iScale._getAxis(), i);
+			value = obj[vProp];
+			if (helpers.isArray(value)) {
+				parseFloatBar(value, item, vScale, i);
+			} else {
+				item[vScale.id] = vScale._parseObject(obj, vProp, i);
+			}
+			parsed.push(item);
+		}
+		return parsed;
+	},
+
+	/**
+	 * @private
+	 */
+	_getLabelAndValue: function(index) {
+		const me = this;
+		const indexScale = me._getIndexScale();
+		const valueScale = me._getValueScale();
+		const parsed = me._getParsed(index);
+		const custom = parsed._custom;
+		const value = custom
+			? '[' + custom.start + ', ' + custom.end + ']'
+			: '' + valueScale.getLabelForValue(parsed[valueScale.id]);
+
+		return {
+			label: '' + indexScale.getLabelForValue(parsed[indexScale.id]),
+			value: value
+		};
+	},
+
 	initialize: function() {
 		var me = this;
 		var meta;
@@ -384,7 +429,7 @@ module.exports = DatasetController.extend({
 			value = custom.barStart;
 			length = custom.barEnd - custom.barStart;
 			// bars crossing origin are not stacked
-			if (value !== 0 && Math.sign(value) !== Math.sign(custom.barEnd)) {
+			if (value !== 0 && helpers.sign(value) !== helpers.sign(custom.barEnd)) {
 				start = 0;
 			}
 			start += value;

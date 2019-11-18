@@ -1,13 +1,13 @@
 'use strict';
 
-var defaults = require('../core/core.defaults');
-var helpers = require('../helpers/index');
-var Scale = require('../core/core.scale');
-var LinearScaleBase = require('./scale.linearbase');
-var Ticks = require('../core/core.ticks');
+const defaults = require('../core/core.defaults');
+const helpers = require('../helpers/index');
+const Scale = require('../core/core.scale');
+const LinearScaleBase = require('./scale.linearbase');
+const Ticks = require('../core/core.ticks');
 
-var valueOrDefault = helpers.valueOrDefault;
-var log10 = helpers.math.log10;
+const valueOrDefault = helpers.valueOrDefault;
+const log10 = helpers.math.log10;
 
 /**
  * Generate a set of logarithmic ticks
@@ -55,7 +55,7 @@ function generateTicks(generationOptions, dataRange) {
 	return ticks;
 }
 
-var defaultConfig = {
+const defaultConfig = {
 	position: 'left',
 
 	// label settings
@@ -64,15 +64,13 @@ var defaultConfig = {
 	}
 };
 
-// TODO(v3): change this to positiveOrDefault
-function nonNegativeOrDefault(value, defaultValue) {
-	return helpers.isFinite(value) && value >= 0 ? value : defaultValue;
-}
+class LogarithmicScale extends Scale {
+	_parse(raw, index) { // eslint-disable-line no-unused-vars
+		const value = LinearScaleBase.prototype._parse.apply(this, arguments);
+		return helpers.isFinite(value) && value >= 0 ? value : undefined;
+	}
 
-module.exports = Scale.extend({
-	_parse: LinearScaleBase.prototype._parse,
-
-	determineDataLimits: function() {
+	determineDataLimits() {
 		var me = this;
 		var minmax = me._getMinMax(true);
 		var min = minmax.min;
@@ -84,53 +82,53 @@ module.exports = Scale.extend({
 		me.minNotZero = helpers.isFinite(minPositive) ? minPositive : null;
 
 		me.handleTickRangeOptions();
-	},
+	}
 
-	handleTickRangeOptions: function() {
+	handleTickRangeOptions() {
 		var me = this;
-		var tickOpts = me.options.ticks;
 		var DEFAULT_MIN = 1;
 		var DEFAULT_MAX = 10;
+		var min = me.min;
+		var max = me.max;
 
-		me.min = nonNegativeOrDefault(tickOpts.min, me.min);
-		me.max = nonNegativeOrDefault(tickOpts.max, me.max);
-
-		if (me.min === me.max) {
-			if (me.min !== 0 && me.min !== null) {
-				me.min = Math.pow(10, Math.floor(log10(me.min)) - 1);
-				me.max = Math.pow(10, Math.floor(log10(me.max)) + 1);
+		if (min === max) {
+			if (min !== 0 && min !== null) {
+				min = Math.pow(10, Math.floor(log10(min)) - 1);
+				max = Math.pow(10, Math.floor(log10(max)) + 1);
 			} else {
-				me.min = DEFAULT_MIN;
-				me.max = DEFAULT_MAX;
+				min = DEFAULT_MIN;
+				max = DEFAULT_MAX;
 			}
 		}
-		if (me.min === null) {
-			me.min = Math.pow(10, Math.floor(log10(me.max)) - 1);
+		if (min === null) {
+			min = Math.pow(10, Math.floor(log10(max)) - 1);
 		}
-		if (me.max === null) {
-			me.max = me.min !== 0
-				? Math.pow(10, Math.floor(log10(me.min)) + 1)
+		if (max === null) {
+			max = min !== 0
+				? Math.pow(10, Math.floor(log10(min)) + 1)
 				: DEFAULT_MAX;
 		}
 		if (me.minNotZero === null) {
-			if (me.min > 0) {
-				me.minNotZero = me.min;
-			} else if (me.max < 1) {
-				me.minNotZero = Math.pow(10, Math.floor(log10(me.max)));
+			if (min > 0) {
+				me.minNotZero = min;
+			} else if (max < 1) {
+				me.minNotZero = Math.pow(10, Math.floor(log10(max)));
 			} else {
 				me.minNotZero = DEFAULT_MIN;
 			}
 		}
-	},
+		me.min = min;
+		me.max = max;
+	}
 
-	buildTicks: function() {
+	buildTicks() {
 		var me = this;
-		var tickOpts = me.options.ticks;
+		var opts = me.options;
 		var reverse = !me.isHorizontal();
 
 		var generationOptions = {
-			min: nonNegativeOrDefault(tickOpts.min),
-			max: nonNegativeOrDefault(tickOpts.max)
+			min: me._userMin,
+			max: me._userMax
 		};
 		var ticks = generateTicks(generationOptions, me);
 
@@ -138,7 +136,7 @@ module.exports = Scale.extend({
 		// range of the scale
 		helpers._setMinAndMaxByKey(ticks, me, 'value');
 
-		if (tickOpts.reverse) {
+		if (opts.reverse) {
 			reverse = !reverse;
 			me.start = me.max;
 			me.end = me.min;
@@ -150,21 +148,21 @@ module.exports = Scale.extend({
 			ticks.reverse();
 		}
 		return ticks;
-	},
+	}
 
-	generateTickLabels: function(ticks) {
+	generateTickLabels(ticks) {
 		this._tickValues = ticks.map(t => t.value);
 
 		return Scale.prototype.generateTickLabels.call(this, ticks);
-	},
+	}
 
-	getPixelForTick: function(index) {
+	getPixelForTick(index) {
 		var ticks = this._tickValues;
 		if (index < 0 || index > ticks.length - 1) {
 			return null;
 		}
 		return this.getPixelForValue(ticks[index]);
-	},
+	}
 
 	/**
 	 * Returns the value of the first tick.
@@ -172,14 +170,14 @@ module.exports = Scale.extend({
 	 * @return {number} The first tick value.
 	 * @private
 	 */
-	_getFirstTickValue: function(value) {
+	_getFirstTickValue(value) {
 		var exp = Math.floor(log10(value));
 		var significand = Math.floor(value / Math.pow(10, exp));
 
 		return significand * Math.pow(10, exp);
-	},
+	}
 
-	_configure: function() {
+	_configure() {
 		var me = this;
 		var start = me.min;
 		var offset = 0;
@@ -194,9 +192,9 @@ module.exports = Scale.extend({
 		me._startValue = log10(start);
 		me._valueOffset = offset;
 		me._valueRange = (log10(me.max) - log10(start)) / (1 - offset);
-	},
+	}
 
-	getPixelForValue: function(value) {
+	getPixelForValue(value) {
 		var me = this;
 		var decimal = 0;
 
@@ -204,16 +202,17 @@ module.exports = Scale.extend({
 			decimal = (log10(value) - me._startValue) / me._valueRange + me._valueOffset;
 		}
 		return me.getPixelForDecimal(decimal);
-	},
+	}
 
-	getValueForPixel: function(pixel) {
+	getValueForPixel(pixel) {
 		var me = this;
 		var decimal = me.getDecimalForPixel(pixel);
 		return decimal === 0 && me.min === 0
 			? 0
 			: Math.pow(10, me._startValue + (decimal - me._valueOffset) * me._valueRange);
 	}
-});
+}
 
+module.exports = LogarithmicScale;
 // INTERNAL: static default options, registered in src/index.js
 module.exports._defaults = defaultConfig;

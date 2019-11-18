@@ -19,6 +19,9 @@
 		}, {
 			title: 'Stacked groups',
 			path: 'charts/bar/stacked-group.html'
+		}, {
+			title: 'Floating',
+			path: 'charts/bar/float.html'
 		}]
 	}, {
 		title: 'Line charts',
@@ -127,6 +130,9 @@
 		}, {
 			title: 'Grid lines style',
 			path: 'scales/gridlines-style.html'
+		}, {
+			title: 'Scriptable Grid lines',
+			path: 'scales/gridlines-scriptable.html'
 		}, {
 			title: 'Multiline labels',
 			path: 'scales/multiline-labels.html'

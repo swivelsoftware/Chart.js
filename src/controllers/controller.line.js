@@ -110,7 +110,6 @@ module.exports = DatasetController.extend({
 		var meta = me.getMeta();
 		var xScale = me._xScale;
 		var yScale = me._yScale;
-		var lineModel = meta.dataset._model;
 		var stacked = meta._stacked;
 		var parsed = me._getParsed(index);
 		var options = me._resolveDataElementOptions(index);
@@ -132,8 +131,6 @@ module.exports = DatasetController.extend({
 			backgroundColor: options.backgroundColor,
 			borderColor: options.borderColor,
 			borderWidth: options.borderWidth,
-			tension: lineModel ? lineModel.tension : 0,
-			steppedLine: lineModel ? lineModel.steppedLine : false,
 			// Tooltip
 			hitRadius: options.hitRadius
 		};
@@ -201,9 +198,9 @@ module.exports = DatasetController.extend({
 			for (i = 0, ilen = points.length; i < ilen; ++i) {
 				model = points[i]._model;
 				controlPoints = helpers.splineCurve(
-					helpers.previousItem(points, i)._model,
+					points[Math.max(0, i - 1)]._model,
 					model,
-					helpers.nextItem(points, i)._model,
+					points[Math.min(i + 1, ilen - 1)]._model,
 					lineModel.tension
 				);
 				model.controlPointPreviousX = controlPoints.previous.x;

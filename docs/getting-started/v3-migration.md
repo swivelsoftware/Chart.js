@@ -2,11 +2,12 @@
 
 Chart.js 3.0 introduces a number of breaking changes. Chart.js 2.0 was released in April 2016. In the years since then, as Chart.js has grown in popularity and feature set, we've learned some lessons about how to better create a charting library. In order to improve performance, offer new features, and improve maintainability it was necessary to break backwards compatibility, but we aimed to do so only when necessary.
 
-## Setup
-
-Chart.js is no longer providing the `Chart.bundle.js` and `Chart.bundle.min.js`. Please see the [installation](installation.md) and [integration](integration.md) docs for details on the recommended way to setup Chart.js if you were using these builds.
-
 ## End user migration
+
+### Setup and installation
+
+* Chart.js is no longer providing the `Chart.bundle.js` and `Chart.bundle.min.js`. Please see the [installation](installation.md) and [integration](integration.md) docs for details on the recommended way to setup Chart.js if you were using these builds.
+* `moment` is no longer specified as an npm dependency. If you are using the time scale, you must include one of [the available adapters](https://github.com/chartjs/awesome#adapters) and corresponding date library. If you are using a date library other than moment, you no longer need to exclude moment from your build.
 
 ### Ticks
 
@@ -26,7 +27,7 @@ Chart.js is no longer providing the `Chart.bundle.js` and `Chart.bundle.min.js`.
 ### Customizability
 
 * `custom` attribute of elements was removed. Please use scriptable options
-* The `zeroLine*` options of axes were removed.
+* The `zeroLine*` options of axes were removed. Use scriptable scale options instead.
 * The `hover` property of scriptable options `context` object was renamed to `active` to align it with the datalabels plugin.
 
 ### Options
@@ -37,9 +38,15 @@ Chart.js is no longer providing the `Chart.bundle.js` and `Chart.bundle.min.js`.
 * `scales.[x/y]Axes.categoryPercentage` was moved to dataset option `categoryPercentage`
 * `scales.[x/y]Axes.minBarLength` was moved to dataset option `minBarLength`
 * `scales.[x/y]Axes.maxBarThickness` was moved to dataset option `maxBarThickness`
+* `scales.[x/y]Axes.ticks.beginAtZero` was renamed to `scales.[x/y]Axes.beginAtZero`
+* `scales.[x/y]Axes.ticks.max` was renamed to `scales.[x/y]Axes.max`
+* `scales.[x/y]Axes.ticks.min` was renamed to `scales.[x/y]Axes.min`
+* `scales.[x/y]Axes.ticks.reverse` was renamed to `scales.[x/y]Axes.reverse`
+* `scales.[x/y]Axes.ticks.suggestedMax` was renamed to `scales.[x/y]Axes.suggestedMax`
+* `scales.[x/y]Axes.ticks.suggestedMin` was renamed to `scales.[x/y]Axes.suggestedMin`
 * `scales.[x/y]Axes.time.format` was renamed to `scales.[x/y]Axes.time.parser`
-* `scales.[x/y]Axes.time.min` was renamed to `scales.[x/y]Axes.ticks.min`
-* `scales.[x/y]Axes.time.max` was renamed to `scales.[x/y]Axes.ticks.max`
+* `scales.[x/y]Axes.time.max` was renamed to `scales.[x/y]Axes.max`
+* `scales.[x/y]Axes.time.min` was renamed to `scales.[x/y]Axes.min`
 
 ## Developer migration
 
@@ -50,28 +57,35 @@ Chart.js is no longer providing the `Chart.bundle.js` and `Chart.bundle.min.js`.
 * `helpers.aliasPixel`
 * `helpers.configMerge`
 * `helpers.indexOf`
+* `helpers.lineTo`
 * `helpers.min`
 * `helpers.max`
+* `helpers.nextItem`
 * `helpers.numberOfLabelLines`
+* `helpers.previousItem`
 * `helpers.removeEvent`
+* `helpers.roundedRect`
 * `helpers.scaleMerge`
-* `Scale.getRightValue`
-* `Scale.mergeTicksOptions`
-* `Scale.ticksAsNumbers`
 * `Chart.Controller`
 * `Chart.chart.chart`
 * `Chart.types`
-* `Line.calculatePointY`
+* `DatasetController.addElementAndReset`
 * `Element.getArea`
 * `Element.height`
 * `Element.inLabelRange`
-* Made `scale.handleDirectionalChanges` private
-* Made `scale.tickValues` private
+* `Line.calculatePointY`
+* `Scale.getRightValue`
+* `Scale.mergeTicksOptions`
+* `Scale.ticksAsNumbers`
+* `Scale.handleDirectionalChanges` is now private
+* `Scale.tickValues` is now private
 
 #### Removal of private APIs
 
 * `_model.datasetLabel`
 * `_model.label`
+* `Point._model.tension`
+* `Point._model.steppedLine`
 * `TimeScale.getLabelWidth`
 
 ### Renamed
@@ -85,9 +99,14 @@ Chart.js is no longer providing the `Chart.bundle.js` and `Chart.bundle.min.js`.
 * `helpers.log10` was renamed to `helpers.math.log10`
 * `Chart.Animation.animationObject` was renamed to `Chart.Animation`
 * `Chart.Animation.chartInstance` was renamed to `Chart.Animation.chart`
+* `DatasetController.createMetaData` and `DatasetController.createMetaDataset` were replaced with `DatasetController.createElement`
 * `TimeScale.getLabelCapacity` was renamed to `TimeScale._getLabelCapacity`
 * `TimeScale.tickFormatFunction` was renamed to `TimeScale._tickFormatFunction`
 * `TimeScale.getPixelForOffset` was renamed to `TimeScale._getPixelForOffset`
+
+#### Renamed private APIs
+
+* `helpers._alignPixel` was renamed to `helpers.canvas._alignPixel`
 
 ### Changed
 
@@ -98,6 +117,7 @@ Chart.js is no longer providing the `Chart.bundle.js` and `Chart.bundle.min.js`.
 
 ##### Ticks
 
+* When `autoSkip` is enabled, `scale.ticks` now contains only the non-skipped ticks instead of all ticks.
 * `scale.ticks` now contains objects instead of strings
 * `buildTicks` is now expected to return tick objects
 * `afterBuildTicks` now has no parameters like the other callbacks

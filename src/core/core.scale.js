@@ -5,15 +5,19 @@ const Element = require('./core.element');
 const helpers = require('../helpers/index');
 const Ticks = require('./core.ticks');
 
+const alignPixel = helpers.canvas._alignPixel;
 const isArray = helpers.isArray;
+const isFinite = helpers.isFinite;
 const isNullOrUndef = helpers.isNullOrUndef;
 const valueOrDefault = helpers.valueOrDefault;
-const valueAtIndexOrDefault = helpers.valueAtIndexOrDefault;
+const resolve = helpers.options.resolve;
 
 defaults._set('scale', {
 	display: true,
 	position: 'left',
 	offset: false,
+	reverse: false,
+	beginAtZero: false,
 
 	// grid line settings
 	gridLines: {
@@ -46,12 +50,10 @@ defaults._set('scale', {
 
 	// label settings
 	ticks: {
-		beginAtZero: false,
 		minRotation: 0,
 		maxRotation: 50,
 		mirror: false,
 		padding: 0,
-		reverse: false,
 		display: true,
 		autoSkip: true,
 		autoSkipPadding: 0,
@@ -199,7 +201,7 @@ function parseFontOptions(options, nestedOpts) {
 		fontStyle: valueOrDefault(nestedOpts.fontStyle, options.fontStyle),
 		lineHeight: valueOrDefault(nestedOpts.lineHeight, options.lineHeight)
 	}), {
-		color: helpers.options.resolve([nestedOpts.fontColor, options.fontColor, defaults.global.defaultFontColor])
+		color: resolve([nestedOpts.fontColor, options.fontColor, defaults.global.defaultFontColor])
 	});
 }
 
@@ -347,26 +349,49 @@ class Scale extends Element {
 		return null;
 	}
 
+	/**
+	 * @private
+	 * @since 3.0
+	 */
+	_getUserBounds() {
+		var min = this._userMin;
+		var max = this._userMax;
+		if (isNullOrUndef(min) || isNaN(min)) {
+			min = Number.POSITIVE_INFINITY;
+		}
+		if (isNullOrUndef(max) || isNaN(max)) {
+			max = Number.NEGATIVE_INFINITY;
+		}
+		return {min, max, minDefined: isFinite(min), maxDefined: isFinite(max)};
+	}
+
+	/**
+	 * @private
+	 * @since 3.0
+	 */
 	_getMinMax(canStack) {
 		var me = this;
-		var metas = me._getMatchingVisibleMetas();
-		var min = Number.POSITIVE_INFINITY;
-		var max = Number.NEGATIVE_INFINITY;
+		var {min, max, minDefined, maxDefined} = me._getUserBounds();
 		var minPositive = Number.POSITIVE_INFINITY;
-		var i, ilen, minmax;
+		var i, ilen, metas, minmax;
 
+		if (minDefined && maxDefined) {
+			return {min, max};
+		}
+
+		metas = me._getMatchingVisibleMetas();
 		for (i = 0, ilen = metas.length; i < ilen; ++i) {
 			minmax = metas[i].controller._getMinMax(me, canStack);
-			min = Math.min(min, minmax.min);
-			max = Math.max(max, minmax.max);
+			if (!minDefined) {
+				min = Math.min(min, minmax.min);
+			}
+			if (!maxDefined) {
+				max = Math.max(max, minmax.max);
+			}
 			minPositive = Math.min(minPositive, minmax.minPositive);
 		}
 
-		return {
-			min: min,
-			max: max,
-			minPositive: minPositive
-		};
+		return {min, max, minPositive};
 	}
 
 	_invalidateCaches() {}
@@ -484,11 +509,11 @@ class Scale extends Element {
 		me.afterFit();
 
 		// Auto-skip
-		me._ticksToDraw = tickOpts.display && (tickOpts.autoSkip || tickOpts.source === 'auto') ? me._autoSkip(me.ticks) : me.ticks;
+		me.ticks = tickOpts.display && (tickOpts.autoSkip || tickOpts.source === 'auto') ? me._autoSkip(me.ticks) : me.ticks;
 
 		if (samplingEnabled) {
 			// Generate labels using all non-skipped ticks
-			me._convertTicksToLabels(me._ticksToDraw);
+			me._convertTicksToLabels(me.ticks);
 		}
 
 		// IMPORTANT: after this point, we consider that `this.ticks` will NEVER change!
@@ -505,7 +530,7 @@ class Scale extends Element {
 	 */
 	_configure() {
 		var me = this;
-		var reversePixels = me.options.ticks.reverse;
+		var reversePixels = me.options.reverse;
 		var startPixel, endPixel;
 
 		if (me.isHorizontal()) {
@@ -963,14 +988,17 @@ class Scale extends Element {
 		var position = options.position;
 		var offsetGridLines = gridLines.offsetGridLines;
 		var isHorizontal = me.isHorizontal();
-		var ticks = me._ticksToDraw;
+		var ticks = me.ticks;
 		var ticksLength = ticks.length + (offsetGridLines ? 1 : 0);
-
 		var tl = getTickMarkLength(gridLines);
 		var items = [];
-		var axisWidth = gridLines.drawBorder ? valueAtIndexOrDefault(gridLines.lineWidth, 0, 0) : 0;
+
+		var context = {
+			scale: me,
+			tick: ticks[0],
+		};
+		var axisWidth = gridLines.drawBorder ? resolve([gridLines.lineWidth, 0], context, 0) : 0;
 		var axisHalfWidth = axisWidth / 2;
-		var alignPixel = helpers._alignPixel;
 		var alignBorderValue = function(pixel) {
 			return alignPixel(chart, pixel, axisWidth);
 		};
@@ -1006,12 +1034,17 @@ class Scale extends Element {
 		for (i = 0; i < ticksLength; ++i) {
 			tick = ticks[i] || {};
 
-			const lineWidth = valueAtIndexOrDefault(gridLines.lineWidth, i, 1);
-			const lineColor = valueAtIndexOrDefault(gridLines.color, i, 'rgba(0,0,0,0.1)');
-			const borderDash = gridLines.borderDash || [];
-			const borderDashOffset = gridLines.borderDashOffset || 0.0;
+			context = {
+				scale: me,
+				tick,
+			};
 
-			lineValue = getPixelForGridLine(me, tick._index || i, offsetGridLines);
+			const lineWidth = resolve([gridLines.lineWidth], context, i);
+			const lineColor = resolve([gridLines.color], context, i);
+			const borderDash = gridLines.borderDash || [];
+			const borderDashOffset = resolve([gridLines.borderDashOffset], context, i);
+
+			lineValue = getPixelForGridLine(me, i, offsetGridLines);
 
 			// Skip if the pixel is out of the range
 			if (lineValue === undefined) {
@@ -1058,7 +1091,7 @@ class Scale extends Element {
 		var position = options.position;
 		var isMirrored = optionTicks.mirror;
 		var isHorizontal = me.isHorizontal();
-		var ticks = me._ticksToDraw;
+		var ticks = me.ticks;
 		var fonts = parseTickFontOptions(optionTicks);
 		var tickPadding = optionTicks.padding;
 		var tl = getTickMarkLength(options.gridLines);
@@ -1084,7 +1117,7 @@ class Scale extends Element {
 			tick = ticks[i];
 			label = tick.label;
 
-			pixel = me.getPixelForTick(tick._index || i) + optionTicks.labelOffset;
+			pixel = me.getPixelForTick(i) + optionTicks.labelOffset;
 			font = tick.major ? fonts.major : fonts.minor;
 			lineHeight = font.lineHeight;
 			lineCount = isArray(label) ? label.length : 1;
@@ -1126,8 +1159,11 @@ class Scale extends Element {
 
 		var ctx = me.ctx;
 		var chart = me.chart;
-		var alignPixel = helpers._alignPixel;
-		var axisWidth = gridLines.drawBorder ? valueAtIndexOrDefault(gridLines.lineWidth, 0, 0) : 0;
+		var context = {
+			scale: me,
+			tick: me.ticks[0],
+		};
+		var axisWidth = gridLines.drawBorder ? resolve([gridLines.lineWidth, 0], context, 0) : 0;
 		var items = me._gridLineItems || (me._gridLineItems = me._computeGridLineItems(chartArea));
 		var width, color, i, ilen, item;
 
@@ -1165,7 +1201,11 @@ class Scale extends Element {
 		if (axisWidth) {
 			// Draw the line at the edge of the axis
 			var firstLineWidth = axisWidth;
-			var lastLineWidth = valueAtIndexOrDefault(gridLines.lineWidth, items.ticksLength - 1, 1);
+			context = {
+				scale: me,
+				tick: me.ticks[items.ticksLength - 1],
+			};
+			var lastLineWidth = resolve([gridLines.lineWidth, 1], context, items.ticksLength - 1);
 			var borderValue = items.borderValue;
 			var x1, x2, y1, y2;
 
@@ -1180,7 +1220,7 @@ class Scale extends Element {
 			}
 
 			ctx.lineWidth = axisWidth;
-			ctx.strokeStyle = valueAtIndexOrDefault(gridLines.color, 0);
+			ctx.strokeStyle = resolve([gridLines.color], context, 0);
 			ctx.beginPath();
 			ctx.moveTo(x1, y1);
 			ctx.lineTo(x2, y2);
@@ -1251,7 +1291,7 @@ class Scale extends Element {
 		var scaleLabelAlign = scaleLabel.align;
 		var position = options.position;
 		var rotation = 0;
-		var isReverse = me.options.ticks.reverse;
+		var isReverse = me.options.reverse;
 		var scaleLabelX, scaleLabelY, textAlign;
 
 		if (me.isHorizontal()) {
@@ -1351,8 +1391,8 @@ class Scale extends Element {
 	/**
 	 * @private
 	 */
-	_getAxisID() {
-		return this.isHorizontal() ? 'xAxisID' : 'yAxisID';
+	_getAxis() {
+		return this.isHorizontal() ? 'x' : 'y';
 	}
 
 	/**
@@ -1363,7 +1403,7 @@ class Scale extends Element {
 	_getMatchingVisibleMetas(type) {
 		var me = this;
 		var metas = me.chart._getSortedVisibleDatasetMetas();
-		var axisID = me._getAxisID();
+		var axisID = me._getAxis() + 'AxisID';
 		var result = [];
 		var i, ilen, meta;
 

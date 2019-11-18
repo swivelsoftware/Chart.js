@@ -152,20 +152,6 @@ module.exports = function() {
 		return Math.sqrt(Math.pow(pt2.x - pt1.x, 2) + Math.pow(pt2.y - pt1.y, 2));
 	};
 
-	/**
-	 * Returns the aligned pixel value to avoid anti-aliasing blur
-	 * @param {Chart} chart - The chart instance.
-	 * @param {number} pixel - A pixel value.
-	 * @param {number} width - The width of the element.
-	 * @returns {number} The aligned pixel value.
-	 * @private
-	 */
-	helpers._alignPixel = function(chart, pixel, width) {
-		var devicePixelRatio = chart.currentDevicePixelRatio;
-		var halfWidth = width / 2;
-		return Math.round((pixel - halfWidth) * devicePixelRatio) / devicePixelRatio + halfWidth;
-	};
-
 	helpers.splineCurve = function(firstPoint, middlePoint, afterPoint, t) {
 		// Props to Rob Spencer at scaled innovation for his post on splining between points
 		// http://scaledinnovation.com/analytics/splines/aboutSplines.html
@@ -291,18 +277,6 @@ module.exports = function() {
 				pointCurrent.model.controlPointNextY = pointCurrent.model.y + deltaX * pointCurrent.mK;
 			}
 		}
-	};
-	helpers.nextItem = function(collection, index, loop) {
-		if (loop) {
-			return index >= collection.length - 1 ? collection[0] : collection[index + 1];
-		}
-		return index >= collection.length - 1 ? collection[collection.length - 1] : collection[index + 1];
-	};
-	helpers.previousItem = function(collection, index, loop) {
-		if (loop) {
-			return index <= 0 ? collection[collection.length - 1] : collection[index - 1];
-		}
-		return index <= 0 ? collection[0] : collection[index - 1];
 	};
 	// Implementation of the nice number algorithm used in determining where axis labels will go
 	helpers.niceNum = function(range, round) {
