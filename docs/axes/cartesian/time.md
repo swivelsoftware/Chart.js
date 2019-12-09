@@ -67,18 +67,19 @@ var chart = new Chart(ctx, {
     data: data,
     options: {
         scales: {
-            xAxes: [{
+            x: {
                 type: 'time',
                 time: {
                     unit: 'month'
                 }
-            }]
+            }
         }
     }
 });
 ```
 
 ### Display Formats
+
 The following display formats are used to configure how different time units are formed into strings for the axis tick marks. See [Moment.js](https://momentjs.com/docs/#/displaying/format/) for the allowable format strings.
 
 Name | Default | Example
@@ -101,14 +102,14 @@ var chart = new Chart(ctx, {
     data: data,
     options: {
         scales: {
-            xAxes: [{
+            x: {
                 type: 'time',
                 time: {
                     displayFormats: {
                         quarter: 'MMM YYYY'
                     }
                 }
-            }]
+            }
         }
     }
 });
@@ -127,14 +128,16 @@ var chart = new Chart(ctx, {
     data: data,
     options: {
         scales: {
-            xAxes: [{
+            x: {
                 type: 'time',
                 distribution: 'series'
-            }]
+            }
         }
     }
 });
 ```
+
+When the scale is in `series` mode, the data indices are expected to be unique, sorted, and consistent across datasets.
 
 ### Scale Bounds
 
@@ -152,6 +155,11 @@ The `ticks.source` property controls the ticks generation.
 * `'labels'`: generates ticks from user given `labels` ONLY
 
 ### Parser
+
 If this property is defined as a string, it is interpreted as a custom format to be used by Moment.js to parse the date.
 
 If this is a function, it must return a Moment.js object given the appropriate data value.
+
+### Internal data format
+
+Internally time scale uses milliseconds since epoch

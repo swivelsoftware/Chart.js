@@ -33,26 +33,26 @@ Chart.js 3.0 introduces a number of breaking changes. Chart.js 2.0 was released 
 ### Options
 
 * The dataset option `tension` was renamed to `lineTension`
+* `scales.[x/y]Axes` arrays were removed. Scales are now configured directly to `options.scales` object with the object key being the scale Id.
 * `scales.[x/y]Axes.barPercentage` was moved to dataset option `barPercentage`
 * `scales.[x/y]Axes.barThickness` was moved to dataset option `barThickness`
 * `scales.[x/y]Axes.categoryPercentage` was moved to dataset option `categoryPercentage`
 * `scales.[x/y]Axes.minBarLength` was moved to dataset option `minBarLength`
 * `scales.[x/y]Axes.maxBarThickness` was moved to dataset option `maxBarThickness`
-* `scales.[x/y]Axes.ticks.beginAtZero` was renamed to `scales.[x/y]Axes.beginAtZero`
-* `scales.[x/y]Axes.ticks.max` was renamed to `scales.[x/y]Axes.max`
-* `scales.[x/y]Axes.ticks.min` was renamed to `scales.[x/y]Axes.min`
-* `scales.[x/y]Axes.ticks.reverse` was renamed to `scales.[x/y]Axes.reverse`
-* `scales.[x/y]Axes.ticks.suggestedMax` was renamed to `scales.[x/y]Axes.suggestedMax`
-* `scales.[x/y]Axes.ticks.suggestedMin` was renamed to `scales.[x/y]Axes.suggestedMin`
-* `scales.[x/y]Axes.time.format` was renamed to `scales.[x/y]Axes.time.parser`
-* `scales.[x/y]Axes.time.max` was renamed to `scales.[x/y]Axes.max`
-* `scales.[x/y]Axes.time.min` was renamed to `scales.[x/y]Axes.min`
+* `scales.[x/y]Axes.ticks.beginAtZero` was renamed to `scales[id].beginAtZero`
+* `scales.[x/y]Axes.ticks.max` was renamed to `scales[id].max`
+* `scales.[x/y]Axes.ticks.min` was renamed to `scales[id].min`
+* `scales.[x/y]Axes.ticks.reverse` was renamed to `scales[id].reverse`
+* `scales.[x/y]Axes.ticks.suggestedMax` was renamed to `scales[id].suggestedMax`
+* `scales.[x/y]Axes.ticks.suggestedMin` was renamed to `scales[id].suggestedMin`
+* `scales.[x/y]Axes.time.format` was renamed to `scales[id].time.parser`
+* `scales.[x/y]Axes.time.max` was renamed to `scales[id].max`
+* `scales.[x/y]Axes.time.min` was renamed to `scales[id].min`
 
 ## Developer migration
 
 ### Removed
 
-* `afterScaleUpdate`
 * `helpers.addEvent`
 * `helpers.aliasPixel`
 * `helpers.configMerge`
@@ -70,9 +70,13 @@ Chart.js 3.0 introduces a number of breaking changes. Chart.js 2.0 was released 
 * `Chart.chart.chart`
 * `Chart.types`
 * `DatasetController.addElementAndReset`
+* `DatasetController.createMetaData`
+* `DatasetController.createMetaDataset`
 * `Element.getArea`
 * `Element.height`
+* `Element.initialize`
 * `Element.inLabelRange`
+* `IPlugin.afterScaleUpdate`. Use `afterLayout` instead
 * `Line.calculatePointY`
 * `Scale.getRightValue`
 * `Scale.mergeTicksOptions`
@@ -82,10 +86,13 @@ Chart.js 3.0 introduces a number of breaking changes. Chart.js 2.0 was released 
 
 #### Removal of private APIs
 
-* `_model.datasetLabel`
-* `_model.label`
+* `Chart.data.datasets[datasetIndex]._meta`
+* `Element._ctx`
+* `Element._model.datasetLabel`
+* `Element._model.label`
 * `Point._model.tension`
 * `Point._model.steppedLine`
+* `TimeScale._getPixelForOffset`
 * `TimeScale.getLabelWidth`
 
 ### Renamed
@@ -99,7 +106,7 @@ Chart.js 3.0 introduces a number of breaking changes. Chart.js 2.0 was released 
 * `helpers.log10` was renamed to `helpers.math.log10`
 * `Chart.Animation.animationObject` was renamed to `Chart.Animation`
 * `Chart.Animation.chartInstance` was renamed to `Chart.Animation.chart`
-* `DatasetController.createMetaData` and `DatasetController.createMetaDataset` were replaced with `DatasetController.createElement`
+* `DatasetController.updateElement` was renamed to `DatasetController.updateElements`
 * `TimeScale.getLabelCapacity` was renamed to `TimeScale._getLabelCapacity`
 * `TimeScale.tickFormatFunction` was renamed to `TimeScale._tickFormatFunction`
 * `TimeScale.getPixelForOffset` was renamed to `TimeScale._getPixelForOffset`
@@ -112,16 +119,16 @@ Chart.js 3.0 introduces a number of breaking changes. Chart.js 2.0 was released 
 
 #### Scales
 
-* `scale.getLabelForIndex` was replaced by `scale.getLabelForValue`
-* `scale.getPixelForValue` now has only one parameter
+* `Scale.getLabelForIndex` was replaced by `scale.getLabelForValue`
+* `Scale.getPixelForValue` now has only one parameter. For the `TimeScale` that parameter must be millis since the epoch
 
 ##### Ticks
 
-* When `autoSkip` is enabled, `scale.ticks` now contains only the non-skipped ticks instead of all ticks.
-* `scale.ticks` now contains objects instead of strings
-* `buildTicks` is now expected to return tick objects
-* `afterBuildTicks` now has no parameters like the other callbacks
-* `convertTicksToLabels` was renamed to `generateTickLabels`. It is now expected to set the label property on the ticks given as input
+* When the `autoSkip` option is enabled, `Scale.ticks` now contains only the non-skipped ticks instead of all ticks.
+* `Scale.ticks` now contains objects instead of strings
+* `Scale.buildTicks` is now expected to return tick objects
+* `Scale.afterBuildTicks` now has no parameters like the other callbacks
+* `Scale.convertTicksToLabels` was renamed to `generateTickLabels`. It is now expected to set the label property on the ticks given as input
 
 ##### Time Scale
 

@@ -9,8 +9,10 @@ var valueOrDefault = helpers.valueOrDefault;
 
 defaults._set('radar', {
 	spanGaps: false,
-	scale: {
-		type: 'radialLinear'
+	scales: {
+		r: {
+			type: 'radialLinear',
+		}
 	},
 	elements: {
 		line: {
@@ -67,14 +69,14 @@ module.exports = DatasetController.extend({
 	 * @private
 	 */
 	_getIndexScaleId: function() {
-		return this.chart.scale.id;
+		return this._cachedMeta.rAxisID;
 	},
 
 	/**
 	 * @private
 	 */
 	_getValueScaleId: function() {
-		return this.chart.scale.id;
+		return this._cachedMeta.rAxisID;
 	},
 
 	/**
@@ -82,18 +84,18 @@ module.exports = DatasetController.extend({
 	 */
 	_getLabelAndValue: function(index) {
 		const me = this;
-		const scale = me._getValueScale();
+		const vScale = me._cachedMeta.vScale;
 		const parsed = me._getParsed(index);
 
 		return {
-			label: scale._getLabels()[index],
-			value: '' + scale.getLabelForValue(parsed[scale.id])
+			label: vScale._getLabels()[index],
+			value: '' + vScale.getLabelForValue(parsed[vScale.id])
 		};
 	},
 
 	update: function(reset) {
 		var me = this;
-		var meta = me.getMeta();
+		var meta = me._cachedMeta;
 		var line = meta.dataset;
 		var points = meta.data || [];
 		var animationsDisabled = me.chart._animationsDisabled;
@@ -108,9 +110,7 @@ module.exports = DatasetController.extend({
 		line.pivot(animationsDisabled);
 
 		// Update Points
-		for (i = 0, ilen = points.length; i < ilen; ++i) {
-			me.updateElement(points[i], i, reset);
-		}
+		me.updateElements(points, 0, points.length, reset);
 
 		// Update bezier control points
 		me.updateBezierControlPoints();
@@ -121,34 +121,39 @@ module.exports = DatasetController.extend({
 		}
 	},
 
-	updateElement: function(point, index, reset) {
-		var me = this;
-		var dataset = me.getDataset();
-		var scale = me.chart.scale;
-		var pointPosition = scale.getPointPositionForValue(index, dataset.data[index]);
-		var options = me._resolveDataElementOptions(index);
-		var x = reset ? scale.xCenter : pointPosition.x;
-		var y = reset ? scale.yCenter : pointPosition.y;
+	updateElements: function(points, start, count, reset) {
+		const me = this;
+		const dataset = me.getDataset();
+		const scale = me.chart.scales.r;
+		var i;
 
-		// Utility
-		point._options = options;
+		for (i = start; i < start + count; i++) {
+			const point = points[i];
+			const pointPosition = scale.getPointPositionForValue(i, dataset.data[i]);
+			const options = me._resolveDataElementOptions(i);
+			const x = reset ? scale.xCenter : pointPosition.x;
+			const y = reset ? scale.yCenter : pointPosition.y;
 
-		// Desired view properties
-		point._model = {
-			x: x, // value not used in dataset scale, but we want a consistent API between scales
-			y: y,
-			skip: isNaN(x) || isNaN(y),
-			// Appearance
-			radius: options.radius,
-			pointStyle: options.pointStyle,
-			rotation: options.rotation,
-			backgroundColor: options.backgroundColor,
-			borderColor: options.borderColor,
-			borderWidth: options.borderWidth,
+			// Utility
+			point._options = options;
 
-			// Tooltip
-			hitRadius: options.hitRadius
-		};
+			// Desired view properties
+			point._model = {
+				x: x, // value not used in dataset scale, but we want a consistent API between scales
+				y: y,
+				skip: isNaN(x) || isNaN(y),
+				// Appearance
+				radius: options.radius,
+				pointStyle: options.pointStyle,
+				rotation: options.rotation,
+				backgroundColor: options.backgroundColor,
+				borderColor: options.borderColor,
+				borderWidth: options.borderWidth,
+
+				// Tooltip
+				hitRadius: options.hitRadius
+			};
+		}
 	},
 
 	/**
@@ -168,7 +173,7 @@ module.exports = DatasetController.extend({
 
 	updateBezierControlPoints: function() {
 		var me = this;
-		var meta = me.getMeta();
+		var meta = me._cachedMeta;
 		var lineModel = meta.dataset._model;
 		var area = me.chart.chartArea;
 		var points = meta.data || [];

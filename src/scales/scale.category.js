@@ -1,12 +1,12 @@
 'use strict';
 
-const Scale = require('../core/core.scale');
+import Scale from '../core/core.scale';
 
 const defaultConfig = {
 	position: 'bottom'
 };
 
-class CategroyScale extends Scale {
+class CategoryScale extends Scale {
 	_parse(raw, index) {
 		var labels = this._getLabels();
 		var first = labels.indexOf(raw);
@@ -94,6 +94,6 @@ class CategroyScale extends Scale {
 	}
 }
 
-module.exports = CategroyScale;
 // INTERNAL: static default options, registered in src/index.js
-module.exports._defaults = defaultConfig;
+CategoryScale._defaults = defaultConfig;
+export default CategoryScale;

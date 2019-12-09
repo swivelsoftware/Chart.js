@@ -10,19 +10,18 @@ defaults._set('horizontalBar', {
 	},
 
 	scales: {
-		xAxes: [{
+		x: {
 			type: 'linear',
 			position: 'bottom'
-		}],
-
-		yAxes: [{
+		},
+		y: {
 			type: 'category',
 			position: 'left',
 			offset: true,
 			gridLines: {
 				offsetGridLines: true
 			}
-		}]
+		}
 	},
 
 	elements: {
@@ -51,13 +50,13 @@ module.exports = BarController.extend({
 	 * @private
 	 */
 	_getValueScaleId: function() {
-		return this.getMeta().xAxisID;
+		return this._cachedMeta.xAxisID;
 	},
 
 	/**
 	 * @private
 	 */
 	_getIndexScaleId: function() {
-		return this.getMeta().yAxisID;
+		return this._cachedMeta.yAxisID;
 	}
 });

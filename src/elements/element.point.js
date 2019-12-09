@@ -1,8 +1,8 @@
 'use strict';
 
-const defaults = require('../core/core.defaults');
-const Element = require('../core/core.element');
-const helpers = require('../helpers/index');
+import defaults from '../core/core.defaults';
+import Element from '../core/core.element';
+import helpers from '../helpers';
 
 const defaultColor = defaults.global.defaultColor;
 
@@ -67,9 +67,8 @@ class Point extends Element {
 		};
 	}
 
-	draw(chartArea) {
+	draw(ctx, chartArea) {
 		const vm = this._view;
-		const ctx = this._ctx;
 		const pointStyle = vm.pointStyle;
 		const rotation = vm.rotation;
 		const radius = vm.radius;
@@ -92,4 +91,4 @@ class Point extends Element {
 
 Point.prototype._type = 'point';
 
-module.exports = Point;
+export default Point;

@@ -10,16 +10,14 @@ var resolve = helpers.options.resolve;
 
 defaults._set('bubble', {
 	scales: {
-		xAxes: [{
-			type: 'linear', // bubble should probably use a linear scale by default
-			position: 'bottom',
-			id: 'x-axis-0' // need an ID so datasets can reference the scale
-		}],
-		yAxes: [{
+		x: {
 			type: 'linear',
-			position: 'left',
-			id: 'y-axis-0'
-		}]
+			position: 'bottom'
+		},
+		y: {
+			type: 'linear',
+			position: 'left'
+		}
 	},
 
 	tooltips: {
@@ -59,17 +57,18 @@ module.exports = DatasetController.extend({
 	 * @private
 	 */
 	_parseObjectData: function(meta, data, start, count) {
-		var xScale = this.getScaleForId(meta.xAxisID);
-		var yScale = this.getScaleForId(meta.yAxisID);
-		var parsed = [];
-		var i, ilen, item, obj;
+		const {xScale, yScale} = meta;
+		const xId = xScale.id;
+		const yId = yScale.id;
+		const parsed = [];
+		let i, ilen, item;
 		for (i = start, ilen = start + count; i < ilen; ++i) {
-			obj = data[i];
-			item = {};
-			item[xScale.id] = xScale._parseObject(obj, 'x', i);
-			item[yScale.id] = yScale._parseObject(obj, 'y', i);
-			item._custom = obj && obj.r && +obj.r;
-			parsed.push(item);
+			item = data[i];
+			parsed.push({
+				[xId]: xScale._parseObject(item, 'x', i),
+				[yId]: yScale._parseObject(item, 'y', i),
+				_custom: item && item.r && +item.r
+			});
 		}
 		return parsed;
 	},
@@ -95,8 +94,7 @@ module.exports = DatasetController.extend({
 	_getLabelAndValue: function(index) {
 		const me = this;
 		const meta = me._cachedMeta;
-		const xScale = me.getScaleForId(meta.xAxisID);
-		const yScale = me.getScaleForId(meta.yAxisID);
+		const {xScale, yScale} = meta;
 		const parsed = me._getParsed(index);
 		const x = xScale.getLabelForValue(parsed[xScale.id]);
 		const y = yScale.getLabelForValue(parsed[yScale.id]);
@@ -112,44 +110,44 @@ module.exports = DatasetController.extend({
 	 * @protected
 	 */
 	update: function(reset) {
-		var me = this;
-		var meta = me.getMeta();
-		var points = meta.data;
+		const me = this;
+		const points = me._cachedMeta.data;
 
 		// Update Points
-		helpers.each(points, function(point, index) {
-			me.updateElement(point, index, reset);
-		});
+		me.updateElements(points, 0, points.length, reset);
 	},
 
 	/**
 	 * @protected
 	 */
-	updateElement: function(point, index, reset) {
-		var me = this;
-		var meta = me.getMeta();
-		var xScale = me.getScaleForId(meta.xAxisID);
-		var yScale = me.getScaleForId(meta.yAxisID);
-		var options = me._resolveDataElementOptions(index);
-		var parsed = !reset && me._getParsed(index);
-		var x = reset ? xScale.getPixelForDecimal(0.5) : xScale.getPixelForValue(parsed[xScale.id]);
-		var y = reset ? yScale.getBasePixel() : yScale.getPixelForValue(parsed[yScale.id]);
+	updateElements: function(points, start, count, reset) {
+		const me = this;
+		const {xScale, yScale} = me._cachedMeta;
+		let i;
 
-		point._options = options;
-		point._model = {
-			backgroundColor: options.backgroundColor,
-			borderColor: options.borderColor,
-			borderWidth: options.borderWidth,
-			hitRadius: options.hitRadius,
-			pointStyle: options.pointStyle,
-			rotation: options.rotation,
-			radius: reset ? 0 : options.radius,
-			skip: isNaN(x) || isNaN(y),
-			x: x,
-			y: y,
-		};
+		for (i = start; i < start + count; i++) {
+			const point = points[i];
+			const options = me._resolveDataElementOptions(i);
+			const parsed = !reset && me._getParsed(i);
+			const x = reset ? xScale.getPixelForDecimal(0.5) : xScale.getPixelForValue(parsed[xScale.id]);
+			const y = reset ? yScale.getBasePixel() : yScale.getPixelForValue(parsed[yScale.id]);
 
-		point.pivot(me.chart._animationsDisabled);
+			point._options = options;
+			point._model = {
+				backgroundColor: options.backgroundColor,
+				borderColor: options.borderColor,
+				borderWidth: options.borderWidth,
+				hitRadius: options.hitRadius,
+				pointStyle: options.pointStyle,
+				rotation: options.rotation,
+				radius: reset ? 0 : options.radius,
+				skip: isNaN(x) || isNaN(y),
+				x: x,
+				y: y,
+			};
+
+			point.pivot(me.chart._animationsDisabled);
+		}
 	},
 
 	/**
