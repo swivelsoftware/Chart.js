@@ -145,7 +145,7 @@ function applyStack(stack, value, dsIndex, allOther) {
 			break;
 		}
 		otherValue = stack.values[datasetIndex];
-		if (!isNaN(otherValue) && (value === 0 || helpers.sign(value) === helpers.sign(otherValue))) {
+		if (!isNaN(otherValue) && (value === 0 || helpers.math.sign(value) === helpers.math.sign(otherValue))) {
 			value += otherValue;
 		}
 	}
@@ -648,6 +648,10 @@ helpers.extend(DatasetController.prototype, {
 					keys: indices,
 					values: parsed._stacks[scale.id]
 				};
+				// Need to consider individual stack values for data range,
+				// in addition to the stacked value
+				min = Math.min(min, value);
+				max = Math.max(max, value);
 				value = applyStack(stack, value, meta.index, true);
 			}
 			min = Math.min(min, value);
