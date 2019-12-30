@@ -81,7 +81,7 @@ defaults._set('global', {
 					return {
 						text: datasets[meta.index].label,
 						fillStyle: style.backgroundColor,
-						hidden: !chart.isDatasetVisible(meta.index),
+						hidden: !meta.visible,
 						lineCap: style.borderCapStyle,
 						lineDash: style.borderDash,
 						lineDashOffset: style.borderDashOffset,
@@ -297,7 +297,7 @@ class Legend extends Element {
 			ctx.textAlign = 'left';
 			ctx.textBaseline = 'middle';
 
-			helpers.each(me.legendItems, function(legendItem, i) {
+			me.legendItems.forEach(function(legendItem, i) {
 				var boxWidth = getBoxWidth(labelOpts, fontSize);
 				var width = boxWidth + (fontSize / 2) + ctx.measureText(legendItem.text).width;
 
@@ -327,7 +327,7 @@ class Legend extends Element {
 			var currentColWidth = 0;
 			var currentColHeight = 0;
 
-			helpers.each(me.legendItems, function(legendItem, i) {
+			me.legendItems.forEach(function(legendItem, i) {
 				var boxWidth = getBoxWidth(labelOpts, fontSize);
 				var itemWidth = boxWidth + (fontSize / 2) + ctx.measureText(legendItem.text).width;
 
@@ -509,7 +509,7 @@ class Legend extends Element {
 		helpers.rtl.overrideTextDirection(me.ctx, opts.textDirection);
 
 		var itemHeight = fontSize + labelOpts.padding;
-		helpers.each(me.legendItems, function(legendItem, i) {
+		me.legendItems.forEach(function(legendItem, i) {
 			var textWidth = ctx.measureText(legendItem.text).width;
 			var width = boxWidth + (fontSize / 2) + textWidth;
 			var x = cursor.x;

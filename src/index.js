@@ -6,6 +6,7 @@ var Chart = require('./core/core.controller');
 Chart.helpers = require('./helpers/index');
 Chart._adapters = require('./core/core.adapters');
 Chart.Animation = require('./core/core.animation');
+Chart.Animator = require('./core/core.animator');
 Chart.animationService = require('./core/core.animations');
 Chart.controllers = require('./controllers/index');
 Chart.DatasetController = require('./core/core.datasetController');
@@ -22,8 +23,9 @@ Chart.Ticks = require('./core/core.ticks');
 Chart.Tooltip = require('./core/core.tooltip');
 
 // Register built-in scales
-var scales = require('./scales');
-Chart.helpers.each(scales, function(scale, type) {
+const scales = require('./scales');
+Object.keys(scales).forEach(function(type) {
+	const scale = scales[type];
 	Chart.scaleService.registerScaleType(type, scale, scale._defaults);
 });
 
