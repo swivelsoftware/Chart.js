@@ -10198,7 +10198,7 @@ function (_Element) {
       xLinePadding = displayColors && bodyAlignForCalculation !== 'right' ? bodyAlign === 'center' ? bodyFontSize / 2 + 1 : bodyFontSize + 2 : 0; // Draw body lines now
 
       for (i = 0, ilen = body.length; i < ilen; ++i) {
-        var point = vm.dataPoints[i];
+        var point = me.dataPoints[i];
         var meta = ci.getDatasetMeta(point.datasetIndex);
         bodyItem = body[i];
         textColor = me.labelTextColors[i];

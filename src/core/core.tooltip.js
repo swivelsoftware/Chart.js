@@ -813,7 +813,7 @@ class Tooltip extends Element {
 
 		// Draw body lines now
 		for (i = 0, ilen = body.length; i < ilen; ++i) {
-			var point = vm.dataPoints[i];
+			var point = me.dataPoints[i];
 			var meta = ci.getDatasetMeta(point.datasetIndex);
 
 			bodyItem = body[i];
