@@ -10124,7 +10124,9 @@ function (_Element) {
       var centerX = x + boxWidth / 2;
       var centerY = y + fontSize / 2;
       ctx.lineWidth *= Math.SQRT2 / 2;
-      require$$0.canvas.drawPoint(ctx, style.pointStyle, radius, centerX, centerY, style.rotation);
+      require$$0.canvas.drawPoint(ctx, style.pointStyle, radius, centerX, centerY, style.rotation); // restore fillStyle
+
+      ctx.fillStyle = me.labelTextColors[i];
     }
   }, {
     key: "drawBody",

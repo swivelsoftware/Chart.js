@@ -779,6 +779,9 @@ class Tooltip extends Element {
 		var centerY = y + fontSize / 2;
 		ctx.lineWidth *= Math.SQRT2 / 2;
 		helpers.canvas.drawPoint(ctx, style.pointStyle, radius, centerX, centerY, style.rotation);
+
+		// restore fillStyle
+		ctx.fillStyle = me.labelTextColors[i];
 	}
 
 	drawBody(pt, ctx) {
