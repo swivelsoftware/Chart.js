@@ -22,27 +22,6 @@ defaults._set('doughnut', {
 		// Boolean - Whether we animate scaling the Doughnut from the centre
 		animateScale: false
 	},
-	legendCallback: function(chart) {
-		var list = document.createElement('ul');
-		var data = chart.data;
-		var datasets = data.datasets;
-		var labels = data.labels;
-		var i, ilen, listItem, listItemSpan;
-
-		list.setAttribute('class', chart.id + '-legend');
-		if (datasets.length) {
-			for (i = 0, ilen = datasets[0].data.length; i < ilen; ++i) {
-				listItem = list.appendChild(document.createElement('li'));
-				listItemSpan = listItem.appendChild(document.createElement('span'));
-				listItemSpan.style.backgroundColor = datasets[0].backgroundColor[i];
-				if (labels[i]) {
-					listItem.appendChild(document.createTextNode(labels[i]));
-				}
-			}
-		}
-
-		return list.outerHTML;
-	},
 	legend: {
 		labels: {
 			generateLabels: function(chart) {
@@ -240,10 +219,20 @@ module.exports = DatasetController.extend({
 		me.outerRadius = chart.outerRadius - chart.radiusLength * me._getRingWeightOffset(me.index);
 		me.innerRadius = Math.max(me.outerRadius - chart.radiusLength * chartWeight, 0);
 
-		me.updateElements(arcs, 0, arcs.length, mode);
+		me.updateElements(arcs, 0, mode);
 	},
 
-	updateElements: function(arcs, start, count, mode) {
+	/**
+	 * @private
+	 */
+	_circumference: function(i, reset) {
+		const me = this;
+		const opts = me.chart.options;
+		const meta = me._cachedMeta;
+		return reset && opts.animation.animateRotate ? 0 : meta.data[i].hidden ? 0 : me.calculateCircumference(meta._parsed[i] * opts.circumference / DOUBLE_PI);
+	},
+
+	updateElements: function(arcs, start, mode) {
 		const me = this;
 		const reset = mode === 'reset';
 		const chart = me.chart;
@@ -252,20 +241,20 @@ module.exports = DatasetController.extend({
 		const animationOpts = opts.animation;
 		const centerX = (chartArea.left + chartArea.right) / 2;
 		const centerY = (chartArea.top + chartArea.bottom) / 2;
-		const meta = me.getMeta();
 		const innerRadius = reset && animationOpts.animateScale ? 0 : me.innerRadius;
 		const outerRadius = reset && animationOpts.animateScale ? 0 : me.outerRadius;
 		let startAngle = opts.rotation;
 		let i;
 
-		for (i = 0; i < start + count; ++i) {
+		for (i = 0; i < start; ++i) {
+			startAngle += me._circumference(i, reset);
+		}
+
+		for (i = 0; i < arcs.length; ++i) {
+			const index = start + i;
+			const circumference = me._circumference(index, reset);
 			const arc = arcs[i];
-			const circumference = reset && animationOpts.animateRotate ? 0 : arc.hidden ? 0 : me.calculateCircumference(meta._parsed[i] * opts.circumference / DOUBLE_PI);
 			const options = arc._options || {};
-			if (i < start) {
-				startAngle += circumference;
-				continue;
-			}
 			const properties = {
 				x: centerX + chart.offsetX,
 				y: centerY + chart.offsetY,
@@ -278,7 +267,7 @@ module.exports = DatasetController.extend({
 			};
 			startAngle += circumference;
 
-			me._updateElement(arc, i, properties, mode);
+			me._updateElement(arc, index, properties, mode);
 		}
 	},
 

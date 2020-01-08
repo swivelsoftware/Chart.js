@@ -77,9 +77,8 @@ module.exports = DatasetController.extend({
 
 		// Update Line
 		if (showLine && mode !== 'resize') {
-
 			const properties = {
-				_children: points,
+				points,
 				options: me._resolveDatasetElementOptions()
 			};
 
@@ -88,24 +87,24 @@ module.exports = DatasetController.extend({
 
 		// Update Points
 		if (meta.visible) {
-			me.updateElements(points, 0, points.length, mode);
+			me.updateElements(points, 0, mode);
 		}
 	},
 
-	updateElements: function(points, start, count, mode) {
+	updateElements: function(points, start, mode) {
 		const me = this;
 		const reset = mode === 'reset';
 		const {xScale, yScale, _stacked} = me._cachedMeta;
 		const firstOpts = me._resolveDataElementOptions(start, mode);
 		const sharedOptions = me._getSharedOptions(mode, points[start], firstOpts);
 		const includeOptions = me._includeOptions(mode, sharedOptions);
-		let i;
 
-		for (i = start; i < start + count; ++i) {
+		for (let i = 0; i < points.length; ++i) {
+			const index = start + i;
 			const point = points[i];
-			const parsed = me._getParsed(i);
-			const x = xScale.getPixelForValue(parsed[xScale.id]);
-			const y = reset ? yScale.getBasePixel() : yScale.getPixelForValue(_stacked ? me._applyStack(yScale, parsed) : parsed[yScale.id]);
+			const parsed = me._getParsed(index);
+			const x = xScale.getPixelForValue(parsed.x);
+			const y = reset ? yScale.getBasePixel() : yScale.getPixelForValue(_stacked ? me._applyStack(yScale, parsed) : parsed.y);
 			const properties = {
 				x,
 				y,
@@ -113,11 +112,10 @@ module.exports = DatasetController.extend({
 			};
 
 			if (includeOptions) {
-				properties.options = i === start ? firstOpts
-					: me._resolveDataElementOptions(i, mode);
+				properties.options = me._resolveDataElementOptions(index, mode);
 			}
 
-			me._updateElement(point, i, properties, mode);
+			me._updateElement(point, index, properties, mode);
 		}
 
 		me._updateSharedOptions(sharedOptions, mode);
@@ -149,11 +147,11 @@ module.exports = DatasetController.extend({
 	_getMaxOverflow: function() {
 		const me = this;
 		const meta = me._cachedMeta;
+		const border = me._showLine && meta.dataset.options.borderWidth || 0;
 		const data = meta.data || [];
 		if (!data.length) {
-			return false;
+			return border;
 		}
-		const border = me._showLine && meta.dataset.options.borderWidth || 0;
 		const firstPoint = data[0].size();
 		const lastPoint = data[data.length - 1].size();
 		return Math.max(border, firstPoint, lastPoint) / 2;

@@ -80,6 +80,9 @@
 			title: 'Pie',
 			path: 'charts/pie.html'
 		}, {
+			title: 'Multi Series Pie',
+			path: 'charts/multi-series-pie.html'
+		}, {
 			title: 'Polar area',
 			path: 'charts/polar-area.html'
 		}, {
@@ -166,6 +169,12 @@
 		}, {
 			title: 'Callbacks',
 			path: 'legend/callbacks.html'
+		}]
+	}, {
+		title: 'Title',
+		items: [{
+			title: 'Alignment',
+			path: 'title/alignment.html'
 		}]
 	}, {
 		title: 'Tooltip',

@@ -5,27 +5,25 @@ import Animation from './core.animation';
 import defaults from '../core/core.defaults';
 import {noop, extend, isObject} from '../helpers/helpers.core';
 
-defaults._set('global', {
-	animation: {
-		duration: 1000,
-		easing: 'easeOutQuart',
-		active: {
-			duration: 400
-		},
-		resize: {
-			duration: 0
-		},
-		numbers: {
-			type: 'number',
-			properties: ['x', 'y', 'borderWidth', 'radius', 'tension']
-		},
-		colors: {
-			type: 'color',
-			properties: ['borderColor', 'backgroundColor']
-		},
-		onProgress: noop,
-		onComplete: noop
-	}
+defaults._set('animation', {
+	duration: 1000,
+	easing: 'easeOutQuart',
+	active: {
+		duration: 400
+	},
+	resize: {
+		duration: 0
+	},
+	numbers: {
+		type: 'number',
+		properties: ['x', 'y', 'borderWidth', 'radius', 'tension']
+	},
+	colors: {
+		type: 'color',
+		properties: ['borderColor', 'backgroundColor']
+	},
+	onProgress: noop,
+	onComplete: noop
 });
 
 function copyOptions(target, values) {
@@ -42,6 +40,17 @@ function copyOptions(target, values) {
 	delete values.options;
 }
 
+function extensibleConfig(animations) {
+	const result = {};
+	Object.keys(animations).forEach(key => {
+		const value = animations[key];
+		if (!isObject(value)) {
+			result[key] = value;
+		}
+	});
+	return result;
+}
+
 export default class Animations {
 	constructor(chart, animations) {
 		this._chart = chart;
@@ -50,14 +59,19 @@ export default class Animations {
 	}
 
 	configure(animations) {
-		const animatedProps = this._properties;
-		const animDefaults = Object.fromEntries(Object.entries(animations).filter(({1: value}) => !isObject(value)));
+		if (!isObject(animations)) {
+			return;
+		}
 
-		for (let [key, cfg] of Object.entries(animations)) {
+		const animatedProps = this._properties;
+		const animDefaults = extensibleConfig(animations);
+
+		Object.keys(animations).forEach(key => {
+			const cfg = animations[key];
 			if (!isObject(cfg)) {
-				continue;
+				return;
 			}
-			for (let prop of cfg.properties || [key]) {
+			(cfg.properties || [key]).forEach(function(prop) {
 				// Can have only one config per animation.
 				if (!animatedProps.has(prop)) {
 					animatedProps.set(prop, extend({}, animDefaults, cfg));
@@ -65,8 +79,8 @@ export default class Animations {
 					// Single property targetting config wins over multi-targetting.
 					animatedProps.set(prop, extend({}, animatedProps.get(prop), cfg));
 				}
-			}
-		}
+			});
+		});
 	}
 
 	/**

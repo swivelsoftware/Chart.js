@@ -22,20 +22,19 @@ defaults._set('bar', {
 		},
 		y: {
 			type: 'linear',
+			beginAtZero: true,
 		}
 	}
 });
 
-defaults._set('global', {
-	datasets: {
-		bar: {
-			categoryPercentage: 0.8,
-			barPercentage: 0.9,
-			animation: {
-				numbers: {
-					type: 'number',
-					properties: ['x', 'y', 'base', 'width', 'height']
-				}
+defaults._set('datasets', {
+	bar: {
+		categoryPercentage: 0.8,
+		barPercentage: 0.9,
+		animation: {
+			numbers: {
+				type: 'number',
+				properties: ['x', 'y', 'base', 'width', 'height']
 			}
 		}
 	}
@@ -53,7 +52,7 @@ function computeMinSampleSize(scale, pixels) {
 		min = Math.min(min, Math.abs(pixels[i] - pixels[i - 1]));
 	}
 
-	for (i = 0, ilen = scale.getTicks().length; i < ilen; ++i) {
+	for (i = 0, ilen = scale.ticks.length; i < ilen; ++i) {
 		curr = scale.getPixelForTick(i);
 		min = i > 0 ? Math.min(min, Math.abs(curr - prev)) : min;
 		prev = curr;
@@ -145,7 +144,7 @@ function parseFloatBar(arr, item, vScale, i) {
 
 	// Store `barEnd` (furthest away from origin) as parsed value,
 	// to make stacking straight forward
-	item[vScale.id] = barEnd;
+	item[vScale.axis] = barEnd;
 
 	item._custom = {
 		barStart: barStart,
@@ -168,12 +167,12 @@ function parseArrayOrPrimitive(meta, data, start, count) {
 	for (i = start, ilen = start + count; i < ilen; ++i) {
 		entry = data[i];
 		item = {};
-		item[iScale.id] = singleScale || iScale._parse(labels[i], i);
+		item[iScale.axis] = singleScale || iScale._parse(labels[i], i);
 
 		if (helpers.isArray(entry)) {
 			parseFloatBar(entry, item, vScale, i);
 		} else {
-			item[vScale.id] = vScale._parse(entry, i);
+			item[vScale.axis] = vScale._parse(entry, i);
 		}
 
 		parsed.push(item);
@@ -231,12 +230,12 @@ module.exports = DatasetController.extend({
 		for (i = start, ilen = start + count; i < ilen; ++i) {
 			obj = data[i];
 			item = {};
-			item[iScale.id] = iScale._parseObject(obj, iScale.axis, i);
+			item[iScale.axis] = iScale._parseObject(obj, iScale.axis, i);
 			value = obj[vProp];
 			if (helpers.isArray(value)) {
 				parseFloatBar(value, item, vScale, i);
 			} else {
-				item[vScale.id] = vScale._parseObject(obj, vProp, i);
+				item[vScale.axis] = vScale._parseObject(obj, vProp, i);
 			}
 			parsed.push(item);
 		}
@@ -254,10 +253,10 @@ module.exports = DatasetController.extend({
 		const custom = parsed._custom;
 		const value = custom
 			? '[' + custom.start + ', ' + custom.end + ']'
-			: '' + vScale.getLabelForValue(parsed[vScale.id]);
+			: '' + vScale.getLabelForValue(parsed[vScale.axis]);
 
 		return {
-			label: '' + iScale.getLabelForValue(parsed[iScale.id]),
+			label: '' + iScale.getLabelForValue(parsed[iScale.axis]),
 			value: value
 		};
 	},
@@ -277,10 +276,10 @@ module.exports = DatasetController.extend({
 		const me = this;
 		const rects = me._cachedMeta.data;
 
-		me.updateElements(rects, 0, rects.length, mode);
+		me.updateElements(rects, 0, mode);
 	},
 
-	updateElements: function(rectangles, start, count, mode) {
+	updateElements: function(rectangles, start, mode) {
 		const me = this;
 		const reset = mode === 'reset';
 		const vscale = me._cachedMeta.vScale;
@@ -293,10 +292,11 @@ module.exports = DatasetController.extend({
 
 		let i;
 
-		for (i = 0; i < start + count; i++) {
-			const options = me._resolveDataElementOptions(i, mode);
-			const vpixels = me.calculateBarValuePixels(i, options);
-			const ipixels = me.calculateBarIndexPixels(i, ruler, options);
+		for (i = 0; i < rectangles.length; i++) {
+			const index = start + i;
+			const options = me._resolveDataElementOptions(index, mode);
+			const vpixels = me.calculateBarValuePixels(index, options);
+			const ipixels = me.calculateBarIndexPixels(index, ruler, options);
 
 			const properties = {
 				horizontal,
@@ -316,7 +316,7 @@ module.exports = DatasetController.extend({
 			if (includeOptions) {
 				properties.options = options;
 			}
-			me._updateElement(rectangles[i], i, properties, mode);
+			me._updateElement(rectangles[i], index, properties, mode);
 		}
 
 		me._updateSharedOptions(sharedOptions, mode);
@@ -394,7 +394,7 @@ module.exports = DatasetController.extend({
 		let i, ilen;
 
 		for (i = 0, ilen = meta.data.length; i < ilen; ++i) {
-			pixels.push(iScale.getPixelForValue(me._getParsed(i)[iScale.id]));
+			pixels.push(iScale.getPixelForValue(me._getParsed(i)[iScale.axis]));
 		}
 
 		return {
@@ -417,9 +417,9 @@ module.exports = DatasetController.extend({
 		const minBarLength = options.minBarLength;
 		const parsed = me._getParsed(index);
 		const custom = parsed._custom;
-		let value = parsed[vScale.id];
+		let value = parsed[vScale.axis];
 		let start = 0;
-		let length = meta._stacked ? me._applyStack(vScale, parsed) : parsed[vScale.id];
+		let length = meta._stacked ? me._applyStack(vScale, parsed) : parsed[vScale.axis];
 		let base, head, size;
 
 		if (length !== value) {
@@ -489,7 +489,7 @@ module.exports = DatasetController.extend({
 		helpers.canvas.clipArea(chart.ctx, chart.chartArea);
 
 		for (; i < ilen; ++i) {
-			if (!isNaN(me._getParsed(i)[vScale.id])) {
+			if (!isNaN(me._getParsed(i)[vScale.axis])) {
 				rects[i].draw(me._ctx);
 			}
 		}

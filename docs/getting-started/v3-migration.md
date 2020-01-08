@@ -1,6 +1,6 @@
 # Chart.js 3.x Migration Guide
 
-Chart.js 3.0 introduces a number of breaking changes. Chart.js 2.0 was released in April 2016. In the years since then, as Chart.js has grown in popularity and feature set, we've learned some lessons about how to better create a charting library. In order to improve performance, offer new features, and improve maintainability it was necessary to break backwards compatibility, but we aimed to do so only when necessary.
+Chart.js 3.0 introduces a number of breaking changes. Chart.js 2.0 was released in April 2016. In the years since then, as Chart.js has grown in popularity and feature set, we've learned some lessons about how to better create a charting library. In order to improve performance, offer new features, and improve maintainability, it was necessary to break backwards compatibility, but we aimed to do so only when necessary.
 
 ## End user migration
 
@@ -29,6 +29,17 @@ Chart.js 3.0 introduces a number of breaking changes. Chart.js 2.0 was released 
 * `custom` attribute of elements was removed. Please use scriptable options
 * The `hover` property of scriptable options `context` object was renamed to `active` to align it with the datalabels plugin.
 * The `zeroLine*` options of axes were removed. Use scriptable scale options instead.
+
+## Defaults
+
+* `global` namespace was removed from `defaults`. So `Chart.defaults.global` is now `Chart.defaults`
+* `default` prefix was removed from defaults. For example `Chart.defaults.global.defaultColor` is now `Chart.defaults.color`
+  * `defaultColor` was renamed to `color`
+  * `defaultFontColor` was renamed to `fontColor`
+  * `defaultFontFamily` was renamed to `fontFamily`
+  * `defaultFontSize` was renamed to `fontSize`
+  * `defaultFontStyle` was renamed to `fontStyle`
+  * `defaultLineHeight` was renamed to `lineHeight`
 
 ### Options
 
@@ -62,6 +73,7 @@ Animation system was completely rewritten in Chart.js v3. Each property can now 
 
 * `Chart.chart.chart`
 * `Chart.Controller`
+* `Chart.prototype.generateLegend`
 * `Chart.types`
 * `DatasetController.addElementAndReset`
 * `DatasetController.createMetaData`
@@ -84,10 +96,13 @@ Animation system was completely rewritten in Chart.js v3. Each property can now 
 * `helpers.roundedRect`
 * `helpers.scaleMerge`
 * `helpers.where`
+* `ILayoutItem.minSize`
 * `IPlugin.afterScaleUpdate`. Use `afterLayout` instead
 * `Line.calculatePointY`
 * `Scale.getRightValue`
 * `Scale.handleDirectionalChanges` is now private
+* `Scale.longestLabelWidth`
+* `Scale.longestTextCache` is now private
 * `Scale.mergeTicksOptions`
 * `Scale.ticksAsNumbers`
 * `Scale.tickValues` is now private
@@ -106,7 +121,6 @@ Animation system was completely rewritten in Chart.js v3. Each property can now 
 
 * `Chart.Animation.animationObject` was renamed to `Chart.Animation`
 * `Chart.Animation.chartInstance` was renamed to `Chart.Animation.chart`
-* `DatasetController.updateElement` was renamed to `DatasetController.updateElements`
 * `helpers._decimalPlaces` was renamed to `helpers.math._decimalPlaces`
 * `helpers.almostEquals` was renamed to `helpers.math.almostEquals`
 * `helpers.almostWhole` was renamed to `helpers.math.almostWhole`
@@ -168,8 +182,13 @@ Animation system was completely rewritten in Chart.js v3. Each property can now 
 
 ##### Dataset Controllers
 
+* `updateElement` was replaced with `updateElements` now taking the elements to update, the `start` index, and `mode`
 * `setHoverStyle` and `removeHoverStyle` now additionally take the `datasetIndex` and `index`
 
 #### Interactions
 
 * Interaction mode methods now return an array of objects containing the `element`, `datasetIndex`, and `index`
+
+#### Layout
+
+* `ILayoutItem.update` no longer has a return value

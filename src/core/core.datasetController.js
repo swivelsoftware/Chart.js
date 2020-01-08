@@ -193,17 +193,17 @@ function updateStacks(controller, parsed) {
 	const {chart, _cachedMeta: meta} = controller;
 	const stacks = chart._stacks || (chart._stacks = {}); // map structure is {stackKey: {datasetIndex: value}}
 	const {iScale, vScale, index: datasetIndex} = meta;
-	const iId = iScale.id;
-	const vId = vScale.id;
+	const iAxis = iScale.axis;
+	const vAxis = vScale.axis;
 	const key = getStackKey(iScale, vScale, meta);
 	const ilen = parsed.length;
 	let stack;
 
 	for (let i = 0; i < ilen; ++i) {
 		const item = parsed[i];
-		const {[iId]: index, [vId]: value} = item;
+		const {[iAxis]: index, [vAxis]: value} = item;
 		const itemStacks = item._stacks || (item._stacks = {});
-		stack = itemStacks[vId] = getOrCreateStack(stacks, key, index);
+		stack = itemStacks[vAxis] = getOrCreateStack(stacks, key, index);
 		stack[datasetIndex] = value;
 	}
 }
@@ -478,11 +478,18 @@ helpers.extend(DatasetController.prototype, {
 		const me = this;
 		const {_cachedMeta: meta, _data: data} = me;
 		const {iScale, vScale, _stacked} = meta;
-		let offset = 0;
-		let i, parsed;
+		const iAxis = iScale.axis;
+		let sorted = true;
+		let i, parsed, cur, prev;
+
+		if (start > 0) {
+			sorted = meta._sorted;
+			prev = meta._parsed[start - 1];
+		}
 
 		if (me._parsing === false) {
 			meta._parsed = data;
+			meta._sorted = true;
 		} else {
 			if (helpers.isArray(data[start])) {
 				parsed = me._parseArrayData(meta, data, start, count);
@@ -492,9 +499,17 @@ helpers.extend(DatasetController.prototype, {
 				parsed = me._parsePrimitiveData(meta, data, start, count);
 			}
 
+
 			for (i = 0; i < count; ++i) {
-				meta._parsed[i + start] = parsed[i + offset];
+				meta._parsed[i + start] = cur = parsed[i];
+				if (sorted) {
+					if (prev && cur[iAxis] < prev[iAxis]) {
+						sorted = false;
+					}
+					prev = cur;
+				}
 			}
+			meta._sorted = sorted;
 		}
 
 		if (_stacked) {
@@ -502,9 +517,7 @@ helpers.extend(DatasetController.prototype, {
 		}
 
 		iScale._invalidateCaches();
-		if (vScale !== iScale) {
-			vScale._invalidateCaches();
-		}
+		vScale._invalidateCaches();
 	},
 
 	/**
@@ -520,8 +533,8 @@ helpers.extend(DatasetController.prototype, {
 	 */
 	_parsePrimitiveData: function(meta, data, start, count) {
 		const {iScale, vScale} = meta;
-		const iId = iScale.id;
-		const vId = vScale.id;
+		const iAxis = iScale.axis;
+		const vAxis = vScale.axis;
 		const labels = iScale._getLabels();
 		const singleScale = iScale === vScale;
 		const parsed = new Array(count);
@@ -530,8 +543,8 @@ helpers.extend(DatasetController.prototype, {
 		for (i = 0, ilen = count; i < ilen; ++i) {
 			index = i + start;
 			parsed[i] = {
-				[iId]: singleScale || iScale._parse(labels[index], index),
-				[vId]: vScale._parse(data[index], index)
+				[iAxis]: singleScale || iScale._parse(labels[index], index),
+				[vAxis]: vScale._parse(data[index], index)
 			};
 		}
 		return parsed;
@@ -545,13 +558,11 @@ helpers.extend(DatasetController.prototype, {
 	 * @param {number} count - number of items to parse
 	 * @returns {object} parsed item - item containing index and a parsed value
 	 * for each scale id.
-	 * Example: {xScale0: 0, yScale0: 1}
+	 * Example: {x: 0, y: 1}
 	 * @private
 	 */
 	_parseArrayData: function(meta, data, start, count) {
 		const {xScale, yScale} = meta;
-		const xId = xScale.id;
-		const yId = yScale.id;
 		const parsed = new Array(count);
 		let i, ilen, index, item;
 
@@ -559,8 +570,8 @@ helpers.extend(DatasetController.prototype, {
 			index = i + start;
 			item = data[index];
 			parsed[i] = {
-				[xId]: xScale._parse(item[0], index),
-				[yId]: yScale._parse(item[1], index)
+				x: xScale._parse(item[0], index),
+				y: yScale._parse(item[1], index)
 			};
 		}
 		return parsed;
@@ -579,8 +590,6 @@ helpers.extend(DatasetController.prototype, {
 	 */
 	_parseObjectData: function(meta, data, start, count) {
 		const {xScale, yScale} = meta;
-		const xId = xScale.id;
-		const yId = yScale.id;
 		const parsed = new Array(count);
 		let i, ilen, index, item;
 
@@ -588,8 +597,8 @@ helpers.extend(DatasetController.prototype, {
 			index = i + start;
 			item = data[index];
 			parsed[i] = {
-				[xId]: xScale._parseObject(item, 'x', index),
-				[yId]: yScale._parseObject(item, 'y', index)
+				x: xScale._parseObject(item, 'x', index),
+				y: yScale._parseObject(item, 'y', index)
 			};
 		}
 		return parsed;
@@ -599,11 +608,7 @@ helpers.extend(DatasetController.prototype, {
 	 * @private
 	 */
 	_getParsed: function(index) {
-		const data = this._cachedMeta._parsed;
-		if (index < 0 || index >= data.length) {
-			return;
-		}
-		return data[index];
+		return this._cachedMeta._parsed[index];
 	},
 
 	/**
@@ -612,10 +617,10 @@ helpers.extend(DatasetController.prototype, {
 	_applyStack: function(scale, parsed) {
 		const chart = this.chart;
 		const meta = this._cachedMeta;
-		const value = parsed[scale.id];
+		const value = parsed[scale.axis];
 		const stack = {
 			keys: getSortedDatasetIndices(chart, true),
-			values: parsed._stacks[scale.id]
+			values: parsed._stacks[scale.axis]
 		};
 		return applyStack(stack, value, meta.index);
 	},
@@ -624,33 +629,21 @@ helpers.extend(DatasetController.prototype, {
 	 * @private
 	 */
 	_getMinMax: function(scale, canStack) {
-		const chart = this.chart;
 		const meta = this._cachedMeta;
-		const metaData = meta.data;
-		const ilen = meta._parsed.length;
-		const stacked = canStack && meta._stacked;
-		const indices = getSortedDatasetIndices(chart, true);
+		const {data, _parsed} = meta;
+		const sorted = meta._sorted && scale === meta.iScale;
+		const ilen = _parsed.length;
 		const otherScale = this._getOtherScale(scale);
+		const stack = canStack && meta._stacked && {keys: getSortedDatasetIndices(this.chart, true), values: null};
 		let max = Number.NEGATIVE_INFINITY;
 		let {min: otherMin, max: otherMax} = getUserBounds(otherScale);
-		let i, item, value, parsed, stack, min, minPositive, otherValue;
+		let i, item, value, parsed, min, minPositive, otherValue;
 
 		min = minPositive = Number.POSITIVE_INFINITY;
 
-		for (i = 0; i < ilen; ++i) {
-			item = metaData[i];
-			parsed = meta._parsed[i];
-			value = parsed[scale.id];
-			otherValue = parsed[otherScale.id];
-			if ((item && item.hidden) || isNaN(value) ||
-				otherMin > otherValue || otherMax < otherValue) {
-				continue;
-			}
-			if (stacked) {
-				stack = {
-					keys: indices,
-					values: parsed._stacks[scale.id]
-				};
+		function _compute() {
+			if (stack) {
+				stack.values = parsed._stacks[scale.axis];
 				// Need to consider individual stack values for data range,
 				// in addition to the stacked value
 				min = Math.min(min, value);
@@ -663,11 +656,34 @@ helpers.extend(DatasetController.prototype, {
 				minPositive = Math.min(minPositive, value);
 			}
 		}
-		return {
-			min: min,
-			max: max,
-			minPositive: minPositive
-		};
+
+		function _skip() {
+			item = data[i];
+			parsed = _parsed[i];
+			value = parsed[scale.axis];
+			otherValue = parsed[otherScale.axis];
+			return ((item && item.hidden) || isNaN(value) || otherMin > otherValue || otherMax < otherValue);
+		}
+
+		for (i = 0; i < ilen; ++i) {
+			if (_skip()) {
+				continue;
+			}
+			_compute();
+			if (sorted) {
+				break;
+			}
+		}
+		if (sorted) {
+			for (i = ilen - 1; i >= 0; --i) {
+				if (_skip()) {
+					continue;
+				}
+				_compute();
+				break;
+			}
+		}
+		return {min, max, minPositive};
 	},
 
 	/**
@@ -679,7 +695,7 @@ helpers.extend(DatasetController.prototype, {
 		let i, ilen, value;
 
 		for (i = 0, ilen = parsed.length; i < ilen; ++i) {
-			value = parsed[i][scale.id];
+			value = parsed[i][scale.axis];
 			if (!isNaN(value)) {
 				values.push(value);
 			}
@@ -735,8 +751,8 @@ helpers.extend(DatasetController.prototype, {
 		const vScale = meta.vScale;
 		const parsed = me._getParsed(index);
 		return {
-			label: iScale ? '' + iScale.getLabelForValue(parsed[iScale.id]) : '',
-			value: vScale ? '' + vScale.getLabelForValue(parsed[vScale.id]) : ''
+			label: iScale ? '' + iScale.getLabelForValue(parsed[iScale.axis]) : '',
+			value: vScale ? '' + vScale.getLabelForValue(parsed[vScale.axis]) : ''
 		};
 	},
 
@@ -1063,7 +1079,7 @@ helpers.extend(DatasetController.prototype, {
 		}
 		me._parse(start, count);
 
-		me.updateElements(data, start, count, 'reset');
+		me.updateElements(elements, start, 'reset');
 	},
 
 	/**

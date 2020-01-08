@@ -66,7 +66,7 @@ describe('Chart', function() {
 			var callback = function() {};
 			var defaults = Chart.defaults;
 
-			defaults.global.hover.onHover = callback;
+			defaults.hover.onHover = callback;
 			defaults.line.spanGaps = true;
 			defaults.line.hover.mode = 'x-axis';
 
@@ -75,13 +75,13 @@ describe('Chart', function() {
 			});
 
 			var options = chart.options;
-			expect(options.defaultFontSize).toBe(defaults.global.defaultFontSize);
+			expect(options.fontSize).toBe(defaults.fontSize);
 			expect(options.showLines).toBe(defaults.line.showLines);
 			expect(options.spanGaps).toBe(true);
 			expect(options.hover.onHover).toBe(callback);
 			expect(options.hover.mode).toBe('x-axis');
 
-			defaults.global.hover.onHover = null;
+			defaults.hover.onHover = null;
 			defaults.line.spanGaps = false;
 			defaults.line.hover.mode = 'index';
 		});
@@ -90,7 +90,7 @@ describe('Chart', function() {
 			var callback = function() {};
 			var defaults = Chart.defaults;
 
-			defaults.global.hover.onHover = callback;
+			defaults.hover.onHover = callback;
 			defaults.line.hover.mode = 'x-axis';
 			defaults.line.spanGaps = true;
 
@@ -108,12 +108,12 @@ describe('Chart', function() {
 			});
 
 			var options = chart.options;
-			expect(options.showLines).toBe(defaults.global.showLines);
+			expect(options.showLines).toBe(defaults.showLines);
 			expect(options.spanGaps).toBe(false);
 			expect(options.hover.mode).toBe('dataset');
 			expect(options.title.position).toBe('bottom');
 
-			defaults.global.hover.onHover = null;
+			defaults.hover.onHover = null;
 			defaults.line.hover.mode = 'index';
 			defaults.line.spanGaps = false;
 		});
@@ -297,7 +297,7 @@ describe('Chart', function() {
 			expect(chart.scales.y.options._jasmineCheck).toBeDefined();
 
 			expect(Chart.defaults.line._jasmineCheck).not.toBeDefined();
-			expect(Chart.defaults.global._jasmineCheck).not.toBeDefined();
+			expect(Chart.defaults._jasmineCheck).not.toBeDefined();
 			expect(Chart.scaleService.defaults.linear._jasmineCheck).not.toBeDefined();
 			expect(Chart.scaleService.defaults.category._jasmineCheck).not.toBeDefined();
 		});
@@ -1345,6 +1345,41 @@ describe('Chart', function() {
 			expect(metasets[1].order).toEqual(5);
 			expect(metasets[2].order).toEqual(4);
 			expect(metasets[3].order).toEqual(3);
+		});
+	});
+
+	describe('data visibility', function() {
+		it('should hide a dataset', function() {
+			var chart = acquireChart({
+				type: 'line',
+				data: {
+					datasets: [{
+						data: [0, 1, 2]
+					}],
+					labels: ['a', 'b', 'c']
+				}
+			});
+
+			chart.setDatasetVisibility(0, false);
+
+			var meta = chart.getDatasetMeta(0);
+			expect(meta.hidden).toBe(true);
+		});
+
+		it('should hide a single data item', function() {
+			var chart = acquireChart({
+				type: 'polarArea',
+				data: {
+					datasets: [{
+						data: [1, 2, 3]
+					}]
+				}
+			});
+
+			chart.setDataVisibility(0, 1, false);
+
+			var meta = chart.getDatasetMeta(0);
+			expect(meta.data[1].hidden).toBe(true);
 		});
 	});
 });
