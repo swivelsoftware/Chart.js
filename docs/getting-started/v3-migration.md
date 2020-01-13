@@ -19,6 +19,7 @@ Chart.js 3.0 introduces a number of breaking changes. Chart.js 2.0 was released 
 
 ### Interactions
 
+* `interactions` are now limited to the chart area
 * `{mode: 'label'}` was replaced with `{mode: 'index'}`
 * `{mode: 'single'}` was replaced with `{mode: 'nearest', intersect: true}`
 * `modes['X-axis']` was replaced with `{mode: 'index', intersect: false}`
@@ -43,6 +44,7 @@ Chart.js 3.0 introduces a number of breaking changes. Chart.js 2.0 was released 
 
 ### Options
 
+* `Polar area` `startAngle` option is now consistent with `Radar`, 0 is at top and value is in degrees. Default is changed from `-½π` to  `0`.
 * `scales.[x/y]Axes` arrays were removed. Scales are now configured directly to `options.scales` object with the object key being the scale Id.
 * `scales.[x/y]Axes.barPercentage` was moved to dataset option `barPercentage`
 * `scales.[x/y]Axes.barThickness` was moved to dataset option `barThickness`
@@ -116,6 +118,7 @@ Animation system was completely rewritten in Chart.js v3. Each property can now 
 * `Element._view`
 * `TimeScale._getPixelForOffset`
 * `TimeScale.getLabelWidth`
+* `Tooltip._lastActive`
 
 ### Renamed
 
