@@ -416,12 +416,17 @@ class Legend extends Element {
 			if (labelOpts && labelOpts.usePointStyle) {
 				// Recalculate x and y for drawPoint() because its expecting
 				// x and y to be center of figure (instead of top left)
-				var radius = boxWidth * Math.SQRT2 / 2;
+				const drawOptions = {
+					radius: boxWidth * Math.SQRT2 / 2,
+					pointStyle: legendItem.pointStyle,
+					rotation: legendItem.rotation,
+					borderWidth: lineWidth
+				};
 				var centerX = rtlHelper.xPlus(x, boxWidth / 2);
 				var centerY = y + fontSize / 2;
 
 				// Draw pointStyle as legend symbol
-				helpers.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY, legendItem.rotation);
+				helpers.canvas.drawPoint(ctx, drawOptions, centerX, centerY);
 			} else if (meta.type === 'line') {
 				// Draw line as legend symbol
 				ctx.fillStyle = 'transparent';
@@ -726,7 +731,7 @@ export default {
 		}
 	},
 
-	beforeUpdate: function(chart) {
+	afterUpdate: function(chart) {
 		var legendOpts = chart.options.legend;
 		var legend = chart.legend;
 
@@ -736,6 +741,7 @@ export default {
 			if (legend) {
 				layouts.configure(chart, legend, legendOpts);
 				legend.options = legendOpts;
+				legend.buildLabels();
 			} else {
 				createNewLegendAndAttach(chart, legendOpts);
 			}

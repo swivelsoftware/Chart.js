@@ -241,6 +241,7 @@ class Chart {
 		const options = me.options;
 		const canvas = me.canvas;
 		const aspectRatio = (options.maintainAspectRatio && me.aspectRatio) || null;
+		const oldRatio = me.currentDevicePixelRatio;
 
 		// the canvas render width and height will be casted to integers so make sure that
 		// the canvas display style uses the same integer values to avoid blurring effect.
@@ -248,8 +249,9 @@ class Chart {
 		// Set to 0 instead of canvas.size because the size defaults to 300x150 if the element is collapsed
 		const newWidth = Math.max(0, Math.floor(helpers.dom.getMaximumWidth(canvas)));
 		const newHeight = Math.max(0, Math.floor(aspectRatio ? newWidth / aspectRatio : helpers.dom.getMaximumHeight(canvas)));
+		const newRatio = options.devicePixelRatio || platform.getDevicePixelRatio();
 
-		if (me.width === newWidth && me.height === newHeight) {
+		if (me.width === newWidth && me.height === newHeight && oldRatio === newRatio) {
 			return;
 		}
 
@@ -258,7 +260,7 @@ class Chart {
 		canvas.style.width = newWidth + 'px';
 		canvas.style.height = newHeight + 'px';
 
-		helpers.dom.retinaScale(me, options.devicePixelRatio);
+		helpers.dom.retinaScale(me, newRatio);
 
 		if (!silent) {
 			// Notify any plugins about the resize
@@ -697,7 +699,6 @@ class Chart {
 		const me = this;
 		const ctx = me.ctx;
 		const clip = meta._clip;
-		const canvas = me.canvas;
 		const area = me.chartArea;
 		const args = {
 			meta: meta,
@@ -710,9 +711,9 @@ class Chart {
 
 		helpers.canvas.clipArea(ctx, {
 			left: clip.left === false ? 0 : area.left - clip.left,
-			right: clip.right === false ? canvas.width : area.right + clip.right,
+			right: clip.right === false ? me.width : area.right + clip.right,
 			top: clip.top === false ? 0 : area.top - clip.top,
-			bottom: clip.bottom === false ? canvas.height : area.bottom + clip.bottom
+			bottom: clip.bottom === false ? me.height : area.bottom + clip.bottom
 		});
 
 		meta.controller.draw();
