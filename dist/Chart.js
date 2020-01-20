@@ -10897,7 +10897,7 @@ function (_Element) {
       var bodyFontSize = options.bodyFontSize;
       var colorX = getAlignedX(me, 'left');
       var rtlColorX = rtlHelper.x(colorX);
-      var style = meta.controller.getStyle(undefined);
+      var style = meta.controller.getStyle(undefined) || {};
       var x = rtlColorX;
       var y = pt.y;
       var fontSize = bodyFontSize;
