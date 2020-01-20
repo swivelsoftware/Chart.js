@@ -1,5 +1,5 @@
 /*!
- * Chart.js v2.9.2
+ * Chart.js v3.0.0-dev
  * https://www.chartjs.org
  * (c) 2020 Chart.js Contributors
  * Released under the MIT License
@@ -2236,8 +2236,11 @@ function _alignPixel(chart, pixel, width) {
 function clear(chart) {
   chart.ctx.clearRect(0, 0, chart.width, chart.height);
 }
-function drawPoint(ctx, style, radius, x, y, rotation) {
+function drawPoint(ctx, options, x, y) {
   var type, xOffset, yOffset, size, cornerRadius;
+  var style = options.pointStyle;
+  var rotation = options.rotation;
+  var radius = options.radius;
   var rad = (rotation || 0) * RAD_PER_DEG;
 
   if (style && _typeof(style) === 'object') {
@@ -2359,7 +2362,10 @@ function drawPoint(ctx, style, radius, x, y, rotation) {
   }
 
   ctx.fill();
-  ctx.stroke();
+
+  if (options.borderWidth > 0) {
+    ctx.stroke();
+  }
 }
 /**
  * Returns true if the point is inside the rectangle
@@ -2970,23 +2976,18 @@ function getMaximumHeight(domNode) {
 }
 function retinaScale(chart, forceRatio) {
   var pixelRatio = chart.currentDevicePixelRatio = forceRatio || typeof window !== 'undefined' && window.devicePixelRatio || 1;
-
-  if (pixelRatio === 1) {
-    return;
-  }
-
-  var canvasElement = chart.canvas;
-  var height = chart.height;
-  var width = chart.width;
-  canvasElement.height = height * pixelRatio;
-  canvasElement.width = width * pixelRatio;
-  chart.ctx.scale(pixelRatio, pixelRatio); // If no style has been set on the canvas, the render size is used as display size,
+  var canvas = chart.canvas,
+      width = chart.width,
+      height = chart.height;
+  canvas.height = height * pixelRatio;
+  canvas.width = width * pixelRatio;
+  chart.ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0); // If no style has been set on the canvas, the render size is used as display size,
   // making the chart visually bigger, so let's enforce it to the "correct" values.
   // See https://github.com/chartjs/Chart.js/issues/3575
 
-  if (!canvasElement.style.height && !canvasElement.style.width) {
-    canvasElement.style.height = height + 'px';
-    canvasElement.style.width = width + 'px';
+  if (!canvas.style.height && !canvas.style.width) {
+    canvas.style.height = height + 'px';
+    canvas.style.width = width + 'px';
   }
 }
 
@@ -6486,9 +6487,8 @@ function (_Element) {
     value: function draw(ctx, chartArea) {
       var me = this;
       var options = me.options;
-      var radius = options.radius;
 
-      if (me.skip || radius <= 0) {
+      if (me.skip || options.radius <= 0) {
         return;
       } // Clipping for Points.
 
@@ -6497,7 +6497,7 @@ function (_Element) {
         ctx.strokeStyle = options.borderColor;
         ctx.lineWidth = options.borderWidth;
         ctx.fillStyle = options.backgroundColor;
-        helpers.canvas.drawPoint(ctx, options.pointStyle, radius, me.x, me.y, options.rotation);
+        helpers.canvas.drawPoint(ctx, options, me.x, me.y);
       }
     }
   }]);
@@ -6643,23 +6643,24 @@ function (_Element) {
     key: "draw",
     value: function draw(ctx) {
       var options = this.options;
-      var rects = boundingRects(this);
-      var outer = rects.outer;
-      var inner = rects.inner;
-      ctx.fillStyle = options.backgroundColor;
-      ctx.fillRect(outer.x, outer.y, outer.w, outer.h);
 
-      if (outer.w === inner.w && outer.h === inner.h) {
-        return;
-      }
+      var _boundingRects = boundingRects(this),
+          inner = _boundingRects.inner,
+          outer = _boundingRects.outer;
 
       ctx.save();
-      ctx.beginPath();
-      ctx.rect(outer.x, outer.y, outer.w, outer.h);
-      ctx.clip();
-      ctx.fillStyle = options.borderColor;
-      ctx.rect(inner.x, inner.y, inner.w, inner.h);
-      ctx.fill('evenodd');
+
+      if (outer.w !== inner.w || outer.h !== inner.h) {
+        ctx.beginPath();
+        ctx.rect(outer.x, outer.y, outer.w, outer.h);
+        ctx.clip();
+        ctx.rect(inner.x, inner.y, inner.w, inner.h);
+        ctx.fillStyle = options.borderColor;
+        ctx.fill('evenodd');
+      }
+
+      ctx.fillStyle = options.backgroundColor;
+      ctx.fillRect(inner.x, inner.y, inner.w, inner.h);
       ctx.restore();
     }
   }, {
@@ -9575,6 +9576,9 @@ var dom$1 = {
     }
 
     removeListener(canvas, type, proxy);
+  },
+  getDevicePixelRatio: function getDevicePixelRatio() {
+    return window.devicePixelRatio;
   }
 };
 
@@ -9623,7 +9627,14 @@ var platform = helpers.extend({
    * @param {string} type - The ({@link IEvent}) type to remove
    * @param {function} listener - The listener function to remove from the event target.
    */
-  removeEventListener: function removeEventListener() {}
+  removeEventListener: function removeEventListener() {},
+
+  /**
+   * Returs current devicePixelRatio of the device this platform is connected to.
+   */
+  getDevicePixelRatio: function getDevicePixelRatio() {
+    return 1;
+  }
 }, implementation);
 /**
  * @interface IPlatform
@@ -10941,18 +10952,17 @@ function (_Element) {
         textColor = me.labelTextColors[i];
         ctx.fillStyle = textColor;
         helpers.each(bodyItem.before, fillLineOfText);
-        lines = bodyItem.lines;
+        lines = bodyItem.lines; // Draw Legend-like boxes if needed
+
+        if (displayColors && lines.length) {
+          if (meta.type === 'line') {
+            me._drawColorDot(ctx, pt, i, rtlHelper, meta);
+          } else {
+            me._drawColorBox(ctx, pt, i, rtlHelper);
+          }
+        }
 
         for (j = 0, jlen = lines.length; j < jlen; ++j) {
-          // Draw Legend-like boxes if needed
-          if (displayColors) {
-            if (meta.type === 'line') {
-              me._drawColorDot(ctx, pt, i, rtlHelper, meta);
-            } else {
-              me._drawColorBox(ctx, pt, i, rtlHelper);
-            }
-          }
-
           fillLineOfText(lines[j]);
         }
 
@@ -11376,14 +11386,16 @@ function () {
       var me = this;
       var options = me.options;
       var canvas = me.canvas;
-      var aspectRatio = options.maintainAspectRatio && me.aspectRatio || null; // the canvas render width and height will be casted to integers so make sure that
+      var aspectRatio = options.maintainAspectRatio && me.aspectRatio || null;
+      var oldRatio = me.currentDevicePixelRatio; // the canvas render width and height will be casted to integers so make sure that
       // the canvas display style uses the same integer values to avoid blurring effect.
       // Set to 0 instead of canvas.size because the size defaults to 300x150 if the element is collapsed
 
       var newWidth = Math.max(0, Math.floor(helpers.dom.getMaximumWidth(canvas)));
       var newHeight = Math.max(0, Math.floor(aspectRatio ? newWidth / aspectRatio : helpers.dom.getMaximumHeight(canvas)));
+      var newRatio = options.devicePixelRatio || platform.getDevicePixelRatio();
 
-      if (me.width === newWidth && me.height === newHeight) {
+      if (me.width === newWidth && me.height === newHeight && oldRatio === newRatio) {
         return;
       }
 
@@ -11391,7 +11403,7 @@ function () {
       canvas.height = me.height = newHeight;
       canvas.style.width = newWidth + 'px';
       canvas.style.height = newHeight + 'px';
-      helpers.dom.retinaScale(me, options.devicePixelRatio);
+      helpers.dom.retinaScale(me, newRatio);
 
       if (!silent) {
         // Notify any plugins about the resize
@@ -11865,7 +11877,6 @@ function () {
       var me = this;
       var ctx = me.ctx;
       var clip = meta._clip;
-      var canvas = me.canvas;
       var area = me.chartArea;
       var args = {
         meta: meta,
@@ -11878,9 +11889,9 @@ function () {
 
       helpers.canvas.clipArea(ctx, {
         left: clip.left === false ? 0 : area.left - clip.left,
-        right: clip.right === false ? canvas.width : area.right + clip.right,
+        right: clip.right === false ? me.width : area.right + clip.right,
         top: clip.top === false ? 0 : area.top - clip.top,
-        bottom: clip.bottom === false ? canvas.height : area.bottom + clip.bottom
+        bottom: clip.bottom === false ? me.height : area.bottom + clip.bottom
       });
       meta.controller.draw();
       helpers.canvas.unclipArea(ctx);
@@ -12235,6 +12246,12 @@ function () {
 
 Chart.instances = {};
 
+/**
+ * @namespace Chart._adapters
+ * @since 2.8.0
+ * @private
+ */
+
 function _abstract() {
   throw new Error('This method is not implemented: either no adapter can ' + 'be found or an incomplete integration was provided.');
 }
@@ -12332,9 +12349,8 @@ DateAdapter.override = function (members) {
   helpers.extend(DateAdapter.prototype, members);
 };
 
-var _date = DateAdapter;
-var core_adapters = {
-  _date: _date
+var _adapters = {
+  _date: DateAdapter
 };
 
 var math$1 = helpers.math;
@@ -14123,14 +14139,14 @@ function generateTicks(generationOptions, dataRange) {
   // for details.
 
   var MIN_SPACING = 1e-14;
-  var stepSize = generationOptions.stepSize;
+  var stepSize = generationOptions.stepSize,
+      min = generationOptions.min,
+      max = generationOptions.max,
+      precision = generationOptions.precision;
   var unit = stepSize || 1;
   var maxNumSpaces = generationOptions.maxTicks - 1;
-  var min = generationOptions.min;
-  var max = generationOptions.max;
-  var precision = generationOptions.precision;
-  var rmin = dataRange.min;
-  var rmax = dataRange.max;
+  var rmin = dataRange.min,
+      rmax = dataRange.max;
   var spacing = helpers.niceNum((rmax - rmin) / maxNumSpaces / unit) * unit;
   var factor, niceMin, niceMax, numSpaces; // Beyond MIN_SPACING floating point numbers being to lose precision
   // such that we can't do the math necessary to generate ticks
@@ -14162,13 +14178,10 @@ function generateTicks(generationOptions, dataRange) {
   niceMin = Math.floor(rmin / spacing) * spacing;
   niceMax = Math.ceil(rmax / spacing) * spacing; // If min, max and stepSize is set and they make an evenly spaced scale use it.
 
-  if (stepSize) {
+  if (stepSize && !isNullOrUndef$2(min) && !isNullOrUndef$2(max)) {
     // If very close to our whole number, use it.
-    if (!isNullOrUndef$2(min) && almostWhole(min / spacing, spacing / 1000)) {
+    if (almostWhole((max - min) / stepSize, spacing / 1000)) {
       niceMin = min;
-    }
-
-    if (!isNullOrUndef$2(max) && almostWhole(max / spacing, spacing / 1000)) {
       niceMax = max;
     }
   }
@@ -14295,8 +14308,8 @@ function (_Scale) {
     value: function getTickLimit() {
       var me = this;
       var tickOpts = me.options.ticks;
-      var stepSize = tickOpts.stepSize;
-      var maxTicksLimit = tickOpts.maxTicksLimit;
+      var maxTicksLimit = tickOpts.maxTicksLimit,
+          stepSize = tickOpts.stepSize;
       var maxTicks;
 
       if (stepSize) {
@@ -15815,7 +15828,7 @@ function (_Scale) {
 
     var options = me.options;
     var time = options.time || (options.time = {});
-    var adapter = me._adapter = new core_adapters._date(options.adapters.date);
+    var adapter = me._adapter = new _adapters._date(options.adapters.date);
     me._cache = {}; // Backward compatibility: before introducing adapter, `displayFormats` was
     // supposed to contain *all* unit/string pairs but this can't be resolved
     // when loading the scale (adapters are loaded afterward), so let's populate
@@ -16046,6 +16059,7 @@ var scales = {
   time: TimeScale
 };
 
+// TODO v3 - make this adapter external (chartjs-adapter-moment)
 var FORMATS = {
   datetime: 'MMM D, YYYY, h:mm:ss a',
   millisecond: 'h:mm:ss.SSS a',
@@ -16059,7 +16073,7 @@ var FORMATS = {
   year: 'YYYY'
 };
 
-core_adapters._date.override(typeof moment === 'function' ? {
+_adapters._date.override(typeof moment === 'function' ? {
   _id: 'moment',
   // DEBUG ONLY
   formats: function formats() {
@@ -17114,11 +17128,16 @@ function (_Element) {
         if (labelOpts && labelOpts.usePointStyle) {
           // Recalculate x and y for drawPoint() because its expecting
           // x and y to be center of figure (instead of top left)
-          var radius = boxWidth * Math.SQRT2 / 2;
+          var drawOptions = {
+            radius: boxWidth * Math.SQRT2 / 2,
+            pointStyle: legendItem.pointStyle,
+            rotation: legendItem.rotation,
+            borderWidth: lineWidth
+          };
           var centerX = rtlHelper.xPlus(x, boxWidth / 2);
           var centerY = y + fontSize / 2; // Draw pointStyle as legend symbol
 
-          helpers.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY, legendItem.rotation);
+          helpers.canvas.drawPoint(ctx, drawOptions, centerX, centerY);
         } else if (meta.type === 'line') {
           // Draw line as legend symbol
           ctx.fillStyle = 'transparent';
@@ -17438,7 +17457,7 @@ var legend = {
       createNewLegendAndAttach(chart, legendOpts);
     }
   },
-  beforeUpdate: function beforeUpdate(chart) {
+  afterUpdate: function afterUpdate(chart) {
     var legendOpts = chart.options.legend;
     var legend = chart.legend;
 
@@ -17448,6 +17467,7 @@ var legend = {
       if (legend) {
         layouts.configure(chart, legend, legendOpts);
         legend.options = legendOpts;
+        legend.buildLabels();
       } else {
         createNewLegendAndAttach(chart, legendOpts);
       }
@@ -17756,7 +17776,7 @@ var plugins = {
  * @namespace Chart
  */
 Chart.helpers = helpers;
-Chart._adapters = core_adapters;
+Chart._adapters = _adapters;
 Chart.Animation = Animation;
 Chart.Animator = instance;
 Chart.animationService = Animations;
