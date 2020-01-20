@@ -757,7 +757,7 @@ class Tooltip extends Element {
 		const colorX = getAlignedX(me, 'left');
 		const rtlColorX = rtlHelper.x(colorX);
 
-		var style = meta.controller.getStyle(undefined) || {};
+		var style = meta.controller.getStyle(undefined);
 		var x = rtlColorX;
 		var y = pt.y;
 		var fontSize = bodyFontSize;
