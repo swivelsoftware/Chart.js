@@ -2,7 +2,8 @@
 
 import DatasetController from '../core/core.datasetController';
 import defaults from '../core/core.defaults';
-import elements from '../elements';
+import Line from '../elements/element.line';
+import Point from '../elements/element.point';
 import helpers from '../helpers';
 
 const valueOrDefault = helpers.valueOrDefault;
@@ -28,9 +29,9 @@ defaults._set('line', {
 
 export default DatasetController.extend({
 
-	datasetElementType: elements.Line,
+	datasetElementType: Line,
 
-	dataElementType: elements.Point,
+	dataElementType: Point,
 
 	/**
 	 * @private
@@ -98,6 +99,9 @@ export default DatasetController.extend({
 		const firstOpts = me._resolveDataElementOptions(start, mode);
 		const sharedOptions = me._getSharedOptions(mode, points[start], firstOpts);
 		const includeOptions = me._includeOptions(mode, sharedOptions);
+		const spanGaps = valueOrDefault(me._config.spanGaps, me.chart.options.spanGaps);
+		const maxGapLength = helpers.math.isNumber(spanGaps) ? spanGaps : Number.POSITIVE_INFINITY;
+		let prevParsed;
 
 		for (let i = 0; i < points.length; ++i) {
 			const index = start + i;
@@ -108,7 +112,8 @@ export default DatasetController.extend({
 			const properties = {
 				x,
 				y,
-				skip: isNaN(x) || isNaN(y)
+				skip: isNaN(x) || isNaN(y),
+				stop: i > 0 && (parsed.x - prevParsed.x) > maxGapLength
 			};
 
 			if (includeOptions) {
@@ -116,6 +121,8 @@ export default DatasetController.extend({
 			}
 
 			me._updateElement(point, index, properties, mode);
+
+			prevParsed = parsed;
 		}
 
 		me._updateSharedOptions(sharedOptions, mode);

@@ -1,7 +1,7 @@
 'use strict';
 
 import defaults from './core.defaults';
-import helpers from '../helpers/';
+import {clone} from '../helpers/helpers.core';
 
 defaults._set('plugins', {});
 
@@ -142,7 +142,7 @@ export default {
 			}
 
 			if (opts === true) {
-				opts = helpers.clone(defaults.plugins[id]);
+				opts = clone(defaults.plugins[id]);
 			}
 
 			plugins.push(plugin);
@@ -199,6 +199,13 @@ export default {
  * hook will not be called if the chart update has been previously cancelled.
  * @param {Chart.Controller} chart - The chart instance.
  * @param {object} options - The plugin options.
+ */
+/**
+ * @method IPlugin#reset
+ * @desc Called during chart reset
+ * @param {Chart.Controller} chart - The chart instance.
+ * @param {object} options - The plugin options.
+ * @since version 3.0.0
  */
 /**
  * @method IPlugin#beforeDatasetsUpdate
