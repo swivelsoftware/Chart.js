@@ -122,8 +122,8 @@
 			title: 'Line (point data)',
 			path: 'scales/time/line-point-data.html'
 		}, {
-			title: 'Time Series',
-			path: 'scales/time/financial.html'
+			title: 'Line (break on 2 day gap)',
+			path: 'scales/time/line-max-span.html'
 		}, {
 			title: 'Combo',
 			path: 'scales/time/combo.html'
@@ -239,6 +239,9 @@
 	}, {
 		title: 'Advanced',
 		items: [{
+			title: 'Custom minor and major ticks',
+			path: 'advanced/financial.html'
+		}, {
 			title: 'Progress bar',
 			path: 'advanced/progress-bar.html'
 		}, {

@@ -6,10 +6,9 @@ import defaults from './core.defaults';
 import helpers from '../helpers/index';
 import Interaction from './core.interaction';
 import layouts from './core.layouts';
-import platform from '../platforms/platform';
+import {BasicPlatform, DomPlatform} from '../platform/platforms';
 import plugins from './core.plugins';
 import scaleService from '../core/core.scaleService';
-import Tooltip from './core.tooltip';
 
 const valueOrDefault = helpers.valueOrDefault;
 
@@ -117,8 +116,6 @@ function updateConfig(chart) {
 	chart._animationsDisabled = isAnimationDisabled(newOptions);
 	chart.ensureScalesHaveIDs();
 	chart.buildOrUpdateScales();
-
-	chart.tooltip.initialize();
 }
 
 const KNOWN_POSITIONS = new Set(['top', 'bottom', 'left', 'right', 'chartArea']);
@@ -148,13 +145,38 @@ function onAnimationProgress(ctx) {
 	helpers.callback(animationOptions && animationOptions.onProgress, arguments, chart);
 }
 
+function isDomSupported() {
+	return typeof window !== undefined && typeof document !== undefined;
+}
+
+/**
+ * Chart.js can take a string id of a canvas element, a 2d context, or a canvas element itself.
+ * Attempt to unwrap the item passed into the chart constructor so that it is a canvas element (if possible).
+ */
+function getCanvas(item) {
+	if (isDomSupported() && typeof item === 'string') {
+		item = document.getElementById(item);
+	} else if (item.length) {
+		// Support for array based queries (such as jQuery)
+		item = item[0];
+	}
+
+	if (item && item.canvas) {
+		// Support for any object associated to a canvas (including a context2d)
+		item = item.canvas;
+	}
+	return item;
+}
+
 class Chart {
 	constructor(item, config) {
 		const me = this;
 
 		config = initConfig(config);
+		const initialCanvas = getCanvas(item);
+		me._initializePlatform(initialCanvas, config);
 
-		const context = platform.acquireContext(item, config);
+		const context = me.platform.acquireContext(initialCanvas, config);
 		const canvas = context && context.canvas;
 		const height = canvas && canvas.height;
 		const width = canvas && canvas.width;
@@ -196,14 +218,14 @@ class Chart {
 		Animator.listen(me, 'complete', onAnimationsComplete);
 		Animator.listen(me, 'progress', onAnimationProgress);
 
-		me.initialize();
+		me._initialize();
 		me.update();
 	}
 
 	/**
 	 * @private
 	 */
-	initialize() {
+	_initialize() {
 		const me = this;
 
 		// Before init plugin notification
@@ -218,12 +240,27 @@ class Chart {
 			me.resize(true);
 		}
 
-		me.initToolTip();
-
 		// After init plugin notification
 		plugins.notify(me, 'afterInit');
 
 		return me;
+	}
+
+	/**
+	 * @private
+	 */
+	_initializePlatform(canvas, config) {
+		const me = this;
+
+		if (config.platform) {
+			me.platform = new config.platform();
+		} else if (!isDomSupported()) {
+			me.platform = new BasicPlatform();
+		} else if (window.OffscreenCanvas && canvas instanceof window.OffscreenCanvas) {
+			me.platform = new BasicPlatform();
+		} else {
+			me.platform = new DomPlatform();
+		}
 	}
 
 	clear() {
@@ -249,7 +286,7 @@ class Chart {
 		// Set to 0 instead of canvas.size because the size defaults to 300x150 if the element is collapsed
 		const newWidth = Math.max(0, Math.floor(helpers.dom.getMaximumWidth(canvas)));
 		const newHeight = Math.max(0, Math.floor(aspectRatio ? newWidth / aspectRatio : helpers.dom.getMaximumHeight(canvas)));
-		const newRatio = options.devicePixelRatio || platform.getDevicePixelRatio();
+		const newRatio = options.devicePixelRatio || me.platform.getDevicePixelRatio();
 
 		if (me.width === newWidth && me.height === newHeight && oldRatio === newRatio) {
 			return;
@@ -466,7 +503,7 @@ class Chart {
 	*/
 	reset() {
 		this.resetElements();
-		this.tooltip.initialize();
+		plugins.notify(this, 'reset');
 	}
 
 	update(mode) {
@@ -638,8 +675,6 @@ class Chart {
 			layers[i].draw(me.chartArea);
 		}
 
-		me._drawTooltip();
-
 		plugins.notify(me, 'afterDraw');
 	}
 
@@ -721,27 +756,6 @@ class Chart {
 		helpers.canvas.unclipArea(ctx);
 
 		plugins.notify(me, 'afterDatasetDraw', [args]);
-	}
-
-	/**
-	 * Draws tooltip unless a plugin returns `false` to the `beforeTooltipDraw`
-	 * hook, in which case, plugins will not be called on `afterTooltipDraw`.
-	 * @private
-	 */
-	_drawTooltip() {
-		const me = this;
-		const tooltip = me.tooltip;
-		const args = {
-			tooltip: tooltip
-		};
-
-		if (plugins.notify(me, 'beforeTooltipDraw', [args]) === false) {
-			return;
-		}
-
-		tooltip.draw(me.ctx);
-
-		plugins.notify(me, 'afterTooltipDraw', [args]);
 	}
 
 	/**
@@ -852,7 +866,7 @@ class Chart {
 		if (canvas) {
 			me.unbindEvents();
 			helpers.canvas.clear(me);
-			platform.releaseContext(me.ctx);
+			me.platform.releaseContext(me.ctx);
 			me.canvas = null;
 			me.ctx = null;
 		}
@@ -866,10 +880,6 @@ class Chart {
 		return this.canvas.toDataURL.apply(this.canvas, arguments);
 	}
 
-	initToolTip() {
-		this.tooltip = new Tooltip({_chart: this});
-	}
-
 	/**
 	 * @private
 	 */
@@ -881,7 +891,7 @@ class Chart {
 		};
 
 		helpers.each(me.options.events, function(type) {
-			platform.addEventListener(me, type, listener);
+			me.platform.addEventListener(me, type, listener);
 			listeners[type] = listener;
 		});
 
@@ -892,7 +902,7 @@ class Chart {
 				me.resize();
 			};
 
-			platform.addEventListener(me, 'resize', listener);
+			me.platform.addEventListener(me, 'resize', listener);
 			listeners.resize = listener;
 		}
 	}
@@ -909,7 +919,7 @@ class Chart {
 
 		delete me._listeners;
 		helpers.each(listeners, function(listener, type) {
-			platform.removeEventListener(me, type, listener);
+			me.platform.removeEventListener(me, type, listener);
 		});
 	}
 
@@ -920,10 +930,6 @@ class Chart {
 		if (mode === 'dataset') {
 			meta = this.getDatasetMeta(items[0].datasetIndex);
 			meta.controller['_' + prefix + 'DatasetHoverStyle']();
-			for (i = 0, ilen = meta.data.length; i < ilen; ++i) {
-				meta.controller[prefix + 'HoverStyle'](meta.data[i], items[0].datasetIndex, i);
-			}
-			return;
 		}
 
 		for (i = 0, ilen = items.length; i < ilen; ++i) {
@@ -958,17 +964,12 @@ class Chart {
 	 */
 	eventHandler(e) {
 		const me = this;
-		const tooltip = me.tooltip;
 
 		if (plugins.notify(me, 'beforeEvent', [e]) === false) {
 			return;
 		}
 
 		me.handleEvent(e);
-
-		if (tooltip) {
-			tooltip.handleEvent(e);
-		}
 
 		plugins.notify(me, 'afterEvent', [e]);
 

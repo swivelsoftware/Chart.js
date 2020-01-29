@@ -1129,9 +1129,13 @@ class Scale extends Element {
 
 			if (isHorizontal) {
 				x = pixel;
-				textOffset = position === 'top'
-					? ((!rotation ? 0.5 : 1) - lineCount) * lineHeight
-					: (!rotation ? 0.5 : 0) * lineHeight;
+				if (position === 'top') {
+					textOffset = (Math.sin(rotation) * (lineCount / 2) + 0.5) * lineHeight;
+					textOffset -= (rotation === 0 ? (lineCount - 0.5) : Math.cos(rotation) * (lineCount / 2)) * lineHeight;
+				} else {
+					textOffset = Math.sin(rotation) * (lineCount / 2) * lineHeight;
+					textOffset += (rotation === 0 ? 0.5 : Math.cos(rotation) * (lineCount / 2)) * lineHeight;
+				}
 			} else {
 				y = pixel;
 				textOffset = (1 - lineCount) * lineHeight / 2;
@@ -1157,11 +1161,6 @@ class Scale extends Element {
 	_drawGrid(chartArea) {
 		const me = this;
 		const gridLines = me.options.gridLines;
-
-		if (!gridLines.display) {
-			return;
-		}
-
 		const ctx = me.ctx;
 		const chart = me.chart;
 		let context = {
@@ -1172,34 +1171,36 @@ class Scale extends Element {
 		const items = me._gridLineItems || (me._gridLineItems = me._computeGridLineItems(chartArea));
 		let i, ilen;
 
-		for (i = 0, ilen = items.length; i < ilen; ++i) {
-			const item = items[i];
-			const width = item.width;
-			const color = item.color;
+		if (gridLines.display) {
+			for (i = 0, ilen = items.length; i < ilen; ++i) {
+				const item = items[i];
+				const width = item.width;
+				const color = item.color;
 
-			if (width && color) {
-				ctx.save();
-				ctx.lineWidth = width;
-				ctx.strokeStyle = color;
-				if (ctx.setLineDash) {
-					ctx.setLineDash(item.borderDash);
-					ctx.lineDashOffset = item.borderDashOffset;
+				if (width && color) {
+					ctx.save();
+					ctx.lineWidth = width;
+					ctx.strokeStyle = color;
+					if (ctx.setLineDash) {
+						ctx.setLineDash(item.borderDash);
+						ctx.lineDashOffset = item.borderDashOffset;
+					}
+
+					ctx.beginPath();
+
+					if (gridLines.drawTicks) {
+						ctx.moveTo(item.tx1, item.ty1);
+						ctx.lineTo(item.tx2, item.ty2);
+					}
+
+					if (gridLines.drawOnChartArea) {
+						ctx.moveTo(item.x1, item.y1);
+						ctx.lineTo(item.x2, item.y2);
+					}
+
+					ctx.stroke();
+					ctx.restore();
 				}
-
-				ctx.beginPath();
-
-				if (gridLines.drawTicks) {
-					ctx.moveTo(item.tx1, item.ty1);
-					ctx.lineTo(item.tx2, item.ty2);
-				}
-
-				if (gridLines.drawOnChartArea) {
-					ctx.moveTo(item.x1, item.y1);
-					ctx.lineTo(item.x2, item.y2);
-				}
-
-				ctx.stroke();
-				ctx.restore();
 			}
 		}
 
