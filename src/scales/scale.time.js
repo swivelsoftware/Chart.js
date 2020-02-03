@@ -2,13 +2,11 @@
 
 import adapters from '../core/core.adapters';
 import defaults from '../core/core.defaults';
-import helpers from '../helpers/index';
+import {isFinite, isNullOrUndef, mergeIf, valueOrDefault} from '../helpers/helpers.core';
 import {toRadians} from '../helpers/helpers.math';
+import {resolve} from '../helpers/helpers.options';
 import Scale from '../core/core.scale';
 import {_lookup} from '../helpers/helpers.collection';
-
-const resolve = helpers.options.resolve;
-const valueOrDefault = helpers.valueOrDefault;
 
 // Integer constants are from the ES6 spec.
 const MAX_INTEGER = Number.MAX_SAFE_INTEGER || 9007199254740991;
@@ -152,7 +150,7 @@ function interpolate(table, skey, sval, tkey) {
 }
 
 function parse(scale, input) {
-	if (helpers.isNullOrUndef(input)) {
+	if (isNullOrUndef(input)) {
 		return null;
 	}
 
@@ -166,7 +164,7 @@ function parse(scale, input) {
 	}
 
 	// Only parse if its not a timestamp already
-	if (!helpers.isFinite(value)) {
+	if (!isFinite(value)) {
 		value = typeof parser === 'string'
 			? adapter.parse(value, parser)
 			: adapter.parse(value);
@@ -232,11 +230,13 @@ function determineMajorUnit(unit) {
  * Important: this method can return ticks outside the min and max range, it's the
  * responsibility of the calling code to clamp values if needed.
  */
-function generate(scale, min, max, capacity) {
+function generate(scale) {
 	const adapter = scale._adapter;
+	const min = scale.min;
+	const max = scale.max;
 	const options = scale.options;
 	const timeOpts = options.time;
-	const minor = timeOpts.unit || determineUnitForAutoTicks(timeOpts.minUnit, min, max, capacity);
+	const minor = timeOpts.unit || determineUnitForAutoTicks(timeOpts.minUnit, min, max, scale._getLabelCapacity(min));
 	const stepSize = resolve([timeOpts.stepSize, timeOpts.unitStepSize, 1]);
 	const weekday = minor === 'week' ? timeOpts.isoWeekday : false;
 	const ticks = [];
@@ -398,22 +398,15 @@ function getAllTimestamps(scale) {
 
 
 function getTimestampsForTicks(scale) {
-	const min = scale.min;
-	const max = scale.max;
 	const options = scale.options;
-	const capacity = scale._getLabelCapacity(min);
 	const source = options.ticks.source;
-	let timestamps;
 
 	if (source === 'data' || (source === 'auto' && options.distribution === 'series')) {
-		timestamps = getAllTimestamps(scale);
+		return getAllTimestamps(scale);
 	} else if (source === 'labels') {
-		timestamps = getLabelTimestamps(scale);
-	} else {
-		timestamps = generate(scale, min, max, capacity, options);
+		return getLabelTimestamps(scale);
 	}
-
-	return timestamps;
+	return generate(scale);
 }
 
 function getTimestampsForTable(scale) {
@@ -543,7 +536,7 @@ class TimeScale extends Scale {
 		// when loading the scale (adapters are loaded afterward), so let's populate
 		// missing formats on update
 
-		helpers.mergeIf(time.displayFormats, adapter.formats());
+		mergeIf(time.displayFormats, adapter.formats());
 	}
 
 	determineDataLimits() {
@@ -574,8 +567,8 @@ class TimeScale extends Scale {
 			}
 		}
 
-		min = helpers.isFinite(min) && !isNaN(min) ? min : +adapter.startOf(Date.now(), unit);
-		max = helpers.isFinite(max) && !isNaN(max) ? max : +adapter.endOf(Date.now(), unit) + 1;
+		min = isFinite(min) && !isNaN(min) ? min : +adapter.startOf(Date.now(), unit);
+		max = isFinite(max) && !isNaN(max) ? max : +adapter.endOf(Date.now(), unit) + 1;
 
 		// Make sure that max is strictly higher than min (required by the lookup table)
 		me.min = Math.min(min, max);
@@ -609,7 +602,6 @@ class TimeScale extends Scale {
 			: determineUnitForFormatting(me, ticks.length, timeOpts.minUnit, me.min, me.max));
 		me._majorUnit = !tickOpts.major.enabled || me._unit === 'year' ? undefined
 			: determineMajorUnit(me._unit);
-		me._numIndices = ticks.length;
 		me._table = buildLookupTable(getTimestampsForTable(me), min, max, distribution);
 		me._offsets = computeOffsets(me._table, ticks, min, max, options);
 

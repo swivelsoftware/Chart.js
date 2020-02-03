@@ -91,11 +91,17 @@ Animation system was completely rewritten in Chart.js v3. Each property can now 
 * `helpers.addEvent`
 * `helpers.aliasPixel`
 * `helpers.configMerge`
+* `helpers.findIndex`
+* `helpers.findNextWhere`
+* `helpers.findPreviousWhere`
 * `helpers.indexOf`
 * `helpers.lineTo`
+* `helpers.longestText` was moved to the `helpers.canvas` namespace and made private
 * `helpers.max`
+* `helpers.measureText` was moved to the `helpers.canvas` namespace and made private
 * `helpers.min`
 * `helpers.nextItem`
+* `helpers.niceNum`
 * `helpers.numberOfLabelLines`
 * `helpers.previousItem`
 * `helpers.removeEvent`
