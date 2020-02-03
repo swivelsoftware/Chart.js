@@ -433,11 +433,16 @@ class Legend extends Element {
 				ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
 
 				// Draw point at center
-				var radius = fontSize * Math.sqrt(5) / 5;
 				var centerX = x + boxWidth / 2;
 				var centerY = y + fontSize / 2;
-				ctx.lineWidth *= Math.SQRT2 / 2;
-				helpers.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY, legendItem.rotation);
+
+				const drawOptions = {
+					radius: fontSize * Math.sqrt(5) / 5,
+					pointStyle: legendItem.pointStyle,
+					rotation: legendItem.rotation,
+					borderWidth: lineWidth * Math.SQRT2 / 2
+				}
+				drawPoint(ctx, drawOptions, centerX, centerY);
 			} else {
 				// Draw box as legend symbol
 				ctx.fillRect(rtlHelper.leftForLtr(x, boxWidth), y, boxWidth, fontSize);
