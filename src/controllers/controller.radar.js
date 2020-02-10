@@ -4,11 +4,9 @@ import DatasetController from '../core/core.datasetController';
 import defaults from '../core/core.defaults';
 import Line from '../elements/element.line';
 import Point from '../elements/element.point';
-import helpers from '../helpers';
+import {valueOrDefault} from '../helpers/helpers.core';
 
-const valueOrDefault = helpers.valueOrDefault;
-
-defaults._set('radar', {
+defaults.set('radar', {
 	spanGaps: false,
 	scales: {
 		r: {
@@ -22,60 +20,30 @@ defaults._set('radar', {
 	}
 });
 
-export default DatasetController.extend({
-	datasetElementType: Line,
+class RadarController extends DatasetController {
 
-	dataElementType: Point,
-
-	/**
-	 * @private
-	 */
-	_datasetElementOptions: [
-		'backgroundColor',
-		'borderWidth',
-		'borderColor',
-		'borderCapStyle',
-		'borderDash',
-		'borderDashOffset',
-		'borderJoinStyle',
-		'fill'
-	],
+	constructor(chart, datasetIndex) {
+		super(chart, datasetIndex);
+	}
 
 	/**
 	 * @private
 	 */
-	_dataElementOptions: {
-		backgroundColor: 'pointBackgroundColor',
-		borderColor: 'pointBorderColor',
-		borderWidth: 'pointBorderWidth',
-		hitRadius: 'pointHitRadius',
-		hoverBackgroundColor: 'pointHoverBackgroundColor',
-		hoverBorderColor: 'pointHoverBorderColor',
-		hoverBorderWidth: 'pointHoverBorderWidth',
-		hoverRadius: 'pointHoverRadius',
-		pointStyle: 'pointStyle',
-		radius: 'pointRadius',
-		rotation: 'pointRotation'
-	},
-
-	/**
-	 * @private
-	 */
-	_getIndexScaleId: function() {
+	_getIndexScaleId() {
 		return this._cachedMeta.rAxisID;
-	},
+	}
 
 	/**
 	 * @private
 	 */
-	_getValueScaleId: function() {
+	_getValueScaleId() {
 		return this._cachedMeta.rAxisID;
-	},
+	}
 
 	/**
 	 * @private
 	 */
-	_getLabelAndValue: function(index) {
+	_getLabelAndValue(index) {
 		const me = this;
 		const vScale = me._cachedMeta.vScale;
 		const parsed = me._getParsed(index);
@@ -84,9 +52,9 @@ export default DatasetController.extend({
 			label: vScale._getLabels()[index],
 			value: '' + vScale.getLabelForValue(parsed[vScale.axis])
 		};
-	},
+	}
 
-	update: function(mode) {
+	update(mode) {
 		const me = this;
 		const meta = me._cachedMeta;
 		const line = meta.dataset;
@@ -105,9 +73,9 @@ export default DatasetController.extend({
 		me.updateElements(points, 0, mode);
 
 		line.updateControlPoints(me.chart.chartArea);
-	},
+	}
 
-	updateElements: function(points, start, mode) {
+	updateElements(points, start, mode) {
 		const me = this;
 		const dataset = me.getDataset();
 		const scale = me.chart.scales.r;
@@ -133,20 +101,57 @@ export default DatasetController.extend({
 
 			me._updateElement(point, index, properties, mode);
 		}
-	},
+	}
 
 	/**
 	 * @private
 	 */
-	_resolveDatasetElementOptions: function() {
+	_resolveDatasetElementOptions() {
 		const me = this;
 		const config = me._config;
 		const options = me.chart.options;
-		const values = DatasetController.prototype._resolveDatasetElementOptions.apply(me, arguments);
+		const values = super._resolveDatasetElementOptions.apply(me, arguments);
 
 		values.spanGaps = valueOrDefault(config.spanGaps, options.spanGaps);
 		values.tension = valueOrDefault(config.lineTension, options.elements.line.tension);
 
 		return values;
 	}
-});
+}
+
+RadarController.prototype.datasetElementType = Line;
+
+RadarController.prototype.dataElementType = Point;
+
+/**
+ * @private
+ */
+RadarController.prototype._datasetElementOptions = [
+	'backgroundColor',
+	'borderColor',
+	'borderCapStyle',
+	'borderDash',
+	'borderDashOffset',
+	'borderJoinStyle',
+	'borderWidth',
+	'fill'
+];
+
+/**
+ * @private
+ */
+RadarController.prototype._dataElementOptions = {
+	backgroundColor: 'pointBackgroundColor',
+	borderColor: 'pointBorderColor',
+	borderWidth: 'pointBorderWidth',
+	hitRadius: 'pointHitRadius',
+	hoverBackgroundColor: 'pointHoverBackgroundColor',
+	hoverBorderColor: 'pointHoverBorderColor',
+	hoverBorderWidth: 'pointHoverBorderWidth',
+	hoverRadius: 'pointHoverRadius',
+	pointStyle: 'pointStyle',
+	radius: 'pointRadius',
+	rotation: 'pointRotation'
+};
+
+export default RadarController;

@@ -19,7 +19,7 @@ function finiteOrDefault(value, def) {
  * Generate a set of logarithmic ticks
  * @param generationOptions the options used to generate the ticks
  * @param dataRange the range of the data
- * @returns {number[]} array of tick values
+ * @returns {object[]} array of tick objects
  */
 function generateTicks(generationOptions, dataRange) {
 	const endExp = Math.floor(log10(dataRange.max));
@@ -52,7 +52,7 @@ function generateTicks(generationOptions, dataRange) {
 const defaultConfig = {
 	// label settings
 	ticks: {
-		callback: Ticks.formatters.logarithmic,
+		callback: Ticks.formatters.numeric,
 		major: {
 			enabled: true
 		}
@@ -60,6 +60,20 @@ const defaultConfig = {
 };
 
 class LogarithmicScale extends Scale {
+
+	constructor(cfg) {
+		super(cfg);
+
+		/** @type {number} */
+		this.start = undefined;
+		/** @type {number} */
+		this.end = undefined;
+		/** @type {number} */
+		this._startValue = undefined;
+		/** @type {number} */
+		this._valueRange = undefined;
+	}
+
 	_parse(raw, index) { // eslint-disable-line no-unused-vars
 		const value = LinearScaleBase.prototype._parse.apply(this, arguments);
 		if (value === 0) {
@@ -136,7 +150,7 @@ class LogarithmicScale extends Scale {
 	}
 
 	getLabelForValue(value) {
-		return value === undefined ? 0 : new Intl.NumberFormat().format(value);
+		return value === undefined ? 0 : new Intl.NumberFormat(this.options.locale).format(value);
 	}
 
 	getPixelForTick(index) {

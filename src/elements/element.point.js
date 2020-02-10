@@ -2,11 +2,12 @@
 
 import defaults from '../core/core.defaults';
 import Element from '../core/core.element';
-import helpers from '../helpers';
+import {_isPointInArea, drawPoint} from '../helpers/helpers.canvas';
+import {extend} from '../helpers/helpers.core';
 
 const defaultColor = defaults.color;
 
-defaults._set('elements', {
+defaults.set('elements', {
 	point: {
 		radius: 3,
 		pointStyle: 'circle',
@@ -22,8 +23,16 @@ defaults._set('elements', {
 
 class Point extends Element {
 
-	constructor(props) {
-		super(props);
+	constructor(cfg) {
+		super();
+
+		this.options = undefined;
+		this.skip = undefined;
+		this.stop = undefined;
+
+		if (cfg) {
+			extend(this, cfg);
+		}
 	}
 
 	inRange(mouseX, mouseY) {
@@ -70,11 +79,11 @@ class Point extends Element {
 		}
 
 		// Clipping for Points.
-		if (chartArea === undefined || helpers.canvas._isPointInArea(me, chartArea)) {
+		if (chartArea === undefined || _isPointInArea(me, chartArea)) {
 			ctx.strokeStyle = options.borderColor;
 			ctx.lineWidth = options.borderWidth;
 			ctx.fillStyle = options.backgroundColor;
-			helpers.canvas.drawPoint(ctx, options, me.x, me.y);
+			drawPoint(ctx, options, me.x, me.y);
 		}
 	}
 

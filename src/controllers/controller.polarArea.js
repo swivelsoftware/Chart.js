@@ -3,11 +3,10 @@
 import DatasetController from '../core/core.datasetController';
 import defaults from '../core/core.defaults';
 import Arc from '../elements/element.arc';
-import helpers from '../helpers';
+import {toRadians} from '../helpers/helpers.math';
+import {resolve} from '../helpers/helpers.options';
 
-const resolve = helpers.options.resolve;
-
-defaults._set('polarArea', {
+defaults.set('polarArea', {
 	animation: {
 		numbers: {
 			type: 'number',
@@ -88,51 +87,43 @@ defaults._set('polarArea', {
 function getStartAngleRadians(deg) {
 	// radialLinear scale draws angleLines using startAngle. 0 is expected to be at top.
 	// Here we adjust to standard unit circle used in drawing, where 0 is at right.
-	return helpers.math.toRadians(deg) - 0.5 * Math.PI;
+	return toRadians(deg) - 0.5 * Math.PI;
 }
 
-export default DatasetController.extend({
+class PolarAreaController extends DatasetController {
 
-	dataElementType: Arc,
+	constructor(chart, datasetIndex) {
+		super(chart, datasetIndex);
 
-	/**
-	 * @private
-	 */
-	_dataElementOptions: [
-		'backgroundColor',
-		'borderColor',
-		'borderWidth',
-		'borderAlign',
-		'hoverBackgroundColor',
-		'hoverBorderColor',
-		'hoverBorderWidth',
-	],
+		this.innerRadius = undefined;
+		this.outerRadius = undefined;
+	}
 
 	/**
 	 * @private
 	 */
-	_getIndexScaleId: function() {
+	_getIndexScaleId() {
 		return this._cachedMeta.rAxisID;
-	},
+	}
 
 	/**
 	 * @private
 	 */
-	_getValueScaleId: function() {
+	_getValueScaleId() {
 		return this._cachedMeta.rAxisID;
-	},
+	}
 
-	update: function(mode) {
+	update(mode) {
 		const arcs = this._cachedMeta.data;
 
 		this._updateRadius();
 		this.updateElements(arcs, 0, mode);
-	},
+	}
 
 	/**
 	 * @private
 	 */
-	_updateRadius: function() {
+	_updateRadius() {
 		var me = this;
 		var chart = me.chart;
 		var chartArea = chart.chartArea;
@@ -145,9 +136,9 @@ export default DatasetController.extend({
 
 		me.outerRadius = chart.outerRadius - (chart.radiusLength * me.index);
 		me.innerRadius = me.outerRadius - chart.radiusLength;
-	},
+	}
 
-	updateElements: function(arcs, start, mode) {
+	updateElements(arcs, start, mode) {
 		const me = this;
 		const reset = mode === 'reset';
 		const chart = me.chart;
@@ -196,9 +187,9 @@ export default DatasetController.extend({
 
 			me._updateElement(arc, index, properties, mode);
 		}
-	},
+	}
 
-	countVisibleElements: function() {
+	countVisibleElements() {
 		var dataset = this.getDataset();
 		var meta = this._cachedMeta;
 		var count = 0;
@@ -210,12 +201,12 @@ export default DatasetController.extend({
 		});
 
 		return count;
-	},
+	}
 
 	/**
 	 * @private
 	 */
-	_computeAngle: function(index) {
+	_computeAngle(index) {
 		var me = this;
 		var meta = me._cachedMeta;
 		var count = meta.count;
@@ -238,4 +229,21 @@ export default DatasetController.extend({
 			(2 * Math.PI) / count
 		], context, index);
 	}
-});
+}
+
+PolarAreaController.prototype.dataElementType = Arc;
+
+/**
+ * @private
+ */
+PolarAreaController.prototype._dataElementOptions = [
+	'backgroundColor',
+	'borderColor',
+	'borderWidth',
+	'borderAlign',
+	'hoverBackgroundColor',
+	'hoverBorderColor',
+	'hoverBorderWidth'
+];
+
+export default PolarAreaController;

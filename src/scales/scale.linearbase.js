@@ -37,7 +37,7 @@ function niceNum(range, round) {
  * Generate a set of linear ticks
  * @param generationOptions the options used to generate the ticks
  * @param dataRange the range of the data
- * @returns {number[]} array of tick values
+ * @returns {object[]} array of tick objects
  */
 function generateTicks(generationOptions, dataRange) {
 	const ticks = [];
@@ -106,11 +106,27 @@ function generateTicks(generationOptions, dataRange) {
 }
 
 class LinearScaleBase extends Scale {
+
+	constructor(cfg) {
+		super(cfg);
+
+		/** @type {number} */
+		this.start = undefined;
+		/** @type {number} */
+		this.end = undefined;
+		/** @type {number} */
+		this._startValue = undefined;
+		/** @type {number} */
+		this._endValue = undefined;
+		/** @type {number} */
+		this._valueRange = undefined;
+	}
+
 	_parse(raw, index) { // eslint-disable-line no-unused-vars
 		if (isNullOrUndef(raw)) {
 			return NaN;
 		}
-		if ((typeof raw === 'number' || raw instanceof Number) && !isFinite(raw)) {
+		if ((typeof raw === 'number' || raw instanceof Number) && !isFinite(+raw)) {
 			return NaN;
 		}
 
@@ -270,7 +286,7 @@ class LinearScaleBase extends Scale {
 	}
 
 	getLabelForValue(value) {
-		return new Intl.NumberFormat().format(value);
+		return new Intl.NumberFormat(this.options.locale).format(value);
 	}
 }
 

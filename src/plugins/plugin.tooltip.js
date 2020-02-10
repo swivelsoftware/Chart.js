@@ -6,10 +6,14 @@ import Element from '../core/core.element';
 import plugins from '../core/core.plugins';
 import helpers from '../helpers/index';
 
+/**
+ * @typedef { import("../platform/platform.base").IEvent } IEvent
+ */
+
 const valueOrDefault = helpers.valueOrDefault;
 const getRtlHelper = helpers.rtl.getRtlAdapter;
 
-defaults._set('tooltips', {
+defaults.set('tooltips', {
 	enabled: true,
 	custom: null,
 	mode: 'nearest',
@@ -115,11 +119,11 @@ var positioners = {
 	/**
 	 * Average mode places the tooltip at the average position of the elements shown
 	 * @function Chart.Tooltip.positioners.average
-	 * @param elements {ChartElement[]} the elements being displayed in the tooltip
+	 * @param items {object[]} the items being displayed in the tooltip
 	 * @returns {object} tooltip position
 	 */
-	average: function(elements) {
-		if (!elements.length) {
+	average: function(items) {
+		if (!items.length) {
 			return false;
 		}
 
@@ -128,8 +132,8 @@ var positioners = {
 		var y = 0;
 		var count = 0;
 
-		for (i = 0, len = elements.length; i < len; ++i) {
-			var el = elements[i].element;
+		for (i = 0, len = items.length; i < len; ++i) {
+			var el = items[i].element;
 			if (el && el.hasValue()) {
 				var pos = el.tooltipPosition();
 				x += pos.x;
@@ -147,18 +151,18 @@ var positioners = {
 	/**
 	 * Gets the tooltip position nearest of the item nearest to the event position
 	 * @function Chart.Tooltip.positioners.nearest
-	 * @param elements {Chart.Element[]} the tooltip elements
+	 * @param items {object[]} the tooltip items
 	 * @param eventPosition {object} the position of the event in canvas coordinates
 	 * @returns {object} the tooltip position
 	 */
-	nearest: function(elements, eventPosition) {
+	nearest: function(items, eventPosition) {
 		var x = eventPosition.x;
 		var y = eventPosition.y;
 		var minDistance = Number.POSITIVE_INFINITY;
 		var i, len, nearestElement;
 
-		for (i = 0, len = elements.length; i < len; ++i) {
-			var el = elements[i].element;
+		for (i = 0, len = items.length; i < len; ++i) {
+			var el = items[i].element;
 			if (el && el.hasValue()) {
 				var center = el.getCenterPoint();
 				var d = helpers.math.distanceBetweenPoints(eventPosition, center);
@@ -199,8 +203,8 @@ function pushOrConcat(base, toPush) {
 
 /**
  * Returns array of strings split by newline
- * @param {string} value - The value to split by newline.
- * @returns {string[]} value if newline present - Returned from String split() method
+ * @param {*} str - The value to split by newline.
+ * @returns {string|string[]} value if newline present - Returned from String split() method
  * @function
  */
 function splitNewlines(str) {
@@ -449,12 +453,33 @@ function getBeforeAfterBodyLines(callback) {
 
 class Tooltip extends Element {
 	constructor(config) {
-		super(config);
+		super();
 
-		const me = this;
-		me.opacity = 0;
-		me._active = [];
-		me.initialize();
+		this.opacity = 0;
+		this._active = [];
+		this._chart = config._chart;
+		this._eventPosition = undefined;
+		this._size = undefined;
+		this._cachedAnimations = undefined;
+		this.$animations = undefined;
+		this.options = undefined;
+		this.dataPoints = undefined;
+		this.title = undefined;
+		this.beforeBody = undefined;
+		this.body = undefined;
+		this.afterBody = undefined;
+		this.footer = undefined;
+		this.xAlign = undefined;
+		this.yAlign = undefined;
+		this.x = undefined;
+		this.y = undefined;
+		this.height = undefined;
+		this.width = undefined;
+		this.caretX = undefined;
+		this.labelColors = undefined;
+		this.labelTextColors = undefined;
+
+		this.initialize();
 	}
 
 	initialize() {
@@ -999,7 +1024,7 @@ class Tooltip extends Element {
 	/**
 	 * Handle an event
 	 * @private
-	 * @param {IEvent} event - The event to handle
+	 * @param {IEvent} e - The event to handle
 	 * @returns {boolean} true if the tooltip changed
 	 */
 	handleEvent(e) {

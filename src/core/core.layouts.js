@@ -1,9 +1,12 @@
 'use strict';
 
 import defaults from './core.defaults';
-import helpers from '../helpers';
+import {each, extend} from '../helpers/helpers.core';
+import {toPadding} from '../helpers/helpers.options';
 
-const extend = helpers.extend;
+/**
+ * @typedef { import("./core.controller").default } Chart
+ */
 
 const STATIC_POSITIONS = ['left', 'top', 'right', 'bottom'];
 
@@ -198,7 +201,7 @@ function placeBoxes(boxes, chartArea, params) {
 	chartArea.y = y;
 }
 
-defaults._set('layout', {
+defaults.set('layout', {
 	padding: {
 		top: 0,
 		right: 0,
@@ -209,13 +212,15 @@ defaults._set('layout', {
 
 /**
  * @interface ILayoutItem
+ * @typedef {object} ILayoutItem
  * @prop {string} position - The position of the item in the chart layout. Possible values are
  * 'left', 'top', 'right', 'bottom', and 'chartArea'
  * @prop {number} weight - The weight used to sort the item. Higher weights are further away from the chart area
  * @prop {boolean} fullWidth - if true, and the item is horizontal, then push vertical boxes down
  * @prop {function} isHorizontal - returns true if the layout item is horizontal (ie. top or bottom)
  * @prop {function} update - Takes two parameters: width and height. Returns size of item
- * @prop {function} getPadding -  Returns an object with padding on the edges
+ * @prop {function} draw - Draws the element
+ * @prop {function} [getPadding] -  Returns an object with padding on the edges
  * @prop {number} width - Width of item. Must be valid after update()
  * @prop {number} height - Height of item. Must be valid after update()
  * @prop {number} left - Left edge of the item. Set by layout system and cannot be used in update
@@ -245,6 +250,7 @@ export default {
 		item.fullWidth = item.fullWidth || false;
 		item.position = item.position || 'top';
 		item.weight = item.weight || 0;
+		// @ts-ignore
 		item._layers = item._layers || function() {
 			return [{
 				z: 0,
@@ -302,7 +308,7 @@ export default {
 		}
 
 		var layoutOptions = chart.options.layout || {};
-		var padding = helpers.options.toPadding(layoutOptions.padding);
+		var padding = toPadding(layoutOptions.padding);
 
 		var availableWidth = width - padding.width;
 		var availableHeight = height - padding.height;
@@ -364,7 +370,7 @@ export default {
 			fitBoxes(verticalBoxes, chartArea, params);
 		}
 
-		handleMaxPadding(chartArea, params);
+		handleMaxPadding(chartArea);
 
 		// Finally place the boxes to correct coordinates
 		placeBoxes(boxes.leftAndTop, chartArea, params);
@@ -385,7 +391,7 @@ export default {
 		};
 
 		// Finally update boxes in chartArea (radial scale for example)
-		helpers.each(boxes.chartArea, function(layout) {
+		each(boxes.chartArea, function(layout) {
 			var box = layout.box;
 			extend(box, chart.chartArea);
 			box.update(chartArea.w, chartArea.h);

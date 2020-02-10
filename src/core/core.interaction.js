@@ -2,16 +2,24 @@
 
 import helpers from '../helpers/index';
 import {_isPointInArea} from '../helpers/helpers.canvas';
-import {_lookup, _rlookup} from '../helpers/helpers.collection';
+import {_lookupByKey, _rlookupByKey} from '../helpers/helpers.collection';
+
+/**
+ * @typedef { import("./core.controller").default } Chart
+ */
+
+/**
+ * @typedef { import("../platform/platform.base").IEvent } IEvent
+ */
 
 /**
  * Helper function to get relative position for an event
- * @param {Event|IEvent} event - The event to get the position for
+ * @param {Event|IEvent} e - The event to get the position for
  * @param {Chart} chart - The chart
  * @returns {object} the event position
  */
 function getRelativePosition(e, chart) {
-	if (e.native) {
+	if ('native' in e) {
 		return {
 			x: e.x,
 			y: e.y
@@ -47,13 +55,13 @@ function evaluateAllVisibleItems(chart, handler) {
  * @param {string} axis - the axis mide. x|y|xy
  * @param {number} value - the value to find
  * @param {boolean} intersect - should the element intersect
- * @returns {lo, hi} indices to search data array between
+ * @returns {{lo:number, hi:number}} indices to search data array between
  */
 function binarySearch(metaset, axis, value, intersect) {
 	const {controller, data, _sorted} = metaset;
 	const iScale = controller._cachedMeta.iScale;
 	if (iScale && axis === iScale.axis && _sorted && data.length) {
-		const lookupMethod = iScale._reversePixels ? _rlookup : _lookup;
+		const lookupMethod = iScale._reversePixels ? _rlookupByKey : _lookupByKey;
 		if (!intersect) {
 			return lookupMethod(data, axis, value);
 		} else if (controller._sharedOptions) {
@@ -79,7 +87,7 @@ function binarySearch(metaset, axis, value, intersect) {
  * @param {string} axis - the axis mode. x|y|xy
  * @param {object} position - the point to be nearest to
  * @param {function} handler - the callback to execute for each visible item
- * @param {boolean} intersect - consider intersecting items
+ * @param {boolean} [intersect] - consider intersecting items
  */
 function optimizedEvaluateItems(chart, axis, position, handler, intersect) {
 	const metasets = chart._getSortedVisibleDatasetMetas();
@@ -117,7 +125,7 @@ function getDistanceMetricForAxis(axis) {
  * @param {Chart} chart - the chart
  * @param {object} position - the point to be nearest to
  * @param {string} axis - the axis mode. x|y|xy
- * @return {ChartElement[]} the nearest items
+ * @return {object[]} the nearest items
  */
 function getIntersectItems(chart, position, axis) {
 	const items = [];
@@ -140,9 +148,9 @@ function getIntersectItems(chart, position, axis) {
  * Helper function to get the items nearest to the event position considering all visible items in the chart
  * @param {Chart} chart - the chart to look at elements from
  * @param {object} position - the point to be nearest to
- * @param {function} axis - the axes along which to measure distance
- * @param {boolean} intersect - if true, only consider items that intersect the position
- * @return {ChartElement[]} the nearest items
+ * @param {string} axis - the axes along which to measure distance
+ * @param {boolean} [intersect] - if true, only consider items that intersect the position
+ * @return {object[]} the nearest items
  */
 function getNearestItems(chart, position, axis, intersect) {
 	const distanceMetric = getDistanceMetricForAxis(axis);
@@ -175,6 +183,7 @@ function getNearestItems(chart, position, axis, intersect) {
 
 /**
  * @interface IInteractionOptions
+ * @typedef {object} IInteractionOptions
  */
 /**
  * If true, only consider items that intersect the point

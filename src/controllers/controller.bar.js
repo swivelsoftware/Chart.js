@@ -3,11 +3,11 @@
 import DatasetController from '../core/core.datasetController';
 import defaults from '../core/core.defaults';
 import Rectangle from '../elements/element.rectangle';
-import helpers from '../helpers';
+import {clipArea, unclipArea} from '../helpers/helpers.canvas';
+import {isArray, isNullOrUndef, valueOrDefault} from '../helpers/helpers.core';
+import {_limitValue, sign} from '../helpers/helpers.math';
 
-const valueOrDefault = helpers.valueOrDefault;
-
-defaults._set('bar', {
+defaults.set('bar', {
 	hover: {
 		mode: 'index'
 	},
@@ -69,12 +69,12 @@ function computeFitCategoryTraits(index, ruler, options) {
 	var thickness = options.barThickness;
 	var count = ruler.stackCount;
 	var curr = ruler.pixels[index];
-	var min = helpers.isNullOrUndef(thickness)
+	var min = isNullOrUndef(thickness)
 		? computeMinSampleSize(ruler.scale, ruler.pixels)
 		: -1;
 	var size, ratio;
 
-	if (helpers.isNullOrUndef(thickness)) {
+	if (isNullOrUndef(thickness)) {
 		size = min * options.categoryPercentage;
 		ratio = options.barPercentage;
 	} else {
@@ -167,7 +167,7 @@ function parseArrayOrPrimitive(meta, data, start, count) {
 		item = {};
 		item[iScale.axis] = singleScale || iScale._parse(labels[i], i);
 
-		if (helpers.isArray(entry)) {
+		if (isArray(entry)) {
 			parseFloatBar(entry, item, vScale, i);
 		} else {
 			item[vScale.axis] = vScale._parse(entry, i);
@@ -182,49 +182,36 @@ function isFloatBar(custom) {
 	return custom && custom.barStart !== undefined && custom.barEnd !== undefined;
 }
 
-export default DatasetController.extend({
+class BarController extends DatasetController {
 
-	dataElementType: Rectangle,
-
-	/**
-	 * @private
-	 */
-	_dataElementOptions: [
-		'backgroundColor',
-		'borderColor',
-		'borderSkipped',
-		'borderWidth',
-		'barPercentage',
-		'barThickness',
-		'categoryPercentage',
-		'maxBarThickness',
-		'minBarLength'
-	],
+	constructor(chart, datasetIndex) {
+		super(chart, datasetIndex);
+	}
 
 	/**
 	 * Overriding primitive data parsing since we support mixed primitive/array
 	 * data for float bars
 	 * @private
 	 */
-	_parsePrimitiveData: function() {
+	_parsePrimitiveData() {
 		return parseArrayOrPrimitive.apply(this, arguments);
-	},
+	}
 
 	/**
 	 * Overriding array data parsing since we support mixed primitive/array
 	 * data for float bars
 	 * @private
 	 */
-	_parseArrayData: function() {
+	_parseArrayData() {
 		return parseArrayOrPrimitive.apply(this, arguments);
-	},
+	}
 
 	/**
 	 * Overriding object data parsing since we support mixed primitive/array
 	 * value-scale data for float bars
 	 * @private
 	 */
-	_parseObjectData: function(meta, data, start, count) {
+	_parseObjectData(meta, data, start, count) {
 		const {iScale, vScale} = meta;
 		const vProp = vScale.axis;
 		const parsed = [];
@@ -234,7 +221,7 @@ export default DatasetController.extend({
 			item = {};
 			item[iScale.axis] = iScale._parseObject(obj, iScale.axis, i);
 			value = obj[vProp];
-			if (helpers.isArray(value)) {
+			if (isArray(value)) {
 				parseFloatBar(value, item, vScale, i);
 			} else {
 				item[vScale.axis] = vScale._parseObject(obj, vProp, i);
@@ -242,12 +229,12 @@ export default DatasetController.extend({
 			parsed.push(item);
 		}
 		return parsed;
-	},
+	}
 
 	/**
 	 * @private
 	 */
-	_getLabelAndValue: function(index) {
+	_getLabelAndValue(index) {
 		const me = this;
 		const meta = me._cachedMeta;
 		const {iScale, vScale} = meta;
@@ -261,9 +248,9 @@ export default DatasetController.extend({
 			label: '' + iScale.getLabelForValue(parsed[iScale.axis]),
 			value: value
 		};
-	},
+	}
 
-	initialize: function() {
+	initialize() {
 		var me = this;
 		var meta;
 
@@ -272,16 +259,16 @@ export default DatasetController.extend({
 		meta = me._cachedMeta;
 		meta.stack = me.getDataset().stack;
 		meta.bar = true;
-	},
+	}
 
-	update: function(mode) {
+	update(mode) {
 		const me = this;
-		const rects = me._cachedMeta.data;
+		const meta = me._cachedMeta;
 
-		me.updateElements(rects, 0, mode);
-	},
+		me.updateElements(meta.data, 0, mode);
+	}
 
-	updateElements: function(rectangles, start, mode) {
+	updateElements(rectangles, start, mode) {
 		const me = this;
 		const reset = mode === 'reset';
 		const vscale = me._cachedMeta.vScale;
@@ -322,7 +309,7 @@ export default DatasetController.extend({
 		}
 
 		me._updateSharedOptions(sharedOptions, mode);
-	},
+	}
 
 	/**
 	 * Returns the stacks based on groups and bar visibility.
@@ -330,7 +317,7 @@ export default DatasetController.extend({
 	 * @returns {string[]} The list of stack IDs
 	 * @private
 	 */
-	_getStacks: function(last) {
+	_getStacks(last) {
 		const me = this;
 		const meta = me._cachedMeta;
 		const iScale = meta.iScale;
@@ -364,15 +351,15 @@ export default DatasetController.extend({
 		}
 
 		return stacks;
-	},
+	}
 
 	/**
 	 * Returns the effective number of stacks based on groups and bar visibility.
 	 * @private
 	 */
-	getStackCount: function() {
+	getStackCount() {
 		return this._getStacks().length;
-	},
+	}
 
 	/**
 	 * Returns the stack index for the given dataset based on groups and bar visibility.
@@ -381,7 +368,7 @@ export default DatasetController.extend({
 	 * @returns {number} The stack index
 	 * @private
 	 */
-	getStackIndex: function(datasetIndex, name) {
+	getStackIndex(datasetIndex, name) {
 		var stacks = this._getStacks(datasetIndex);
 		var index = (name !== undefined)
 			? stacks.indexOf(name)
@@ -390,12 +377,12 @@ export default DatasetController.extend({
 		return (index === -1)
 			? stacks.length - 1
 			: index;
-	},
+	}
 
 	/**
 	 * @private
 	 */
-	getRuler: function() {
+	getRuler() {
 		const me = this;
 		const meta = me._cachedMeta;
 		const iScale = meta.iScale;
@@ -413,13 +400,13 @@ export default DatasetController.extend({
 			stackCount: me.getStackCount(),
 			scale: iScale
 		};
-	},
+	}
 
 	/**
 	 * Note: pixel values are not clamped to the scale area.
 	 * @private
 	 */
-	calculateBarValuePixels: function(index, options) {
+	calculateBarValuePixels(index, options) {
 		const me = this;
 		const meta = me._cachedMeta;
 		const vScale = meta.vScale;
@@ -440,7 +427,7 @@ export default DatasetController.extend({
 			value = custom.barStart;
 			length = custom.barEnd - custom.barStart;
 			// bars crossing origin are not stacked
-			if (value !== 0 && helpers.math.sign(value) !== helpers.math.sign(custom.barEnd)) {
+			if (value !== 0 && sign(value) !== sign(custom.barEnd)) {
 				start = 0;
 			}
 			start += value;
@@ -450,7 +437,7 @@ export default DatasetController.extend({
 		// So we don't try to draw so huge rectangles.
 		// https://github.com/chartjs/Chart.js/issues/5247
 		// TODO: use borderWidth instead (need to move the parsing from rectangle)
-		base = helpers.math._limitValue(vScale.getPixelForValue(start),
+		base = _limitValue(vScale.getPixelForValue(start),
 			vScale._startPixel - 10,
 			vScale._endPixel + 10);
 
@@ -468,12 +455,12 @@ export default DatasetController.extend({
 			head: head,
 			center: head + size / 2
 		};
-	},
+	}
 
 	/**
 	 * @private
 	 */
-	calculateBarIndexPixels: function(index, ruler, options) {
+	calculateBarIndexPixels(index, ruler, options) {
 		var me = this;
 		var range = options.barThickness === 'flex'
 			? computeFlexCategoryTraits(index, ruler, options)
@@ -491,9 +478,9 @@ export default DatasetController.extend({
 			center: center,
 			size: size
 		};
-	},
+	}
 
-	draw: function() {
+	draw() {
 		const me = this;
 		const chart = me.chart;
 		const meta = me._cachedMeta;
@@ -502,7 +489,7 @@ export default DatasetController.extend({
 		const ilen = rects.length;
 		let i = 0;
 
-		helpers.canvas.clipArea(chart.ctx, chart.chartArea);
+		clipArea(chart.ctx, chart.chartArea);
 
 		for (; i < ilen; ++i) {
 			if (!isNaN(me._getParsed(i)[vScale.axis])) {
@@ -510,7 +497,26 @@ export default DatasetController.extend({
 			}
 		}
 
-		helpers.canvas.unclipArea(chart.ctx);
+		unclipArea(chart.ctx);
 	}
 
-});
+}
+
+BarController.prototype.dataElementType = Rectangle;
+
+/**
+ * @private
+ */
+BarController.prototype._dataElementOptions = [
+	'backgroundColor',
+	'borderColor',
+	'borderSkipped',
+	'borderWidth',
+	'barPercentage',
+	'barThickness',
+	'categoryPercentage',
+	'maxBarThickness',
+	'minBarLength'
+];
+
+export default BarController;

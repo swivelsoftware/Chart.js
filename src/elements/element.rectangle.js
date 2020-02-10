@@ -2,11 +2,11 @@
 
 import defaults from '../core/core.defaults';
 import Element from '../core/core.element';
-import helpers from '../helpers';
+import {extend, isObject} from '../helpers/helpers.core';
 
 const defaultColor = defaults.color;
 
-defaults._set('elements', {
+defaults.set('elements', {
 	rectangle: {
 		backgroundColor: defaultColor,
 		borderColor: defaultColor,
@@ -17,8 +17,8 @@ defaults._set('elements', {
 
 /**
  * Helper function to get the bounds of the bar regardless of the orientation
- * @param bar {Chart.Element.Rectangle} the bar
- * @return {Bounds} bounds of the bar
+ * @param bar {Rectangle} the bar
+ * @return {object} bounds of the bar
  * @private
  */
 function getBarBounds(bar) {
@@ -79,7 +79,7 @@ function parseBorderWidth(bar, maxW, maxH) {
 	var skip = parseBorderSkipped(bar);
 	var t, r, b, l;
 
-	if (helpers.isObject(value)) {
+	if (isObject(value)) {
 		t = +value.top || 0;
 		r = +value.right || 0;
 		b = +value.bottom || 0;
@@ -130,8 +130,18 @@ function inRange(bar, x, y) {
 
 class Rectangle extends Element {
 
-	constructor(props) {
-		super(props);
+	constructor(cfg) {
+		super();
+
+		this.options = undefined;
+		this.horizontal = undefined;
+		this.base = undefined;
+		this.width = undefined;
+		this.height = undefined;
+
+		if (cfg) {
+			extend(this, cfg);
+		}
 	}
 
 	draw(ctx) {

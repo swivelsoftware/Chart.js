@@ -3,33 +3,47 @@
 import defaults from './core.defaults';
 import {clone} from '../helpers/helpers.core';
 
-defaults._set('plugins', {});
+/**
+ * @typedef { import("./core.controller").default } Chart
+ */
+
+/**
+ * @typedef { import("../platform/platform.base").IEvent } IEvent
+ */
+
+/**
+ * @typedef { import("../plugins/plugin.tooltip").default } Tooltip
+ */
+
+defaults.set('plugins', {});
 
 /**
  * The plugin service singleton
  * @namespace Chart.plugins
  * @since 2.1.0
  */
-export default {
-	/**
-	 * Globally registered plugins.
-	 * @private
-	 */
-	_plugins: [],
+class PluginService {
+	constructor() {
+		/**
+		 * Globally registered plugins.
+		 * @private
+		 */
+		this._plugins = [];
 
-	/**
-	 * This identifier is used to invalidate the descriptors cache attached to each chart
-	 * when a global plugin is registered or unregistered. In this case, the cache ID is
-	 * incremented and descriptors are regenerated during following API calls.
-	 * @private
-	 */
-	_cacheId: 0,
+		/**
+		 * This identifier is used to invalidate the descriptors cache attached to each chart
+		 * when a global plugin is registered or unregistered. In this case, the cache ID is
+		 * incremented and descriptors are regenerated during following API calls.
+		 * @private
+		 */
+		this._cacheId = 0;
+	}
 
 	/**
 	 * Registers the given plugin(s) if not already registered.
 	 * @param {IPlugin[]|IPlugin} plugins plugin instance(s).
 	 */
-	register: function(plugins) {
+	register(plugins) {
 		var p = this._plugins;
 		([]).concat(plugins).forEach(function(plugin) {
 			if (p.indexOf(plugin) === -1) {
@@ -38,13 +52,13 @@ export default {
 		});
 
 		this._cacheId++;
-	},
+	}
 
 	/**
 	 * Unregisters the given plugin(s) only if registered.
 	 * @param {IPlugin[]|IPlugin} plugins plugin instance(s).
 	 */
-	unregister: function(plugins) {
+	unregister(plugins) {
 		var p = this._plugins;
 		([]).concat(plugins).forEach(function(plugin) {
 			var idx = p.indexOf(plugin);
@@ -54,34 +68,34 @@ export default {
 		});
 
 		this._cacheId++;
-	},
+	}
 
 	/**
 	 * Remove all registered plugins.
 	 * @since 2.1.5
 	 */
-	clear: function() {
+	clear() {
 		this._plugins = [];
 		this._cacheId++;
-	},
+	}
 
 	/**
 	 * Returns the number of registered plugins?
 	 * @returns {number}
 	 * @since 2.1.5
 	 */
-	count: function() {
+	count() {
 		return this._plugins.length;
-	},
+	}
 
 	/**
 	 * Returns all registered plugin instances.
 	 * @returns {IPlugin[]} array of plugin objects.
 	 * @since 2.1.5
 	 */
-	getAll: function() {
+	getAll() {
 		return this._plugins;
-	},
+	}
 
 	/**
 	 * Calls enabled plugins for `chart` on the specified hook and with the given args.
@@ -92,7 +106,7 @@ export default {
 	 * @param {Array} [args] - Extra arguments to apply to the hook call.
 	 * @returns {boolean} false if any of the plugins return false, else returns true.
 	 */
-	notify: function(chart, hook, args) {
+	notify(chart, hook, args) {
 		var descriptors = this.descriptors(chart);
 		var ilen = descriptors.length;
 		var i, descriptor, plugin, params, method;
@@ -111,14 +125,14 @@ export default {
 		}
 
 		return true;
-	},
+	}
 
 	/**
 	 * Returns descriptors of enabled plugins for the given chart.
 	 * @returns {object[]} [{ plugin, options }]
 	 * @private
 	 */
-	descriptors: function(chart) {
+	descriptors(chart) {
 		var cache = chart.$plugins || (chart.$plugins = {});
 		if (cache.id === this._cacheId) {
 			return cache.descriptors;
@@ -155,7 +169,7 @@ export default {
 		cache.descriptors = descriptors;
 		cache.id = this._cacheId;
 		return descriptors;
-	},
+	}
 
 	/**
 	 * Invalidates cache for the given chart: descriptors hold a reference on plugin option,
@@ -163,33 +177,37 @@ export default {
 	 * https://github.com/chartjs/Chart.js/issues/5111#issuecomment-355934167
 	 * @private
 	 */
-	_invalidate: function(chart) {
+	_invalidate(chart) {
 		delete chart.$plugins;
 	}
-};
+}
+
+// singleton instance
+export default new PluginService();
 
 /**
  * Plugin extension hooks.
  * @interface IPlugin
+ * @typedef {object} IPlugin
  * @since 2.1.0
  */
 /**
  * @method IPlugin#beforeInit
  * @desc Called before initializing `chart`.
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {object} options - The plugin options.
  */
 /**
  * @method IPlugin#afterInit
  * @desc Called after `chart` has been initialized and before the first update.
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {object} options - The plugin options.
  */
 /**
  * @method IPlugin#beforeUpdate
  * @desc Called before updating `chart`. If any plugin returns `false`, the update
  * is cancelled (and thus subsequent render(s)) until another `update` is triggered.
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {object} options - The plugin options.
  * @returns {boolean} `false` to cancel the chart update.
  */
@@ -197,13 +215,13 @@ export default {
  * @method IPlugin#afterUpdate
  * @desc Called after `chart` has been updated and before rendering. Note that this
  * hook will not be called if the chart update has been previously cancelled.
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {object} options - The plugin options.
  */
 /**
  * @method IPlugin#reset
  * @desc Called during chart reset
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {object} options - The plugin options.
  * @since version 3.0.0
  */
@@ -211,7 +229,7 @@ export default {
  * @method IPlugin#beforeDatasetsUpdate
  * @desc Called before updating the `chart` datasets. If any plugin returns `false`,
  * the datasets update is cancelled until another `update` is triggered.
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {object} options - The plugin options.
  * @returns {boolean} false to cancel the datasets update.
  * @since version 2.1.5
@@ -220,7 +238,7 @@ export default {
  * @method IPlugin#afterDatasetsUpdate
  * @desc Called after the `chart` datasets have been updated. Note that this hook
  * will not be called if the datasets update has been previously cancelled.
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {object} options - The plugin options.
  * @since version 2.1.5
  */
@@ -249,7 +267,7 @@ export default {
  * @method IPlugin#beforeLayout
  * @desc Called before laying out `chart`. If any plugin returns `false`,
  * the layout update is cancelled until another `update` is triggered.
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {object} options - The plugin options.
  * @returns {boolean} `false` to cancel the chart layout.
  */
@@ -257,14 +275,14 @@ export default {
  * @method IPlugin#afterLayout
  * @desc Called after the `chart` has been layed out. Note that this hook will not
  * be called if the layout update has been previously cancelled.
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {object} options - The plugin options.
  */
 /**
  * @method IPlugin#beforeRender
  * @desc Called before rendering `chart`. If any plugin returns `false`,
  * the rendering is cancelled until another `render` is triggered.
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {object} options - The plugin options.
  * @returns {boolean} `false` to cancel the chart rendering.
  */
@@ -272,14 +290,14 @@ export default {
  * @method IPlugin#afterRender
  * @desc Called after the `chart` has been fully rendered (and animation completed). Note
  * that this hook will not be called if the rendering has been previously cancelled.
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {object} options - The plugin options.
  */
 /**
  * @method IPlugin#beforeDraw
  * @desc Called before drawing `chart` at every animation frame. If any plugin returns `false`,
  * the frame drawing is cancelled untilanother `render` is triggered.
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {object} options - The plugin options.
  * @returns {boolean} `false` to cancel the chart drawing.
  */
@@ -287,14 +305,14 @@ export default {
  * @method IPlugin#afterDraw
  * @desc Called after the `chart` has been drawn. Note that this hook will not be called
  * if the drawing has been previously cancelled.
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {object} options - The plugin options.
  */
 /**
  * @method IPlugin#beforeDatasetsDraw
  * @desc Called before drawing the `chart` datasets. If any plugin returns `false`,
  * the datasets drawing is cancelled until another `render` is triggered.
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {object} options - The plugin options.
  * @returns {boolean} `false` to cancel the chart datasets drawing.
  */
@@ -302,7 +320,7 @@ export default {
  * @method IPlugin#afterDatasetsDraw
  * @desc Called after the `chart` datasets have been drawn. Note that this hook
  * will not be called if the datasets drawing has been previously cancelled.
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {object} options - The plugin options.
  */
 /**
@@ -351,7 +369,7 @@ export default {
  * @method IPlugin#beforeEvent
  * @desc Called before processing the specified `event`. If any plugin returns `false`,
  * the event will be discarded.
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {IEvent} event - The event object.
  * @param {object} options - The plugin options.
  */
@@ -359,20 +377,20 @@ export default {
  * @method IPlugin#afterEvent
  * @desc Called after the `event` has been consumed. Note that this hook
  * will not be called if the `event` has been previously discarded.
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {IEvent} event - The event object.
  * @param {object} options - The plugin options.
  */
 /**
  * @method IPlugin#resize
  * @desc Called after the chart as been resized.
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {number} size - The new canvas display size (eq. canvas.style width & height).
  * @param {object} options - The plugin options.
  */
 /**
  * @method IPlugin#destroy
  * @desc Called after the chart as been destroyed.
- * @param {Chart.Controller} chart - The chart instance.
+ * @param {Chart} chart - The chart instance.
  * @param {object} options - The plugin options.
  */

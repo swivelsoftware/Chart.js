@@ -3,15 +3,13 @@
 import DatasetController from '../core/core.datasetController';
 import defaults from '../core/core.defaults';
 import Arc from '../elements/element.arc';
-import helpers from '../helpers';
-
-const valueOrDefault = helpers.valueOrDefault;
+import {isArray, valueOrDefault} from '../helpers/helpers.core';
 
 const PI = Math.PI;
 const DOUBLE_PI = PI * 2;
 const HALF_PI = PI / 2;
 
-defaults._set('doughnut', {
+defaults.set('doughnut', {
 	animation: {
 		numbers: {
 			type: 'number',
@@ -102,7 +100,7 @@ defaults._set('doughnut', {
 				var dataLabel = data.labels[tooltipItem.index];
 				var value = ': ' + data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
 
-				if (helpers.isArray(dataLabel)) {
+				if (isArray(dataLabel)) {
 					// show value on first line of multiline label
 					// need to clone because we are changing the value
 					dataLabel = dataLabel.slice();
@@ -117,40 +115,32 @@ defaults._set('doughnut', {
 	}
 });
 
-export default DatasetController.extend({
+class DoughnutController extends DatasetController {
 
-	dataElementType: Arc,
+	constructor(chart, datasetIndex) {
+		super(chart, datasetIndex);
 
-	linkScales: helpers.noop,
+		this.innerRadius = undefined;
+		this.outerRadius = undefined;
+	}
 
-	/**
-	 * @private
-	 */
-	_dataElementOptions: [
-		'backgroundColor',
-		'borderColor',
-		'borderWidth',
-		'borderAlign',
-		'hoverBackgroundColor',
-		'hoverBorderColor',
-		'hoverBorderWidth',
-	],
+	linkScales() {}
 
 	/**
 	 * Override data parsing, since we are not using scales
 	 * @private
 	 */
-	_parse: function(start, count) {
+	_parse(start, count) {
 		var data = this.getDataset().data;
 		var meta = this._cachedMeta;
 		var i, ilen;
 		for (i = start, ilen = start + count; i < ilen; ++i) {
 			meta._parsed[i] = +data[i];
 		}
-	},
+	}
 
 	// Get index of the dataset in relation to the visible datasets. This allows determining the inner and outer radius correctly
-	getRingIndex: function(datasetIndex) {
+	getRingIndex(datasetIndex) {
 		var ringIndex = 0;
 
 		for (var j = 0; j < datasetIndex; ++j) {
@@ -160,9 +150,9 @@ export default DatasetController.extend({
 		}
 
 		return ringIndex;
-	},
+	}
 
-	update: function(mode) {
+	update(mode) {
 		var me = this;
 		var chart = me.chart;
 		var chartArea = chart.chartArea;
@@ -220,19 +210,19 @@ export default DatasetController.extend({
 		me.innerRadius = Math.max(me.outerRadius - chart.radiusLength * chartWeight, 0);
 
 		me.updateElements(arcs, 0, mode);
-	},
+	}
 
 	/**
 	 * @private
 	 */
-	_circumference: function(i, reset) {
+	_circumference(i, reset) {
 		const me = this;
 		const opts = me.chart.options;
 		const meta = me._cachedMeta;
 		return reset && opts.animation.animateRotate ? 0 : meta.data[i].hidden ? 0 : me.calculateCircumference(meta._parsed[i] * opts.circumference / DOUBLE_PI);
-	},
+	}
 
-	updateElements: function(arcs, start, mode) {
+	updateElements(arcs, start, mode) {
 		const me = this;
 		const reset = mode === 'reset';
 		const chart = me.chart;
@@ -269,9 +259,9 @@ export default DatasetController.extend({
 
 			me._updateElement(arc, index, properties, mode);
 		}
-	},
+	}
 
-	calculateTotal: function() {
+	calculateTotal() {
 		const meta = this._cachedMeta;
 		const metaData = meta.data;
 		let total = 0;
@@ -289,18 +279,18 @@ export default DatasetController.extend({
 		}*/
 
 		return total;
-	},
+	}
 
-	calculateCircumference: function(value) {
+	calculateCircumference(value) {
 		var total = this._cachedMeta.total;
 		if (total > 0 && !isNaN(value)) {
 			return DOUBLE_PI * (Math.abs(value) / total);
 		}
 		return 0;
-	},
+	}
 
 	// gets the max border or hover width to properly scale pie charts
-	getMaxBorderWidth: function(arcs) {
+	getMaxBorderWidth(arcs) {
 		var me = this;
 		var max = 0;
 		var chart = me.chart;
@@ -332,13 +322,13 @@ export default DatasetController.extend({
 			}
 		}
 		return max;
-	},
+	}
 
 	/**
 	 * Get radius length offset of the dataset in relation to the visible datasets weights. This allows determining the inner and outer radius correctly
 	 * @private
 	 */
-	_getRingWeightOffset: function(datasetIndex) {
+	_getRingWeightOffset(datasetIndex) {
 		var ringWeightOffset = 0;
 
 		for (var i = 0; i < datasetIndex; ++i) {
@@ -348,20 +338,38 @@ export default DatasetController.extend({
 		}
 
 		return ringWeightOffset;
-	},
+	}
 
 	/**
 	 * @private
 	 */
-	_getRingWeight: function(dataSetIndex) {
+	_getRingWeight(dataSetIndex) {
 		return Math.max(valueOrDefault(this.chart.data.datasets[dataSetIndex].weight, 1), 0);
-	},
+	}
 
 	/**
 	 * Returns the sum of all visibile data set weights.  This value can be 0.
 	 * @private
 	 */
-	_getVisibleDatasetWeightTotal: function() {
+	_getVisibleDatasetWeightTotal() {
 		return this._getRingWeightOffset(this.chart.data.datasets.length);
 	}
-});
+}
+
+DoughnutController.prototype.dataElementType = Arc;
+
+
+/**
+ * @private
+ */
+DoughnutController.prototype._dataElementOptions = [
+	'backgroundColor',
+	'borderColor',
+	'borderWidth',
+	'borderAlign',
+	'hoverBackgroundColor',
+	'hoverBorderColor',
+	'hoverBorderWidth',
+];
+
+export default DoughnutController;

@@ -4,9 +4,8 @@ import adapters from '../core/core.adapters';
 import defaults from '../core/core.defaults';
 import {isFinite, isNullOrUndef, mergeIf, valueOrDefault} from '../helpers/helpers.core';
 import {toRadians} from '../helpers/helpers.math';
-import {resolve} from '../helpers/helpers.options';
 import Scale from '../core/core.scale';
-import {_lookup} from '../helpers/helpers.collection';
+import {_lookup, _lookupByKey} from '../helpers/helpers.collection';
 
 // Integer constants are from the ES6 spec.
 const MAX_INTEGER = Number.MAX_SAFE_INTEGER || 9007199254740991;
@@ -79,76 +78,6 @@ function arrayUnique(items) {
 	return [...set];
 }
 
-/**
- * Returns an array of {time, pos} objects used to interpolate a specific `time` or position
- * (`pos`) on the scale, by searching entries before and after the requested value. `pos` is
- * a decimal between 0 and 1: 0 being the start of the scale (left or top) and 1 the other
- * extremity (left + width or top + height). Note that it would be more optimized to directly
- * store pre-computed pixels, but the scale dimensions are not guaranteed at the time we need
- * to create the lookup table. The table ALWAYS contains at least two items: min and max.
- *
- * @param {number[]} timestamps - timestamps sorted from lowest to highest.
- * @param {string} distribution - If 'linear', timestamps will be spread linearly along the min
- * and max range, so basically, the table will contains only two items: {min, 0} and {max, 1}.
- * If 'series', timestamps will be positioned at the same distance from each other. In this
- * case, only timestamps that break the time linearity are registered, meaning that in the
- * best case, all timestamps are linear, the table contains only min and max.
- */
-function buildLookupTable(timestamps, min, max, distribution) {
-	if (distribution === 'linear' || !timestamps.length) {
-		return [
-			{time: min, pos: 0},
-			{time: max, pos: 1}
-		];
-	}
-
-	const table = [];
-	const items = [min];
-	let i, ilen, prev, curr, next;
-
-	for (i = 0, ilen = timestamps.length; i < ilen; ++i) {
-		curr = timestamps[i];
-		if (curr > min && curr < max) {
-			items.push(curr);
-		}
-	}
-
-	items.push(max);
-
-	for (i = 0, ilen = items.length; i < ilen; ++i) {
-		next = items[i + 1];
-		prev = items[i - 1];
-		curr = items[i];
-
-		// only add points that breaks the scale linearity
-		if (prev === undefined || next === undefined || Math.round((next + prev) / 2) !== curr) {
-			table.push({time: curr, pos: i / (ilen - 1)});
-		}
-	}
-
-	return table;
-}
-
-/**
- * Linearly interpolates the given source `value` using the table items `skey` values and
- * returns the associated `tkey` value. For example, interpolate(table, 'time', 42, 'pos')
- * returns the position for a timestamp equal to 42. If value is out of bounds, values at
- * index [0, 1] or [n - 1, n] are used for the interpolation.
- */
-function interpolate(table, skey, sval, tkey) {
-	const {lo, hi} = _lookup(table, skey, sval);
-
-	// Note: the lookup table ALWAYS contains at least 2 items (min and max)
-	const prev = table[lo];
-	const next = table[hi];
-
-	const span = next[skey] - prev[skey];
-	const ratio = span ? (sval - prev[skey]) / span : 0;
-	const offset = (next[tkey] - prev[tkey]) * ratio;
-
-	return prev[tkey] + offset;
-}
-
 function parse(scale, input) {
 	if (isNullOrUndef(input)) {
 		return null;
@@ -179,157 +108,6 @@ function parse(scale, input) {
 	}
 
 	return +value;
-}
-
-/**
- * Figures out what unit results in an appropriate number of auto-generated ticks
- */
-function determineUnitForAutoTicks(minUnit, min, max, capacity) {
-	const ilen = UNITS.length;
-	let i, interval, factor;
-
-	for (i = UNITS.indexOf(minUnit); i < ilen - 1; ++i) {
-		interval = INTERVALS[UNITS[i]];
-		factor = interval.steps ? interval.steps : MAX_INTEGER;
-
-		if (interval.common && Math.ceil((max - min) / (factor * interval.size)) <= capacity) {
-			return UNITS[i];
-		}
-	}
-
-	return UNITS[ilen - 1];
-}
-
-/**
- * Figures out what unit to format a set of ticks with
- */
-function determineUnitForFormatting(scale, numTicks, minUnit, min, max) {
-	let i, unit;
-
-	for (i = UNITS.length - 1; i >= UNITS.indexOf(minUnit); i--) {
-		unit = UNITS[i];
-		if (INTERVALS[unit].common && scale._adapter.diff(max, min, unit) >= numTicks - 1) {
-			return unit;
-		}
-	}
-
-	return UNITS[minUnit ? UNITS.indexOf(minUnit) : 0];
-}
-
-function determineMajorUnit(unit) {
-	for (var i = UNITS.indexOf(unit) + 1, ilen = UNITS.length; i < ilen; ++i) {
-		if (INTERVALS[UNITS[i]].common) {
-			return UNITS[i];
-		}
-	}
-}
-
-/**
- * Generates a maximum of `capacity` timestamps between min and max, rounded to the
- * `minor` unit using the given scale time `options`.
- * Important: this method can return ticks outside the min and max range, it's the
- * responsibility of the calling code to clamp values if needed.
- */
-function generate(scale) {
-	const adapter = scale._adapter;
-	const min = scale.min;
-	const max = scale.max;
-	const options = scale.options;
-	const timeOpts = options.time;
-	const minor = timeOpts.unit || determineUnitForAutoTicks(timeOpts.minUnit, min, max, scale._getLabelCapacity(min));
-	const stepSize = resolve([timeOpts.stepSize, timeOpts.unitStepSize, 1]);
-	const weekday = minor === 'week' ? timeOpts.isoWeekday : false;
-	const ticks = [];
-	let first = min;
-	let time;
-
-	// For 'week' unit, handle the first day of week option
-	if (weekday) {
-		first = +adapter.startOf(first, 'isoWeek', weekday);
-	}
-
-	// Align first ticks on unit
-	first = +adapter.startOf(first, weekday ? 'day' : minor);
-
-	// Prevent browser from freezing in case user options request millions of milliseconds
-	if (adapter.diff(max, min, minor) > 100000 * stepSize) {
-		throw min + ' and ' + max + ' are too far apart with stepSize of ' + stepSize + ' ' + minor;
-	}
-
-	for (time = first; time < max; time = +adapter.add(time, stepSize, minor)) {
-		ticks.push(time);
-	}
-
-	if (time === max || options.bounds === 'ticks') {
-		ticks.push(time);
-	}
-
-	return ticks;
-}
-
-/**
- * Returns the start and end offsets from edges in the form of {start, end}
- * where each value is a relative width to the scale and ranges between 0 and 1.
- * They add extra margins on the both sides by scaling down the original scale.
- * Offsets are added when the `offset` option is true.
- */
-function computeOffsets(table, ticks, min, max, options) {
-	let start = 0;
-	let end = 0;
-	let first, last;
-
-	if (options.offset && ticks.length) {
-		first = interpolate(table, 'time', ticks[0], 'pos');
-		if (ticks.length === 1) {
-			start = 1 - first;
-		} else {
-			start = (interpolate(table, 'time', ticks[1], 'pos') - first) / 2;
-		}
-		last = interpolate(table, 'time', ticks[ticks.length - 1], 'pos');
-		if (ticks.length === 1) {
-			end = last;
-		} else {
-			end = (last - interpolate(table, 'time', ticks[ticks.length - 2], 'pos')) / 2;
-		}
-	}
-
-	return {start: start, end: end, factor: 1 / (start + 1 + end)};
-}
-
-function setMajorTicks(scale, ticks, map, majorUnit) {
-	const adapter = scale._adapter;
-	const first = +adapter.startOf(ticks[0].value, majorUnit);
-	const last = ticks[ticks.length - 1].value;
-	let major, index;
-
-	for (major = first; major <= last; major = +adapter.add(major, 1, majorUnit)) {
-		index = map[major];
-		if (index >= 0) {
-			ticks[index].major = true;
-		}
-	}
-	return ticks;
-}
-
-function ticksFromTimestamps(scale, values, majorUnit) {
-	const ticks = [];
-	const map = {};
-	const ilen = values.length;
-	let i, value;
-
-	for (i = 0; i < ilen; ++i) {
-		value = values[i];
-		map[value] = i;
-
-		ticks.push({
-			value: value,
-			major: false
-		});
-	}
-
-	// We set the major ticks separately from the above loop because calling startOf for every tick
-	// is expensive when there is a large number of ticks
-	return (ilen === 0 || !majorUnit) ? ticks : setMajorTicks(scale, ticks, map, majorUnit);
 }
 
 function getDataTimestamps(scale) {
@@ -396,16 +174,254 @@ function getAllTimestamps(scale) {
 	return timestamps;
 }
 
+/**
+ * Returns an array of {time, pos} objects used to interpolate a specific `time` or position
+ * (`pos`) on the scale, by searching entries before and after the requested value. `pos` is
+ * a decimal between 0 and 1: 0 being the start of the scale (left or top) and 1 the other
+ * extremity (left + width or top + height). Note that it would be more optimized to directly
+ * store pre-computed pixels, but the scale dimensions are not guaranteed at the time we need
+ * to create the lookup table. The table ALWAYS contains at least two items: min and max.
+ *
+ * @param {number[]} timestamps - timestamps sorted from lowest to highest.
+ * @param {string} distribution - If 'linear', timestamps will be spread linearly along the min
+ * and max range, so basically, the table will contains only two items: {min, 0} and {max, 1}.
+ * If 'series', timestamps will be positioned at the same distance from each other. In this
+ * case, only timestamps that break the time linearity are registered, meaning that in the
+ * best case, all timestamps are linear, the table contains only min and max.
+ */
+function buildLookupTable(timestamps, min, max, distribution) {
+	if (distribution === 'linear' || !timestamps.length) {
+		return [
+			{time: min, pos: 0},
+			{time: max, pos: 1}
+		];
+	}
+
+	const table = [];
+	const items = [min];
+	let i, ilen, prev, curr, next;
+
+	for (i = 0, ilen = timestamps.length; i < ilen; ++i) {
+		curr = timestamps[i];
+		if (curr > min && curr < max) {
+			items.push(curr);
+		}
+	}
+
+	items.push(max);
+
+	for (i = 0, ilen = items.length; i < ilen; ++i) {
+		next = items[i + 1];
+		prev = items[i - 1];
+		curr = items[i];
+
+		// only add points that breaks the scale linearity
+		if (prev === undefined || next === undefined || Math.round((next + prev) / 2) !== curr) {
+			table.push({time: curr, pos: i / (ilen - 1)});
+		}
+	}
+
+	return table;
+}
+
+/**
+ * Linearly interpolates the given source `value` using the table items `skey` values and
+ * returns the associated `tkey` value. For example, interpolate(table, 'time', 42, 'pos')
+ * returns the position for a timestamp equal to 42. If value is out of bounds, values at
+ * index [0, 1] or [n - 1, n] are used for the interpolation.
+ */
+function interpolate(table, skey, sval, tkey) {
+	const {lo, hi} = _lookupByKey(table, skey, sval);
+
+	// Note: the lookup table ALWAYS contains at least 2 items (min and max)
+	const prev = table[lo];
+	const next = table[hi];
+
+	const span = next[skey] - prev[skey];
+	const ratio = span ? (sval - prev[skey]) / span : 0;
+	const offset = (next[tkey] - prev[tkey]) * ratio;
+
+	return prev[tkey] + offset;
+}
+
+/**
+ * Figures out what unit results in an appropriate number of auto-generated ticks
+ */
+function determineUnitForAutoTicks(minUnit, min, max, capacity) {
+	const ilen = UNITS.length;
+	let i, interval, factor;
+
+	for (i = UNITS.indexOf(minUnit); i < ilen - 1; ++i) {
+		interval = INTERVALS[UNITS[i]];
+		factor = interval.steps ? interval.steps : MAX_INTEGER;
+
+		if (interval.common && Math.ceil((max - min) / (factor * interval.size)) <= capacity) {
+			return UNITS[i];
+		}
+	}
+
+	return UNITS[ilen - 1];
+}
+
+/**
+ * Figures out what unit to format a set of ticks with
+ */
+function determineUnitForFormatting(scale, numTicks, minUnit, min, max) {
+	let i, unit;
+
+	for (i = UNITS.length - 1; i >= UNITS.indexOf(minUnit); i--) {
+		unit = UNITS[i];
+		if (INTERVALS[unit].common && scale._adapter.diff(max, min, unit) >= numTicks - 1) {
+			return unit;
+		}
+	}
+
+	return UNITS[minUnit ? UNITS.indexOf(minUnit) : 0];
+}
+
+function determineMajorUnit(unit) {
+	for (var i = UNITS.indexOf(unit) + 1, ilen = UNITS.length; i < ilen; ++i) {
+		if (INTERVALS[UNITS[i]].common) {
+			return UNITS[i];
+		}
+	}
+}
+
+function addTick(timestamps, ticks, time) {
+	if (!timestamps.length) {
+		return;
+	}
+	const {lo, hi} = _lookup(timestamps, time);
+	const timestamp = timestamps[lo] >= time ? timestamps[lo] : timestamps[hi];
+	ticks.add(timestamp);
+}
+
+/**
+ * Generates a maximum of `capacity` timestamps between min and max, rounded to the
+ * `minor` unit using the given scale time `options`.
+ * Important: this method can return ticks outside the min and max range, it's the
+ * responsibility of the calling code to clamp values if needed.
+ */
+function generate(scale) {
+	const adapter = scale._adapter;
+	const min = scale.min;
+	const max = scale.max;
+	const options = scale.options;
+	const timeOpts = options.time;
+	const minor = timeOpts.unit || determineUnitForAutoTicks(timeOpts.minUnit, min, max, scale._getLabelCapacity(min));
+	const stepSize = valueOrDefault(timeOpts.stepSize, 1);
+	const weekday = minor === 'week' ? timeOpts.isoWeekday : false;
+	const ticks = new Set();
+	let first = min;
+	let time;
+
+	// For 'week' unit, handle the first day of week option
+	if (weekday) {
+		first = +adapter.startOf(first, 'isoWeek', weekday);
+	}
+
+	// Align first ticks on unit
+	first = +adapter.startOf(first, weekday ? 'day' : minor);
+
+	// Prevent browser from freezing in case user options request millions of milliseconds
+	if (adapter.diff(max, min, minor) > 100000 * stepSize) {
+		throw min + ' and ' + max + ' are too far apart with stepSize of ' + stepSize + ' ' + minor;
+	}
+
+	if (scale.options.ticks.source === 'data') {
+		// need to make sure ticks are in data in this case
+		const timestamps = getDataTimestamps(scale);
+
+		for (time = first; time < max; time = +adapter.add(time, stepSize, minor)) {
+			addTick(timestamps, ticks, time);
+		}
+
+		if (time === max || options.bounds === 'ticks') {
+			addTick(timestamps, ticks, time);
+		}
+	} else {
+		for (time = first; time < max; time = +adapter.add(time, stepSize, minor)) {
+			ticks.add(time);
+		}
+
+		if (time === max || options.bounds === 'ticks') {
+			ticks.add(time);
+		}
+	}
+
+	return [...ticks];
+}
+
+/**
+ * Returns the start and end offsets from edges in the form of {start, end}
+ * where each value is a relative width to the scale and ranges between 0 and 1.
+ * They add extra margins on the both sides by scaling down the original scale.
+ * Offsets are added when the `offset` option is true.
+ */
+function computeOffsets(table, timestamps, min, max, options) {
+	let start = 0;
+	let end = 0;
+	let first, last;
+
+	if (options.offset && timestamps.length) {
+		first = interpolate(table, 'time', timestamps[0], 'pos');
+		if (timestamps.length === 1) {
+			start = 1 - first;
+		} else {
+			start = (interpolate(table, 'time', timestamps[1], 'pos') - first) / 2;
+		}
+		last = interpolate(table, 'time', timestamps[timestamps.length - 1], 'pos');
+		if (timestamps.length === 1) {
+			end = last;
+		} else {
+			end = (last - interpolate(table, 'time', timestamps[timestamps.length - 2], 'pos')) / 2;
+		}
+	}
+
+	return {start: start, end: end, factor: 1 / (start + 1 + end)};
+}
+
+function setMajorTicks(scale, ticks, map, majorUnit) {
+	const adapter = scale._adapter;
+	const first = +adapter.startOf(ticks[0].value, majorUnit);
+	const last = ticks[ticks.length - 1].value;
+	let major, index;
+
+	for (major = first; major <= last; major = +adapter.add(major, 1, majorUnit)) {
+		index = map[major];
+		if (index >= 0) {
+			ticks[index].major = true;
+		}
+	}
+	return ticks;
+}
+
+function ticksFromTimestamps(scale, values, majorUnit) {
+	const ticks = [];
+	const map = {};
+	const ilen = values.length;
+	let i, value;
+
+	for (i = 0; i < ilen; ++i) {
+		value = values[i];
+		map[value] = i;
+
+		ticks.push({
+			value: value,
+			major: false
+		});
+	}
+
+	// We set the major ticks separately from the above loop because calling startOf for every tick
+	// is expensive when there is a large number of ticks
+	return (ilen === 0 || !majorUnit) ? ticks : setMajorTicks(scale, ticks, map, majorUnit);
+}
 
 function getTimestampsForTicks(scale) {
-	const options = scale.options;
-	const source = options.ticks.source;
-
-	if (source === 'data' || (source === 'auto' && options.distribution === 'series')) {
-		return getAllTimestamps(scale);
-	} else if (source === 'labels') {
+	if (scale.options.ticks.source === 'labels') {
 		return getLabelTimestamps(scale);
 	}
+
 	return generate(scale);
 }
 
@@ -430,9 +446,9 @@ function getLabelBounds(scale) {
 /**
  * Return subset of `timestamps` between `min` and `max`.
  * Timestamps are assumend to be in sorted order.
- * @param {int[]} timestamps - array of timestamps
- * @param {int} min - min value (timestamp)
- * @param {int} max - max value (timestamp)
+ * @param {number[]} timestamps - array of timestamps
+ * @param {number} min - min value (timestamp)
+ * @param {number} max - max value (timestamp)
  */
 function filterBetween(timestamps, min, max) {
 	let start = 0;
@@ -499,6 +515,33 @@ const defaultConfig = {
 };
 
 class TimeScale extends Scale {
+
+	constructor(props) {
+		super(props);
+
+		const options = this.options;
+		const time = options.time || (options.time = {});
+		const adapter = this._adapter = new adapters._date(options.adapters.date);
+
+
+		this._cache = {};
+
+		/** @type {string | undefined} */
+		this._unit = undefined;
+		/** @type {string | undefined} */
+		this._majorUnit = undefined;
+		/** @type {object | undefined} */
+		this._offsets = undefined;
+		/** @type {object[] | undefined} */
+		this._table = undefined;
+
+		// Backward compatibility: before introducing adapter, `displayFormats` was
+		// supposed to contain *all* unit/string pairs but this can't be resolved
+		// when loading the scale (adapters are loaded afterward), so let's populate
+		// missing formats on update
+		mergeIf(time.displayFormats, adapter.formats());
+	}
+
 	_parse(raw, index) { // eslint-disable-line no-unused-vars
 		if (raw === undefined) {
 			return NaN;
@@ -518,25 +561,6 @@ class TimeScale extends Scale {
 
 	_invalidateCaches() {
 		this._cache = {};
-	}
-
-	constructor(props) {
-		super(props);
-
-		const me = this;
-		const options = me.options;
-		const time = options.time || (options.time = {});
-		const adapter = me._adapter = new adapters._date(options.adapters.date);
-
-
-		me._cache = {};
-
-		// Backward compatibility: before introducing adapter, `displayFormats` was
-		// supposed to contain *all* unit/string pairs but this can't be resolved
-		// when loading the scale (adapters are loaded afterward), so let's populate
-		// missing formats on update
-
-		mergeIf(time.displayFormats, adapter.formats());
 	}
 
 	determineDataLimits() {
@@ -581,7 +605,6 @@ class TimeScale extends Scale {
 		const timeOpts = options.time;
 		const tickOpts = options.ticks;
 		const distribution = options.distribution;
-
 		const timestamps = getTimestampsForTicks(me);
 
 		if (options.bounds === 'ticks' && timestamps.length) {
@@ -603,7 +626,7 @@ class TimeScale extends Scale {
 		me._majorUnit = !tickOpts.major.enabled || me._unit === 'year' ? undefined
 			: determineMajorUnit(me._unit);
 		me._table = buildLookupTable(getTimestampsForTable(me), min, max, distribution);
-		me._offsets = computeOffsets(me._table, ticks, min, max, options);
+		me._offsets = computeOffsets(me._table, getDataTimestamps(me), min, max, options);
 
 		if (options.reverse) {
 			ticks.reverse();
@@ -629,22 +652,15 @@ class TimeScale extends Scale {
 	 */
 	_tickFormatFunction(time, index, ticks, format) {
 		const me = this;
-		const adapter = me._adapter;
 		const options = me.options;
 		const formats = options.time.displayFormats;
-		const minorFormat = formats[me._unit];
 		const majorUnit = me._majorUnit;
+		const minorFormat = formats[me._unit];
 		const majorFormat = formats[majorUnit];
 		const tick = ticks[index];
-		const tickOpts = options.ticks;
 		const major = majorUnit && majorFormat && tick && tick.major;
-		const label = adapter.format(time, format ? format : major ? majorFormat : minorFormat);
-		const nestedTickOpts = major ? tickOpts.major : tickOpts.minor;
-		const formatter = resolve([
-			nestedTickOpts.callback,
-			tickOpts.callback
-		]);
-
+		const label = me._adapter.format(time, format ? format : major ? majorFormat : minorFormat);
+		const formatter = options.ticks.callback;
 		return formatter ? formatter(label, index, ticks) : label;
 	}
 

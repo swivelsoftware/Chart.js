@@ -44,7 +44,7 @@ const defaultConfig = {
 		// Number - The backdrop padding to the side of the label in pixels
 		backdropPaddingX: 2,
 
-		callback: Ticks.formatters.linear
+		callback: Ticks.formatters.numeric
 	},
 
 	pointLabels: {
@@ -253,8 +253,8 @@ function drawRadiusLine(scale, gridLineOpts, radius, index) {
 	var ctx = scale.ctx;
 	var circular = gridLineOpts.circular;
 	var valueCount = scale.chart.data.labels.length;
-	var lineColor = valueAtIndexOrDefault(gridLineOpts.color, index - 1);
-	var lineWidth = valueAtIndexOrDefault(gridLineOpts.lineWidth, index - 1);
+	var lineColor = valueAtIndexOrDefault(gridLineOpts.color, index - 1, undefined);
+	var lineWidth = valueAtIndexOrDefault(gridLineOpts.lineWidth, index - 1, undefined);
 	var pointPosition;
 
 	if ((!circular && !valueCount) || !lineColor || !lineWidth) {
@@ -293,6 +293,20 @@ function numberOrZero(param) {
 }
 
 class RadialLinearScale extends LinearScaleBase {
+
+	constructor(cfg) {
+		super(cfg);
+
+		/** @type {number} */
+		this.xCenter = undefined;
+		/** @type {number} */
+		this.yCenter = undefined;
+		/** @type {number} */
+		this.drawingArea = undefined;
+		/** @type {string[]} */
+		this.pointLabels = undefined;
+	}
+
 	setDimensions() {
 		var me = this;
 
@@ -329,8 +343,8 @@ class RadialLinearScale extends LinearScaleBase {
 		LinearScaleBase.prototype.generateTickLabels.call(me, ticks);
 
 		// Point labels
-		me.pointLabels = me.chart.data.labels.map(function() {
-			var label = helpers.callback(me.options.pointLabels.callback, arguments, me);
+		me.pointLabels = me.chart.data.labels.map(function(value, index) {
+			var label = helpers.callback(me.options.pointLabels.callback, [value, index], me);
 			return label || label === 0 ? label : '';
 		});
 	}
