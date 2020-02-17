@@ -1092,7 +1092,10 @@ function _alignPixel(chart, pixel, width) {
 function clear(chart) {
   chart.ctx.clearRect(0, 0, chart.width, chart.height);
 }
-function drawPoint(ctx, options, x, y) {
+function drawPoint(ctx) {
+  var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var x = arguments.length > 2 ? arguments[2] : undefined;
+  var y = arguments.length > 3 ? arguments[3] : undefined;
   var type, xOffset, yOffset, size, cornerRadius;
   var style = options.pointStyle;
   var rotation = options.rotation;
