@@ -1,9 +1,7 @@
-'use strict';
-
 import Animator from './core.animator';
 import Animation from './core.animation';
 import defaults from '../core/core.defaults';
-import {noop, extend, isObject} from '../helpers/helpers.core';
+import {noop, isObject} from '../helpers/helpers.core';
 
 const numbers = ['x', 'y', 'borderWidth', 'radius', 'tension'];
 const colors = ['borderColor', 'backgroundColor'];
@@ -57,15 +55,15 @@ defaults.set('animation', {
 });
 
 function copyOptions(target, values) {
-	let oldOpts = target.options;
-	let newOpts = values.options;
+	const oldOpts = target.options;
+	const newOpts = values.options;
 	if (!oldOpts || !newOpts || newOpts.$shared) {
 		return;
 	}
 	if (oldOpts.$shared) {
-		target.options = extend({}, oldOpts, newOpts, {$shared: false});
+		target.options = Object.assign({}, oldOpts, newOpts, {$shared: false});
 	} else {
-		extend(oldOpts, newOpts);
+		Object.assign(oldOpts, newOpts);
 	}
 	delete values.options;
 }
@@ -101,13 +99,13 @@ export default class Animations {
 			if (!isObject(cfg)) {
 				return;
 			}
-			(cfg.properties || [key]).forEach(function(prop) {
+			(cfg.properties || [key]).forEach((prop) => {
 				// Can have only one config per animation.
 				if (!animatedProps.has(prop)) {
-					animatedProps.set(prop, extend({}, animDefaults, cfg));
+					animatedProps.set(prop, Object.assign({}, animDefaults, cfg));
 				} else if (prop === key) {
 					// Single property targetting config wins over multi-targetting.
-					animatedProps.set(prop, extend({}, animatedProps.get(prop), cfg));
+					animatedProps.set(prop, Object.assign({}, animatedProps.get(prop), cfg));
 				}
 			});
 		});
@@ -132,7 +130,7 @@ export default class Animations {
 			if (options.$shared) {
 				// If the current / old options are $shared, meaning other elements are
 				// using the same options, we need to clone to become unique.
-				target.options = options = extend({}, options, {$shared: false, $animations: {}});
+				target.options = options = Object.assign({}, options, {$shared: false, $animations: {}});
 			}
 			animations = this._createAnimations(options, newOptions);
 		} else {
@@ -152,16 +150,16 @@ export default class Animations {
 		let i;
 
 		for (i = props.length - 1; i >= 0; --i) {
-			let prop = props[i];
+			const prop = props[i];
 			if (prop.charAt(0) === '$') {
 				continue;
 			}
 
 			if (prop === 'options') {
-				animations.push.apply(animations, this._animateOptions(target, values));
+				animations.push(...this._animateOptions(target, values));
 				continue;
 			}
-			let value = values[prop];
+			const value = values[prop];
 			let animation = running[prop];
 			if (animation) {
 				animation.cancel();
@@ -194,7 +192,7 @@ export default class Animations {
 			copyOptions(target, values);
 			// copyOptions removes the `options` from `values`,
 			// unless it can be directly assigned.
-			extend(target, values);
+			Object.assign(target, values);
 			return;
 		}
 

@@ -1,5 +1,3 @@
-'use strict';
-
 import DatasetController from '../core/core.datasetController';
 import defaults from '../core/core.defaults';
 import Rectangle from '../elements/element.rectangle';
@@ -43,8 +41,8 @@ defaults.set('bar', {
  * @private
  */
 function computeMinSampleSize(scale, pixels) {
-	var min = scale._length;
-	var prev, curr, i, ilen;
+	let min = scale._length;
+	let prev, curr, i, ilen;
 
 	for (i = 1, ilen = pixels.length; i < ilen; ++i) {
 		min = Math.min(min, Math.abs(pixels[i] - pixels[i - 1]));
@@ -66,13 +64,13 @@ function computeMinSampleSize(scale, pixels) {
  * @private
  */
 function computeFitCategoryTraits(index, ruler, options) {
-	var thickness = options.barThickness;
-	var count = ruler.stackCount;
-	var curr = ruler.pixels[index];
-	var min = isNullOrUndef(thickness)
+	const thickness = options.barThickness;
+	const count = ruler.stackCount;
+	const curr = ruler.pixels[index];
+	const min = isNullOrUndef(thickness)
 		? computeMinSampleSize(ruler.scale, ruler.pixels)
 		: -1;
-	var size, ratio;
+	let size, ratio;
 
 	if (isNullOrUndef(thickness)) {
 		size = min * options.categoryPercentage;
@@ -87,7 +85,7 @@ function computeFitCategoryTraits(index, ruler, options) {
 
 	return {
 		chunk: size / count,
-		ratio: ratio,
+		ratio,
 		start: curr - (size / 2)
 	};
 }
@@ -99,12 +97,11 @@ function computeFitCategoryTraits(index, ruler, options) {
  * @private
  */
 function computeFlexCategoryTraits(index, ruler, options) {
-	var pixels = ruler.pixels;
-	var curr = pixels[index];
-	var prev = index > 0 ? pixels[index - 1] : null;
-	var next = index < pixels.length - 1 ? pixels[index + 1] : null;
-	var percent = options.categoryPercentage;
-	var start, size;
+	const pixels = ruler.pixels;
+	const curr = pixels[index];
+	let prev = index > 0 ? pixels[index - 1] : null;
+	let next = index < pixels.length - 1 ? pixels[index + 1] : null;
+	const percent = options.categoryPercentage;
 
 	if (prev === null) {
 		// first data: its size is double based on the next point or,
@@ -117,23 +114,23 @@ function computeFlexCategoryTraits(index, ruler, options) {
 		next = curr + curr - prev;
 	}
 
-	start = curr - (curr - Math.min(prev, next)) / 2 * percent;
-	size = Math.abs(next - prev) / 2 * percent;
+	const start = curr - (curr - Math.min(prev, next)) / 2 * percent;
+	const size = Math.abs(next - prev) / 2 * percent;
 
 	return {
 		chunk: size / ruler.stackCount,
 		ratio: options.barPercentage,
-		start: start
+		start
 	};
 }
 
 function parseFloatBar(arr, item, vScale, i) {
-	var startValue = vScale._parse(arr[0], i);
-	var endValue = vScale._parse(arr[1], i);
-	var min = Math.min(startValue, endValue);
-	var max = Math.max(startValue, endValue);
-	var barStart = min;
-	var barEnd = max;
+	const startValue = vScale._parse(arr[0], i);
+	const endValue = vScale._parse(arr[1], i);
+	const min = Math.min(startValue, endValue);
+	const max = Math.max(startValue, endValue);
+	let barStart = min;
+	let barEnd = max;
 
 	if (Math.abs(min) > Math.abs(max)) {
 		barStart = max;
@@ -145,12 +142,12 @@ function parseFloatBar(arr, item, vScale, i) {
 	item[vScale.axis] = barEnd;
 
 	item._custom = {
-		barStart: barStart,
-		barEnd: barEnd,
+		barStart,
+		barEnd,
 		start: startValue,
 		end: endValue,
-		min: min,
-		max: max
+		min,
+		max
 	};
 }
 
@@ -184,17 +181,13 @@ function isFloatBar(custom) {
 
 class BarController extends DatasetController {
 
-	constructor(chart, datasetIndex) {
-		super(chart, datasetIndex);
-	}
-
 	/**
 	 * Overriding primitive data parsing since we support mixed primitive/array
 	 * data for float bars
 	 * @private
 	 */
-	_parsePrimitiveData() {
-		return parseArrayOrPrimitive.apply(this, arguments);
+	_parsePrimitiveData(meta, data, start, count) {
+		return parseArrayOrPrimitive(meta, data, start, count);
 	}
 
 	/**
@@ -202,8 +195,8 @@ class BarController extends DatasetController {
 	 * data for float bars
 	 * @private
 	 */
-	_parseArrayData() {
-		return parseArrayOrPrimitive.apply(this, arguments);
+	_parseArrayData(meta, data, start, count) {
+		return parseArrayOrPrimitive(meta, data, start, count);
 	}
 
 	/**
@@ -246,17 +239,16 @@ class BarController extends DatasetController {
 
 		return {
 			label: '' + iScale.getLabelForValue(parsed[iScale.axis]),
-			value: value
+			value
 		};
 	}
 
 	initialize() {
-		var me = this;
-		var meta;
+		const me = this;
 
-		DatasetController.prototype.initialize.apply(me, arguments);
+		super.initialize();
 
-		meta = me._cachedMeta;
+		const meta = me._cachedMeta;
 		meta.stack = me.getDataset().stack;
 		meta.bar = true;
 	}
@@ -274,7 +266,7 @@ class BarController extends DatasetController {
 		const vscale = me._cachedMeta.vScale;
 		const base = vscale.getBasePixel();
 		const horizontal = vscale.isHorizontal();
-		const ruler = me.getRuler();
+		const ruler = me._getRuler();
 		const firstOpts = me._resolveDataElementOptions(start, mode);
 		const sharedOptions = me._getSharedOptions(mode, rectangles[start], firstOpts);
 		const includeOptions = me._includeOptions(mode, sharedOptions);
@@ -284,8 +276,8 @@ class BarController extends DatasetController {
 		for (i = 0; i < rectangles.length; i++) {
 			const index = start + i;
 			const options = me._resolveDataElementOptions(index, mode);
-			const vpixels = me.calculateBarValuePixels(index, options);
-			const ipixels = me.calculateBarIndexPixels(index, ruler, options);
+			const vpixels = me._calculateBarValuePixels(index, options);
+			const ipixels = me._calculateBarIndexPixels(index, ruler, options);
 
 			const properties = {
 				horizontal,
@@ -357,7 +349,7 @@ class BarController extends DatasetController {
 	 * Returns the effective number of stacks based on groups and bar visibility.
 	 * @private
 	 */
-	getStackCount() {
+	_getStackCount() {
 		return this._getStacks().length;
 	}
 
@@ -368,9 +360,9 @@ class BarController extends DatasetController {
 	 * @returns {number} The stack index
 	 * @private
 	 */
-	getStackIndex(datasetIndex, name) {
-		var stacks = this._getStacks(datasetIndex);
-		var index = (name !== undefined)
+	_getStackIndex(datasetIndex, name) {
+		const stacks = this._getStacks(datasetIndex);
+		const index = (name !== undefined)
 			? stacks.indexOf(name)
 			: -1; // indexOf returns -1 if element is not present
 
@@ -382,7 +374,7 @@ class BarController extends DatasetController {
 	/**
 	 * @private
 	 */
-	getRuler() {
+	_getRuler() {
 		const me = this;
 		const meta = me._cachedMeta;
 		const iScale = meta.iScale;
@@ -397,7 +389,7 @@ class BarController extends DatasetController {
 			pixels,
 			start: iScale._startPixel,
 			end: iScale._endPixel,
-			stackCount: me.getStackCount(),
+			stackCount: me._getStackCount(),
 			scale: iScale
 		};
 	}
@@ -406,7 +398,7 @@ class BarController extends DatasetController {
 	 * Note: pixel values are not clamped to the scale area.
 	 * @private
 	 */
-	calculateBarValuePixels(index, options) {
+	_calculateBarValuePixels(index, options) {
 		const me = this;
 		const meta = me._cachedMeta;
 		const vScale = meta.vScale;
@@ -416,7 +408,7 @@ class BarController extends DatasetController {
 		let value = parsed[vScale.axis];
 		let start = 0;
 		let length = meta._stacked ? me._applyStack(vScale, parsed) : value;
-		let base, head, size;
+		let head, size;
 
 		if (length !== value) {
 			start = length - value;
@@ -437,7 +429,7 @@ class BarController extends DatasetController {
 		// So we don't try to draw so huge rectangles.
 		// https://github.com/chartjs/Chart.js/issues/5247
 		// TODO: use borderWidth instead (need to move the parsing from rectangle)
-		base = _limitValue(vScale.getPixelForValue(start),
+		const base = _limitValue(vScale.getPixelForValue(start),
 			vScale._startPixel - 10,
 			vScale._endPixel + 10);
 
@@ -450,9 +442,9 @@ class BarController extends DatasetController {
 		}
 
 		return {
-			size: size,
-			base: base,
-			head: head,
+			size,
+			base,
+			head,
 			center: head + size / 2
 		};
 	}
@@ -460,23 +452,23 @@ class BarController extends DatasetController {
 	/**
 	 * @private
 	 */
-	calculateBarIndexPixels(index, ruler, options) {
-		var me = this;
-		var range = options.barThickness === 'flex'
+	_calculateBarIndexPixels(index, ruler, options) {
+		const me = this;
+		const range = options.barThickness === 'flex'
 			? computeFlexCategoryTraits(index, ruler, options)
 			: computeFitCategoryTraits(index, ruler, options);
 
-		var stackIndex = me.getStackIndex(me.index, me._cachedMeta.stack);
-		var center = range.start + (range.chunk * stackIndex) + (range.chunk / 2);
-		var size = Math.min(
+		const stackIndex = me._getStackIndex(me.index, me._cachedMeta.stack);
+		const center = range.start + (range.chunk * stackIndex) + (range.chunk / 2);
+		const size = Math.min(
 			valueOrDefault(options.maxBarThickness, Infinity),
 			range.chunk * range.ratio);
 
 		return {
 			base: center - size / 2,
 			head: center + size / 2,
-			center: center,
-			size: size
+			center,
+			size
 		};
 	}
 

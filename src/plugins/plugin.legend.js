@@ -1,10 +1,8 @@
-'use strict';
-
 import defaults from '../core/core.defaults';
 import Element from '../core/core.element';
 import layouts from '../core/core.layouts';
 import {drawPoint} from '../helpers/helpers.canvas';
-import {callback as call, extend, mergeIf, valueOrDefault} from '../helpers/helpers.core';
+import {callback as call, mergeIf, valueOrDefault} from '../helpers/helpers.core';
 import {_parseFont, toPadding} from '../helpers/helpers.options';
 import {getRtlAdapter, overrideTextDirection, restoreTextDirection} from '../helpers/helpers.rtl';
 
@@ -22,8 +20,8 @@ defaults.set('legend', {
 
 	// a callback that will handle
 	onClick: function(e, legendItem) {
-		var index = legendItem.datasetIndex;
-		var ci = this.chart;
+		const index = legendItem.datasetIndex;
+		const ci = this.chart;
 
 		var hiddens = (ci.data.datasets || []).map(function(meta, i) {
 			return !ci.isDatasetVisible(i);
@@ -65,13 +63,13 @@ defaults.set('legend', {
 		// lineDashOffset :
 		// lineJoin :
 		// lineWidth :
-		generateLabels: function(chart) {
-			var datasets = chart.data.datasets;
-			var options = chart.options.legend || {};
-			var usePointStyle = options.labels && options.labels.usePointStyle;
+		generateLabels(chart) {
+			const datasets = chart.data.datasets;
+			const options = chart.options.legend || {};
+			const usePointStyle = options.labels && options.labels.usePointStyle;
 
-			return chart._getSortedDatasetMetas().map(function(meta) {
-				var style = meta.controller.getStyle(usePointStyle ? 0 : undefined);
+			return chart._getSortedDatasetMetas().map((meta) => {
+				const style = meta.controller.getStyle(usePointStyle ? 0 : undefined);
 
 				return {
 					text: datasets[meta.index].label,
@@ -120,7 +118,7 @@ class Legend extends Element {
 	constructor(config) {
 		super();
 
-		extend(this, config);
+		Object.assign(this, config);
 
 		// Contains hit boxes for each dataset (in dataset order)
 		this.legendHitBoxes = [];
@@ -166,7 +164,7 @@ class Legend extends Element {
 	beforeUpdate() {}
 
 	update(maxWidth, maxHeight, margins) {
-		var me = this;
+		const me = this;
 
 		// Update Lifecycle - Probably don't want to ever extend or overwrite this function ;)
 		me.beforeUpdate();
@@ -195,12 +193,10 @@ class Legend extends Element {
 
 	afterUpdate() {}
 
-	//
-
 	beforeSetDimensions() {}
 
 	setDimensions() {
-		var me = this;
+		const me = this;
 		// Set the unconstrained dimension before label rotation
 		if (me.isHorizontal()) {
 			// Reset position before calculating rotation
@@ -230,19 +226,15 @@ class Legend extends Element {
 
 	afterSetDimensions() {}
 
-	//
-
 	beforeBuildLabels() {}
 
 	buildLabels() {
-		var me = this;
-		var labelOpts = me.options.labels || {};
-		var legendItems = call(labelOpts.generateLabels, [me.chart], me) || [];
+		const me = this;
+		const labelOpts = me.options.labels || {};
+		let legendItems = call(labelOpts.generateLabels, [me.chart], me) || [];
 
 		if (labelOpts.filter) {
-			legendItems = legendItems.filter(function(item) {
-				return labelOpts.filter(item, me.chart.data);
-			});
+			legendItems = legendItems.filter((item) => labelOpts.filter(item, me.chart.data));
 		}
 
 		if (me.options.reverse) {
@@ -253,8 +245,6 @@ class Legend extends Element {
 	}
 
 	afterBuildLabels() {}
-
-	//
 
 	beforeFit() {}
 
@@ -298,7 +288,7 @@ class Legend extends Element {
 			ctx.textAlign = 'left';
 			ctx.textBaseline = 'middle';
 
-			me.legendItems.forEach(function(legendItem, i) {
+			me.legendItems.forEach((legendItem, i) => {
 				const boxWidth = getBoxWidth(labelOpts, fontSize);
 				const width = boxWidth + (fontSize / 2) + ctx.measureText(legendItem.text).width;
 
@@ -311,7 +301,7 @@ class Legend extends Element {
 				hitboxes[i] = {
 					left: 0,
 					top: 0,
-					width: width,
+					width,
 					height: fontSize
 				};
 
@@ -328,8 +318,8 @@ class Legend extends Element {
 			let currentColWidth = 0;
 			let currentColHeight = 0;
 
-			let heightLimit = minSize.height - titleHeight;
-			me.legendItems.forEach(function(legendItem, i) {
+			const heightLimit = minSize.height - titleHeight;
+			me.legendItems.forEach((legendItem, i) => {
 				const boxWidth = getBoxWidth(labelOpts, fontSize);
 				const itemWidth = boxWidth + (fontSize / 2) + ctx.measureText(legendItem.text).width;
 
@@ -404,15 +394,19 @@ class Legend extends Element {
 		ctx.fillStyle = fontColor; // render in correct colour
 		ctx.font = labelFont.string;
 
-		var boxWidth = getBoxWidth(labelOpts, fontSize);
-		var hitboxes = me.legendHitBoxes;
+		const boxWidth = getBoxWidth(labelOpts, fontSize);
+		const hitboxes = me.legendHitBoxes;
 
 		// current position
+<<<<<<< HEAD
 		var drawLegendBox = function(x, y, legendItem) {
 			var index = legendItem.datasetIndex || 0;
 			var ci = me.chart;
 			var meta = ci.getDatasetMeta(index);
 
+=======
+		const drawLegendBox = function(x, y, legendItem) {
+>>>>>>> 7397a41fac0e9a57c969148eddc2805c8b249ee7
 			if (isNaN(boxWidth) || boxWidth <= 0) {
 				return;
 			}
@@ -420,7 +414,7 @@ class Legend extends Element {
 			// Set the ctx for the box
 			ctx.save();
 
-			var lineWidth = valueOrDefault(legendItem.lineWidth, lineDefault.borderWidth);
+			const lineWidth = valueOrDefault(legendItem.lineWidth, lineDefault.borderWidth);
 			ctx.fillStyle = valueOrDefault(legendItem.fillStyle, defaultColor);
 			ctx.lineCap = valueOrDefault(legendItem.lineCap, lineDefault.borderCapStyle);
 			ctx.lineDashOffset = valueOrDefault(legendItem.lineDashOffset, lineDefault.borderDashOffset);
@@ -442,8 +436,8 @@ class Legend extends Element {
 					rotation: legendItem.rotation,
 					borderWidth: lineWidth
 				};
-				var centerX = rtlHelper.xPlus(x, boxWidth / 2);
-				var centerY = y + fontSize / 2;
+				const centerX = rtlHelper.xPlus(x, boxWidth / 2);
+				const centerY = y + fontSize / 2;
 
 				// Draw pointStyle as legend symbol
 				drawPoint(ctx, drawOptions, centerX, centerY);
@@ -474,10 +468,10 @@ class Legend extends Element {
 			ctx.restore();
 		};
 
-		var fillText = function(x, y, legendItem, textWidth) {
-			var halfFontSize = fontSize / 2;
-			var xLeft = rtlHelper.xPlus(x, boxWidth + halfFontSize);
-			var yMiddle = y + halfFontSize;
+		const fillText = function(x, y, legendItem, textWidth) {
+			const halfFontSize = fontSize / 2;
+			const xLeft = rtlHelper.xPlus(x, boxWidth + halfFontSize);
+			const yMiddle = y + halfFontSize;
 
 			ctx.fillText(legendItem.text, xLeft, yMiddle);
 
@@ -491,7 +485,7 @@ class Legend extends Element {
 			}
 		};
 
-		var alignmentOffset = function(dimension, blockSize) {
+		const alignmentOffset = function(dimension, blockSize) {
 			switch (opts.align) {
 			case 'start':
 				return labelOpts.padding;
@@ -521,12 +515,12 @@ class Legend extends Element {
 
 		overrideTextDirection(me.ctx, opts.textDirection);
 
-		var itemHeight = fontSize + labelOpts.padding;
-		me.legendItems.forEach(function(legendItem, i) {
-			var textWidth = ctx.measureText(legendItem.text).width;
-			var width = boxWidth + (fontSize / 2) + textWidth;
-			var x = cursor.x;
-			var y = cursor.y;
+		const itemHeight = fontSize + labelOpts.padding;
+		me.legendItems.forEach((legendItem, i) => {
+			const textWidth = ctx.measureText(legendItem.text).width;
+			const width = boxWidth + (fontSize / 2) + textWidth;
+			let x = cursor.x;
+			let y = cursor.y;
 
 			rtlHelper.setWidth(me._minSize.width);
 
@@ -545,7 +539,7 @@ class Legend extends Element {
 				y = cursor.y = me.top + alignmentOffset(legendHeight, columnHeights[cursor.line]);
 			}
 
-			var realX = rtlHelper.x(x);
+			const realX = rtlHelper.x(x);
 
 			drawLegendBox(realX, y, legendItem);
 
@@ -565,6 +559,9 @@ class Legend extends Element {
 		restoreTextDirection(me.ctx, opts.textDirection);
 	}
 
+	/**
+	 * @private
+	 */
 	_drawTitle() {
 		const me = this;
 		const opts = me.options;
@@ -647,6 +644,9 @@ class Legend extends Element {
 		ctx.fillText(titleOpts.text, x, y);
 	}
 
+	/**
+	 * @private
+	 */
 	_computeTitleHeight() {
 		const titleOpts = this.options.title;
 		const titleFont = _parseFont(titleOpts);
@@ -658,8 +658,8 @@ class Legend extends Element {
 	 * @private
 	 */
 	_getLegendItemAt(x, y) {
-		var me = this;
-		var i, hitBox, lh;
+		const me = this;
+		let i, hitBox, lh;
 
 		if (x >= me.left && x <= me.right && y >= me.top && y <= me.bottom) {
 			// See if we are touching one of the dataset boxes
@@ -680,13 +680,11 @@ class Legend extends Element {
 	/**
 	 * Handle an event
 	 * @param {IEvent} e - The event to handle
-	 * @private
 	 */
 	handleEvent(e) {
-		var me = this;
-		var opts = me.options;
-		var type = e.type === 'mouseup' ? 'click' : e.type;
-		var hoveredItem;
+		const me = this;
+		const opts = me.options;
+		const type = e.type === 'mouseup' ? 'click' : e.type;
 
 		if (type === 'mousemove') {
 			if (!opts.onHover && !opts.onLeave) {
@@ -701,7 +699,7 @@ class Legend extends Element {
 		}
 
 		// Chart event already has relative position in it
-		hoveredItem = me._getLegendItemAt(e.x, e.y);
+		const hoveredItem = me._getLegendItemAt(e.x, e.y);
 
 		if (type === 'click') {
 			if (hoveredItem && opts.onClick) {
@@ -725,10 +723,10 @@ class Legend extends Element {
 }
 
 function createNewLegendAndAttach(chart, legendOpts) {
-	var legend = new Legend({
+	const legend = new Legend({
 		ctx: chart.ctx,
 		options: legendOpts,
-		chart: chart
+		chart
 	});
 
 	layouts.configure(chart, legend, legendOpts);
@@ -748,17 +746,17 @@ export default {
 	 */
 	_element: Legend,
 
-	beforeInit: function(chart) {
-		var legendOpts = chart.options.legend;
+	beforeInit(chart) {
+		const legendOpts = chart.options.legend;
 
 		if (legendOpts) {
 			createNewLegendAndAttach(chart, legendOpts);
 		}
 	},
 
-	afterUpdate: function(chart) {
-		var legendOpts = chart.options.legend;
-		var legend = chart.legend;
+	afterUpdate(chart) {
+		const legendOpts = chart.options.legend;
+		const legend = chart.legend;
 
 		if (legendOpts) {
 			mergeIf(legendOpts, defaults.legend);
@@ -776,8 +774,8 @@ export default {
 		}
 	},
 
-	afterEvent: function(chart, e) {
-		var legend = chart.legend;
+	afterEvent(chart, e) {
+		const legend = chart.legend;
 		if (legend) {
 			legend.handleEvent(e);
 		}

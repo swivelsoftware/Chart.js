@@ -1,3 +1,5 @@
+import {spritingOn, spritingOff} from './spriting';
+
 function createCanvas(w, h) {
 	var canvas = document.createElement('canvas');
 	canvas.width = w;
@@ -62,7 +64,11 @@ function acquireChart(config, options) {
 	window.document.body.appendChild(wrapper);
 
 	try {
-		chart = new Chart(canvas.getContext('2d'), config);
+		var ctx = canvas.getContext('2d');
+		if (options.spriteText) {
+			spritingOn(ctx);
+		}
+		chart = new Chart(ctx, config);
 	} catch (e) {
 		window.document.body.removeChild(wrapper);
 		throw e;
@@ -77,6 +83,7 @@ function acquireChart(config, options) {
 }
 
 function releaseChart(chart) {
+	spritingOff(chart.ctx);
 	chart.destroy();
 
 	var wrapper = (chart.$test || {}).wrapper;
@@ -108,11 +115,11 @@ function waitForResize(chart, callback) {
 }
 
 function afterEvent(chart, type, callback) {
-	var override = chart.eventHandler;
-	chart.eventHandler = function(event) {
+	var override = chart._eventHandler;
+	chart._eventHandler = function(event) {
 		override.call(this, event);
 		if (event.type === type) {
-			chart.eventHandler = override;
+			chart._eventHandler = override;
 			// eslint-disable-next-line callback-return
 			callback();
 		}
@@ -146,7 +153,7 @@ function triggerMouseEvent(chart, type, el) {
 	node.dispatchEvent(event);
 }
 
-module.exports = {
+export default {
 	injectCSS: injectCSS,
 	createCanvas: createCanvas,
 	acquireChart: acquireChart,

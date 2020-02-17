@@ -1,5 +1,3 @@
-'use strict';
-
 import helpers from '../helpers/index';
 import Animations from './core.animations';
 
@@ -10,7 +8,7 @@ const arrayEvents = ['push', 'pop', 'shift', 'splice', 'unshift'];
 /**
  * Hooks the array methods that add or remove values ('push', pop', 'shift', 'splice',
  * 'unshift') and notify the listener AFTER the array has been altered. Listeners are
- * called on the 'onData*' callbacks (e.g. onDataPush, etc.) with same arguments.
+ * called on the '_onData*' callbacks (e.g. _onDataPush, etc.) with same arguments.
  */
 function listenArrayEvents(array, listener) {
 	if (array._chartjs) {
@@ -26,20 +24,19 @@ function listenArrayEvents(array, listener) {
 		}
 	});
 
-	arrayEvents.forEach(function(key) {
-		var method = 'onData' + key.charAt(0).toUpperCase() + key.slice(1);
-		var base = array[key];
+	arrayEvents.forEach((key) => {
+		const method = '_onData' + key.charAt(0).toUpperCase() + key.slice(1);
+		const base = array[key];
 
 		Object.defineProperty(array, key, {
 			configurable: true,
 			enumerable: false,
-			value: function() {
-				var args = Array.prototype.slice.call(arguments);
-				var res = base.apply(this, args);
+			value(...args) {
+				const res = base.apply(this, args);
 
-				array._chartjs.listeners.forEach(function(object) {
+				array._chartjs.listeners.forEach((object) => {
 					if (typeof object[method] === 'function') {
-						object[method].apply(object, args);
+						object[method](...args);
 					}
 				});
 
@@ -50,10 +47,10 @@ function listenArrayEvents(array, listener) {
 }
 
 function scaleClip(scale, allowedOverflow) {
-	var opts = scale && scale.options || {};
-	var reverse = opts.reverse;
-	var min = opts.min === undefined ? allowedOverflow : 0;
-	var max = opts.max === undefined ? allowedOverflow : 0;
+	const opts = scale && scale.options || {};
+	const reverse = opts.reverse;
+	const min = opts.min === undefined ? allowedOverflow : 0;
+	const max = opts.max === undefined ? allowedOverflow : 0;
 	return {
 		start: reverse ? max : min,
 		end: reverse ? min : max
@@ -64,8 +61,8 @@ function defaultClip(xScale, yScale, allowedOverflow) {
 	if (allowedOverflow === false) {
 		return false;
 	}
-	var x = scaleClip(xScale, allowedOverflow);
-	var y = scaleClip(yScale, allowedOverflow);
+	const x = scaleClip(xScale, allowedOverflow);
+	const y = scaleClip(yScale, allowedOverflow);
 
 	return {
 		top: y.end,
@@ -76,7 +73,7 @@ function defaultClip(xScale, yScale, allowedOverflow) {
 }
 
 function toClip(value) {
-	var t, r, b, l;
+	let t, r, b, l;
 
 	if (helpers.isObject(value)) {
 		t = value.top;
@@ -100,13 +97,13 @@ function toClip(value) {
  * the _chartjs stub and overridden methods) if array doesn't have any more listeners.
  */
 function unlistenArrayEvents(array, listener) {
-	var stub = array._chartjs;
+	const stub = array._chartjs;
 	if (!stub) {
 		return;
 	}
 
-	var listeners = stub.listeners;
-	var index = listeners.indexOf(listener);
+	const listeners = stub.listeners;
+	const index = listeners.indexOf(listener);
 	if (index !== -1) {
 		listeners.splice(index, 1);
 	}
@@ -115,7 +112,7 @@ function unlistenArrayEvents(array, listener) {
 		return;
 	}
 
-	arrayEvents.forEach(function(key) {
+	arrayEvents.forEach((key) => {
 		delete array[key];
 	});
 
@@ -123,9 +120,9 @@ function unlistenArrayEvents(array, listener) {
 }
 
 function getSortedDatasetIndices(chart, filterVisible) {
-	var keys = [];
-	var metasets = chart._getSortedDatasetMetas(filterVisible);
-	var i, ilen;
+	const keys = [];
+	const metasets = chart._getSortedDatasetMetas(filterVisible);
+	let i, ilen;
 
 	for (i = 0, ilen = metasets.length; i < ilen; ++i) {
 		keys.push(metasets[i].index);
@@ -134,8 +131,8 @@ function getSortedDatasetIndices(chart, filterVisible) {
 }
 
 function applyStack(stack, value, dsIndex, allOther) {
-	var keys = stack.keys;
-	var i, ilen, datasetIndex, otherValue;
+	const keys = stack.keys;
+	let i, ilen, datasetIndex, otherValue;
 
 	for (i = 0, ilen = keys.length; i < ilen; ++i) {
 		datasetIndex = +keys[i];
@@ -168,7 +165,7 @@ function convertObjectDataToArray(data) {
 }
 
 function isStacked(scale, meta) {
-	var stacked = scale && scale.options.stacked;
+	const stacked = scale && scale.options.stacked;
 	return stacked || (stacked === undefined && meta.stack !== undefined);
 }
 
@@ -177,7 +174,7 @@ function getStackKey(indexScale, valueScale, meta) {
 }
 
 function getUserBounds(scale) {
-	var {min, max, minDefined, maxDefined} = scale._getUserBounds();
+	const {min, max, minDefined, maxDefined} = scale._getUserBounds();
 	return {
 		min: minDefined ? min : Number.NEGATIVE_INFINITY,
 		max: maxDefined ? max : Number.POSITIVE_INFINITY
@@ -210,9 +207,7 @@ function updateStacks(controller, parsed) {
 
 function getFirstScaleId(chart, axis) {
 	const scales = chart.scales;
-	return Object.keys(scales).filter(key => {
-		return scales[key].axis === axis;
-	}).shift();
+	return Object.keys(scales).filter(key => scales[key].axis === axis).shift();
 }
 
 class DatasetController {
@@ -322,7 +317,7 @@ class DatasetController {
 	/**
 	 * @private
 	 */
-	destroy() {
+	_destroy() {
 		if (this._data) {
 			unlistenArrayEvents(this._data, this);
 		}
@@ -388,13 +383,13 @@ class DatasetController {
 	addElements() {
 		const me = this;
 		const meta = me._cachedMeta;
-		let i, ilen, data;
 
 		me._dataCheck();
-		data = me._data;
+
+		const data = me._data;
 		const metaData = meta.data = new Array(data.length);
 
-		for (i = 0, ilen = data.length; i < ilen; ++i) {
+		for (let i = 0, ilen = data.length; i < ilen; ++i) {
 			metaData[i] = new me.dataElementType();
 		}
 
@@ -419,7 +414,7 @@ class DatasetController {
 		if (meta.stack !== dataset.stack) {
 			stackChanged = true;
 			// remove values from old stack
-			meta._parsed.forEach(function(parsed) {
+			meta._parsed.forEach((parsed) => {
 				delete parsed._stacks[meta.vScale.id][meta.index];
 			});
 			meta.stack = dataset.stack;
@@ -427,7 +422,7 @@ class DatasetController {
 
 		// Re-sync meta data in case the user replaced the data array or if we missed
 		// any updates and so make sure that we handle number of datapoints changing.
-		me.resyncElements(dataChanged || labelsChanged || scaleChanged || stackChanged);
+		me._resyncElements(dataChanged || labelsChanged || scaleChanged || stackChanged);
 
 		// if stack changed, update stack values for the whole dataset
 		if (stackChanged) {
@@ -445,7 +440,7 @@ class DatasetController {
 			me.chart.options[me._type].datasets,
 			me.getDataset(),
 		], {
-			merger: function(key, target, source) {
+			merger(key, target, source) {
 				if (key !== 'data') {
 					helpers._merger(key, target, source);
 				}
@@ -620,7 +615,7 @@ class DatasetController {
 		const stack = canStack && meta._stacked && {keys: getSortedDatasetIndices(this.chart, true), values: null};
 		let min = Number.POSITIVE_INFINITY;
 		let max = Number.NEGATIVE_INFINITY;
-		let {min: otherMin, max: otherMax} = getUserBounds(otherScale);
+		const {min: otherMin, max: otherMax} = getUserBounds(otherScale);
 		let i, item, value, parsed, otherValue;
 
 		function _compute() {
@@ -778,9 +773,7 @@ class DatasetController {
 		const me = this;
 		const getHoverColor = helpers.getHoverColor;
 		const normalOptions = me.getStyle(index);
-		const missingColors = Object.keys(normalOptions).filter(key => {
-			return key.indexOf('Color') !== -1 && !(key in options);
-		});
+		const missingColors = Object.keys(normalOptions).filter(key => key.indexOf('Color') !== -1 && !(key in options));
 		let i = missingColors.length - 1;
 		let color;
 		for (; i >= 0; i--) {
@@ -939,7 +932,7 @@ class DatasetController {
 		let config = helpers.mergeIf({}, [datasetAnim, chartAnim]);
 
 		if (config[mode]) {
-			config = helpers.extend({}, config, config[mode]);
+			config = Object.assign({}, config, config[mode]);
 		}
 
 		const animations = new Animations(chart, config);
@@ -982,7 +975,7 @@ class DatasetController {
 	 */
 	_updateElement(element, index, properties, mode) {
 		if (mode === 'reset' || mode === 'none') {
-			helpers.extend(element, properties);
+			Object.assign(element, properties);
 		} else {
 			this._resolveAnimations(index, mode).update(element, properties);
 		}
@@ -1039,16 +1032,16 @@ class DatasetController {
 	/**
 	 * @private
 	 */
-	resyncElements(changed) {
+	_resyncElements(changed) {
 		const me = this;
 		const meta = me._cachedMeta;
 		const numMeta = meta.data.length;
 		const numData = me._data.length;
 
 		if (numData > numMeta) {
-			me.insertElements(numMeta, numData - numMeta);
+			me._insertElements(numMeta, numData - numMeta);
 			if (changed && numMeta) {
-				// insertElements parses the new elements. The old ones might need parsing too.
+				// _insertElements parses the new elements. The old ones might need parsing too.
 				me._parse(0, numMeta);
 			}
 		} else if (numData < numMeta) {
@@ -1063,7 +1056,7 @@ class DatasetController {
 	/**
 	 * @private
 	 */
-	insertElements(start, count) {
+	_insertElements(start, count) {
 		const me = this;
 		const elements = new Array(count);
 		const meta = me._cachedMeta;
@@ -1088,7 +1081,7 @@ class DatasetController {
 	/**
 	 * @private
 	 */
-	removeElements(start, count) {
+	_removeElements(start, count) {
 		const me = this;
 		if (me._parsing) {
 			me._cachedMeta._parsed.splice(start, count);
@@ -1100,38 +1093,38 @@ class DatasetController {
 	/**
 	 * @private
 	 */
-	onDataPush() {
+	_onDataPush() {
 		const count = arguments.length;
-		this.insertElements(this.getDataset().data.length - count, count);
+		this._insertElements(this.getDataset().data.length - count, count);
 	}
 
 	/**
 	 * @private
 	 */
-	onDataPop() {
-		this.removeElements(this._cachedMeta.data.length - 1, 1);
+	_onDataPop() {
+		this._removeElements(this._cachedMeta.data.length - 1, 1);
 	}
 
 	/**
 	 * @private
 	 */
-	onDataShift() {
-		this.removeElements(0, 1);
+	_onDataShift() {
+		this._removeElements(0, 1);
 	}
 
 	/**
 	 * @private
 	 */
-	onDataSplice(start, count) {
-		this.removeElements(start, count);
-		this.insertElements(start, arguments.length - 2);
+	_onDataSplice(start, count) {
+		this._removeElements(start, count);
+		this._insertElements(start, arguments.length - 2);
 	}
 
 	/**
 	 * @private
 	 */
-	onDataUnshift() {
-		this.insertElements(0, arguments.length);
+	_onDataUnshift() {
+		this._insertElements(0, arguments.length);
 	}
 }
 

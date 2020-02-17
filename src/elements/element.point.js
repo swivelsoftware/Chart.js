@@ -1,9 +1,6 @@
-'use strict';
-
 import defaults from '../core/core.defaults';
 import Element from '../core/core.element';
 import {_isPointInArea, drawPoint} from '../helpers/helpers.canvas';
-import {extend} from '../helpers/helpers.core';
 
 const defaultColor = defaults.color;
 
@@ -31,7 +28,7 @@ class Point extends Element {
 		this.stop = undefined;
 
 		if (cfg) {
-			extend(this, cfg);
+			Object.assign(this, cfg);
 		}
 	}
 

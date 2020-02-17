@@ -1,5 +1,3 @@
-'use strict';
-
 import {isFinite} from '../helpers/helpers.core';
 import {_setMinAndMaxByKey, log10} from '../helpers/helpers.math';
 import Scale from '../core/core.scale';
@@ -74,8 +72,11 @@ class LogarithmicScale extends Scale {
 		this._valueRange = undefined;
 	}
 
-	_parse(raw, index) { // eslint-disable-line no-unused-vars
-		const value = LinearScaleBase.prototype._parse.apply(this, arguments);
+	/**
+	 * @private
+	 */
+	_parse(raw, index) {
+		const value = LinearScaleBase.prototype._parse.apply(this, [raw, index]);
 		if (value === 0) {
 			return undefined;
 		}
@@ -149,8 +150,12 @@ class LogarithmicScale extends Scale {
 		return ticks;
 	}
 
+	/**
+	 * @param {number} value
+	 * @return {string}
+	 */
 	getLabelForValue(value) {
-		return value === undefined ? 0 : new Intl.NumberFormat(this.options.locale).format(value);
+		return value === undefined ? '0' : new Intl.NumberFormat(this.options.locale).format(value);
 	}
 
 	getPixelForTick(index) {
@@ -161,9 +166,12 @@ class LogarithmicScale extends Scale {
 		return this.getPixelForValue(ticks[index].value);
 	}
 
+	/**
+	 * @private
+	 */
 	_configure() {
 		const me = this;
-		let start = me.min;
+		const start = me.min;
 
 		Scale.prototype._configure.call(me);
 

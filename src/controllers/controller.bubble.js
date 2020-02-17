@@ -1,9 +1,6 @@
-'use strict';
-
 import DatasetController from '../core/core.datasetController';
 import defaults from '../core/core.defaults';
 import Point from '../elements/element.point';
-import {extend} from '../helpers/helpers.core';
 import {resolve} from '../helpers/helpers.options';
 
 defaults.set('bubble', {
@@ -25,7 +22,7 @@ defaults.set('bubble', {
 
 	tooltips: {
 		callbacks: {
-			title: function() {
+			title() {
 				// Title doesn't make sense for scatter since we format the data as a point
 				return '';
 			}
@@ -34,10 +31,6 @@ defaults.set('bubble', {
 });
 
 class BubbleController extends DatasetController {
-
-	constructor(chart, datasetIndex) {
-		super(chart, datasetIndex);
-	}
 
 	/**
 	 * Parse array of objects
@@ -142,23 +135,23 @@ class BubbleController extends DatasetController {
 	 * @private
 	 */
 	_resolveDataElementOptions(index, mode) {
-		var me = this;
-		var chart = me.chart;
-		var dataset = me.getDataset();
-		var parsed = me._getParsed(index);
-		var values = super._resolveDataElementOptions.apply(me, arguments);
+		const me = this;
+		const chart = me.chart;
+		const dataset = me.getDataset();
+		const parsed = me._getParsed(index);
+		let values = super._resolveDataElementOptions(index, mode);
 
 		// Scriptable options
-		var context = {
-			chart: chart,
+		const context = {
+			chart,
 			dataIndex: index,
-			dataset: dataset,
+			dataset,
 			datasetIndex: me.index
 		};
 
 		// In case values were cached (and thus frozen), we need to clone the values
 		if (values.$shared) {
-			values = extend({}, values, {$shared: false});
+			values = Object.assign({}, values, {$shared: false});
 		}
 
 

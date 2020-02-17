@@ -1,8 +1,5 @@
-'use strict';
-
 import defaults from '../core/core.defaults';
 import Element from '../core/core.element';
-import {extend} from '../helpers/helpers.core';
 import {_bezierInterpolation, _pointInLine, _steppedInterpolation} from '../helpers/helpers.interpolation';
 import {_computeSegments, _boundSegments} from '../helpers/helpers.segment';
 import {_steppedLineTo, _bezierCurveTo} from '../helpers/helpers.canvas';
@@ -72,8 +69,9 @@ function pathSegment(ctx, line, segment, params) {
 	const {points, options} = line;
 	const lineMethod = getLineMethod(options);
 	const count = points.length;
+	// eslint-disable-next-line prefer-const
 	let {move = true, reverse} = params || {};
-	let ilen = end < start ? count + end - start : end - start;
+	const ilen = end < start ? count + end - start : end - start;
 	let i, point, prev;
 
 	for (i = 0; i <= ilen; ++i) {
@@ -117,8 +115,8 @@ function fastPathSegment(ctx, line, segment, params) {
 	const points = line.points;
 	const count = points.length;
 	const {start, end} = segment;
-	let {move = true, reverse} = params || {};
-	let ilen = end < start ? count + end - start : end - start;
+	const {move = true, reverse} = params || {};
+	const ilen = end < start ? count + end - start : end - start;
 	let avgX = 0;
 	let countX = 0;
 	let i, point, prevX, minY, maxY, lastY;
@@ -211,7 +209,7 @@ class Line extends Element {
 		this._segments = undefined;
 
 		if (cfg) {
-			extend(this, cfg);
+			Object.assign(this, cfg);
 		}
 	}
 
@@ -291,7 +289,7 @@ class Line extends Element {
 				continue;
 			}
 			const t = Math.abs((value - p1[property]) / (p2[property] - p1[property]));
-			let interpolated = _interpolate(p1, p2, t, options.steppedLine);
+			const interpolated = _interpolate(p1, p2, t, options.steppedLine);
 			interpolated[property] = point[property];
 			result.push(interpolated);
 		}
