@@ -398,15 +398,11 @@ class Legend extends Element {
 		const hitboxes = me.legendHitBoxes;
 
 		// current position
-<<<<<<< HEAD
-		var drawLegendBox = function(x, y, legendItem) {
+		const drawLegendBox = function(x, y, legendItem) {
 			var index = legendItem.datasetIndex || 0;
 			var ci = me.chart;
 			var meta = ci.getDatasetMeta(index);
-
-=======
-		const drawLegendBox = function(x, y, legendItem) {
->>>>>>> 7397a41fac0e9a57c969148eddc2805c8b249ee7
+			
 			if (isNaN(boxWidth) || boxWidth <= 0) {
 				return;
 			}
