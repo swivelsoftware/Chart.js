@@ -99,7 +99,7 @@ export function clear(chart) {
 	chart.ctx.clearRect(0, 0, chart.width, chart.height);
 }
 
-export function drawPoint(ctx, options, x, y) {
+export function drawPoint(ctx, options = {}, x, y) {
 	let type, xOffset, yOffset, size, cornerRadius;
 	const style = options.pointStyle;
 	const rotation = options.rotation;
