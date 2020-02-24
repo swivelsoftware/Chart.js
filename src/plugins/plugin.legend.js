@@ -19,15 +19,30 @@ defaults.set('legend', {
 	weight: 1000,
 
 	// a callback that will handle
-	onClick(e, legendItem) {
+	onClick: function(e, legendItem) {
 		const index = legendItem.datasetIndex;
 		const ci = this.chart;
-		if (ci.isDatasetVisible(index)) {
-			ci.hide(index);
-			legendItem.hidden = true;
-		} else {
-			ci.show(index);
-			legendItem.hidden = false;
+
+		var hiddens = (ci.data.datasets || []).map(function(meta, i) {
+			return !ci.isDatasetVisible(i);
+		});
+
+		// all hidden except the selected one
+		var allHidden = hiddens.reduce(function(result, flag, i) {
+			if (i === index) {
+				return result;
+			}
+			return result && (flag || false);
+		}, true);
+
+		if (!allHidden) {
+			if (ci.isDatasetVisible(index)) {
+				ci.hide(index);
+				legendItem.hidden = true;
+			} else {
+				ci.show(index);
+				legendItem.hidden = false;
+			}
 		}
 	},
 
@@ -384,7 +399,7 @@ export class Legend extends Element {
 			var index = legendItem.datasetIndex || 0;
 			var ci = me.chart;
 			var meta = ci.getDatasetMeta(index);
-
+			
 			if (isNaN(boxWidth) || boxWidth <= 0) {
 				return;
 			}
@@ -425,11 +440,16 @@ export class Legend extends Element {
 				ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
 
 				// Draw point at center
-				var radius = fontSize * Math.sqrt(5) / 5;
 				var centerX = x + boxWidth / 2;
 				var centerY = y + fontSize / 2;
-				ctx.lineWidth *= Math.SQRT2 / 2;
-				helpers.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY, legendItem.rotation);
+
+				const drawOptions = {
+					radius: fontSize * Math.sqrt(5) / 5,
+					pointStyle: legendItem.pointStyle,
+					rotation: legendItem.rotation,
+					borderWidth: lineWidth * Math.SQRT2 / 2
+				}
+				drawPoint(ctx, drawOptions, centerX, centerY);
 			} else {
 				// Draw box as legend symbol
 				ctx.fillRect(rtlHelper.leftForLtr(x, boxWidth), y, boxWidth, fontSize);
