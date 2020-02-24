@@ -3,20 +3,19 @@
  */
 import Chart from './core/core.controller';
 
-import helpers from './helpers';
+import helpers from './helpers/index';
 import _adapters from './core/core.adapters';
 import Animation from './core/core.animation';
 import Animator from './core/core.animator';
 import animationService from './core/core.animations';
-import controllers from './controllers';
+import controllers from './controllers/index';
 import DatasetController from './core/core.datasetController';
 import defaults from './core/core.defaults';
 import Element from './core/core.element';
-import elements from './elements';
+import elements from './elements/index';
 import Interaction from './core/core.interaction';
 import layouts from './core/core.layouts';
 import platforms from './platform/platforms';
-import platform from './platform/platform';
 import pluginsCore from './core/core.plugins';
 import Scale from './core/core.scale';
 import scaleService from './core/core.scaleService';
@@ -35,31 +34,31 @@ Chart.elements = elements;
 Chart.Interaction = Interaction;
 Chart.layouts = layouts;
 Chart.platforms = platforms;
-Chart.platform = platform;
 Chart.plugins = pluginsCore;
 Chart.Scale = Scale;
 Chart.scaleService = scaleService;
 Chart.Ticks = Ticks;
 
 // Register built-in scales
-import scales from './scales';
-Object.keys(scales).forEach(function(type) {
+import scales from './scales/index';
+Object.keys(scales).forEach((type) => {
 	const scale = scales[type];
 	Chart.scaleService.registerScaleType(type, scale, scale._defaults);
 });
 
 // Load to register built-in adapters (as side effects)
-import './adapters';
+import './adapters/index';
 
 // Loading built-in plugins
-import plugins from './plugins';
-for (var k in plugins) {
+import plugins from './plugins/index';
+for (const k in plugins) {
 	if (Object.prototype.hasOwnProperty.call(plugins, k)) {
 		Chart.plugins.register(plugins[k]);
 	}
 }
 
 if (typeof window !== 'undefined') {
+	// @ts-ignore
 	window.Chart = Chart;
 }
 

@@ -1,11 +1,9 @@
-'use strict';
-
 import defaults from '../core/core.defaults';
 import Element from '../core/core.element';
 import helpers from '../helpers/index';
 import layouts from '../core/core.layouts';
 
-defaults._set('title', {
+defaults.set('title', {
 	align: 'center',
 	display: false,
 	fontStyle: 'bold',
@@ -16,25 +14,38 @@ defaults._set('title', {
 	weight: 2000         // by default greater than legend (1000) to be above
 });
 
-/**
- * IMPORTANT: this class is exposed publicly as Chart.Title, backward compatibility required!
- */
-class Title extends Element {
+export class Title extends Element {
 	constructor(config) {
 		super();
 
-		var me = this;
-		helpers.extend(me, config);
+		Object.assign(this, config);
 
-		// Contains hit boxes for each dataset (in dataset order)
-		me.legendHitBoxes = [];
+		this.chart = config.chart;
+		this.options = config.options;
+		this.ctx = config.ctx;
+		this._margins = undefined;
+		this._padding = undefined;
+		this.legendHitBoxes = []; // Contains hit boxes for each dataset (in dataset order)
+		this.top = undefined;
+		this.bottom = undefined;
+		this.left = undefined;
+		this.right = undefined;
+		this.width = undefined;
+		this.height = undefined;
+		this.maxWidth = undefined;
+		this.maxHeight = undefined;
+		this.position = undefined;
+		this.weight = undefined;
+		this.fullWidth = undefined;
 	}
 
 	// These methods are ordered by lifecycle. Utilities then follow.
 
+
 	beforeUpdate() {}
+
 	update(maxWidth, maxHeight, margins) {
-		var me = this;
+		const me = this;
 
 		// Update Lifecycle - Probably don't want to ever extend or overwrite this function ;)
 		me.beforeUpdate();
@@ -42,7 +53,7 @@ class Title extends Element {
 		// Absorb the master measurements
 		me.maxWidth = maxWidth;
 		me.maxHeight = maxHeight;
-		me.margins = margins;
+		me._margins = margins;
 
 		// Dimensions
 		me.beforeSetDimensions();
@@ -61,13 +72,14 @@ class Title extends Element {
 		me.afterUpdate();
 
 	}
+
 	afterUpdate() {}
 
-	//
 
 	beforeSetDimensions() {}
+
 	setDimensions() {
-		var me = this;
+		const me = this;
 		// Set the unconstrained dimension before label rotation
 		if (me.isHorizontal()) {
 			// Reset position before calculating rotation
@@ -82,40 +94,40 @@ class Title extends Element {
 			me.bottom = me.height;
 		}
 	}
+
 	afterSetDimensions() {}
 
-	//
-
 	beforeBuildLabels() {}
+
 	buildLabels() {}
+
 	afterBuildLabels() {}
 
-	//
-
 	beforeFit() {}
+
 	fit() {
-		var me = this;
-		var opts = me.options;
-		var minSize = {};
-		var isHorizontal = me.isHorizontal();
-		var lineCount, textSize;
+		const me = this;
+		const opts = me.options;
+		const minSize = {};
+		const isHorizontal = me.isHorizontal();
 
 		if (!opts.display) {
 			me.width = minSize.width = me.height = minSize.height = 0;
 			return;
 		}
 
-		lineCount = helpers.isArray(opts.text) ? opts.text.length : 1;
+		const lineCount = helpers.isArray(opts.text) ? opts.text.length : 1;
 		me._padding = helpers.options.toPadding(opts.padding);
-		textSize = lineCount * helpers.options._parseFont(opts).lineHeight + me._padding.height;
+		const textSize = lineCount * helpers.options._parseFont(opts).lineHeight + me._padding.height;
 		me.width = minSize.width = isHorizontal ? me.maxWidth : textSize;
 		me.height = minSize.height = isHorizontal ? textSize : me.maxHeight;
 	}
+
 	afterFit() {}
 
 	// Shared Methods
 	isHorizontal() {
-		var pos = this.options.position;
+		const pos = this.options.position;
 		return pos === 'top' || pos === 'bottom';
 	}
 
@@ -139,9 +151,6 @@ class Title extends Element {
 		const right = me.right;
 		let maxWidth, titleX, titleY;
 		let align;
-
-		ctx.fillStyle = helpers.valueOrDefault(opts.fontColor, defaults.fontColor); // render in correct colour
-		ctx.font = fontOpts.string;
 
 		// Horizontal
 		if (me.isHorizontal()) {
@@ -184,15 +193,19 @@ class Title extends Element {
 		}
 
 		ctx.save();
+
+		ctx.fillStyle = helpers.valueOrDefault(opts.fontColor, defaults.fontColor); // render in correct colour
+		ctx.font = fontOpts.string;
+
 		ctx.translate(titleX, titleY);
 		ctx.rotate(rotation);
 		ctx.textAlign = align;
 		ctx.textBaseline = 'middle';
 
-		var text = opts.text;
+		const text = opts.text;
 		if (helpers.isArray(text)) {
-			var y = 0;
-			for (var i = 0; i < text.length; ++i) {
+			let y = 0;
+			for (let i = 0; i < text.length; ++i) {
 				ctx.fillText(text[i], 0, y, maxWidth);
 				y += lineHeight;
 			}
@@ -205,10 +218,10 @@ class Title extends Element {
 }
 
 function createNewTitleBlockAndAttach(chart, titleOpts) {
-	var title = new Title({
+	const title = new Title({
 		ctx: chart.ctx,
 		options: titleOpts,
-		chart: chart
+		chart
 	});
 
 	layouts.configure(chart, title, titleOpts);
@@ -228,17 +241,17 @@ export default {
 	 */
 	_element: Title,
 
-	beforeInit: function(chart) {
-		var titleOpts = chart.options.title;
+	beforeInit(chart) {
+		const titleOpts = chart.options.title;
 
 		if (titleOpts) {
 			createNewTitleBlockAndAttach(chart, titleOpts);
 		}
 	},
 
-	beforeUpdate: function(chart) {
-		var titleOpts = chart.options.title;
-		var titleBlock = chart.titleBlock;
+	beforeUpdate(chart) {
+		const titleOpts = chart.options.title;
+		const titleBlock = chart.titleBlock;
 
 		if (titleOpts) {
 			helpers.mergeIf(titleOpts, defaults.title);

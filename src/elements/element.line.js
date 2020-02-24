@@ -1,5 +1,3 @@
-'use strict';
-
 import defaults from '../core/core.defaults';
 import Element from '../core/core.element';
 import {_bezierInterpolation, _pointInLine, _steppedInterpolation} from '../helpers/helpers.interpolation';
@@ -7,9 +5,13 @@ import {_computeSegments, _boundSegments} from '../helpers/helpers.segment';
 import {_steppedLineTo, _bezierCurveTo} from '../helpers/helpers.canvas';
 import {_updateBezierControlPoints} from '../helpers/helpers.curve';
 
+/**
+ * @typedef { import("./element.point").default } Point
+ */
+
 const defaultColor = defaults.color;
 
-defaults._set('elements', {
+defaults.set('elements', {
 	line: {
 		tension: 0.4,
 		backgroundColor: defaultColor,
@@ -38,7 +40,7 @@ function lineTo(ctx, previous, target) {
 }
 
 function getLineMethod(options) {
-	if (options.steppedLine) {
+	if (options.stepped) {
 		return _steppedLineTo;
 	}
 
@@ -67,8 +69,9 @@ function pathSegment(ctx, line, segment, params) {
 	const {points, options} = line;
 	const lineMethod = getLineMethod(options);
 	const count = points.length;
+	// eslint-disable-next-line prefer-const
 	let {move = true, reverse} = params || {};
-	let ilen = end < start ? count + end - start : end - start;
+	const ilen = end < start ? count + end - start : end - start;
 	let i, point, prev;
 
 	for (i = 0; i <= ilen; ++i) {
@@ -81,7 +84,7 @@ function pathSegment(ctx, line, segment, params) {
 			ctx.moveTo(point.x, point.y);
 			move = false;
 		} else {
-			lineMethod(ctx, prev, point, reverse, options.steppedLine);
+			lineMethod(ctx, prev, point, reverse, options.stepped);
 		}
 
 		prev = point;
@@ -89,7 +92,7 @@ function pathSegment(ctx, line, segment, params) {
 
 	if (loop) {
 		point = points[(start + (reverse ? ilen : 0)) % count];
-		lineMethod(ctx, prev, point, reverse, options.steppedLine);
+		lineMethod(ctx, prev, point, reverse, options.stepped);
 	}
 
 	return !!loop;
@@ -112,8 +115,8 @@ function fastPathSegment(ctx, line, segment, params) {
 	const points = line.points;
 	const count = points.length;
 	const {start, end} = segment;
-	let {move = true, reverse} = params || {};
-	let ilen = end < start ? count + end - start : end - start;
+	const {move = true, reverse} = params || {};
+	const ilen = end < start ? count + end - start : end - start;
 	let avgX = 0;
 	let countX = 0;
 	let i, point, prevX, minY, maxY, lastY;
@@ -174,12 +177,15 @@ function fastPathSegment(ctx, line, segment, params) {
 function _getSegmentMethod(line) {
 	const opts = line.options;
 	const borderDash = opts.borderDash && opts.borderDash.length;
-	const useFastPath = !line._loop && !opts.tension && !opts.steppedLine && !borderDash;
+	const useFastPath = !line._loop && !opts.tension && !opts.stepped && !borderDash;
 	return useFastPath ? fastPathSegment : pathSegment;
 }
 
+/**
+ * @private
+ */
 function _getInterpolationMethod(options) {
-	if (options.steppedLine) {
+	if (options.stepped) {
 		return _steppedInterpolation;
 	}
 
@@ -190,10 +196,23 @@ function _getInterpolationMethod(options) {
 	return _pointInLine;
 }
 
-class Line extends Element {
+export default class Line extends Element {
 
-	constructor(props) {
-		super(props);
+	static _type = 'line';
+
+	constructor(cfg) {
+		super();
+
+		this.options = undefined;
+		this._loop = undefined;
+		this._fullLoop = undefined;
+		this._controlPointsUpdated = undefined;
+		this._points = undefined;
+		this._segments = undefined;
+
+		if (cfg) {
+			Object.assign(this, cfg);
+		}
 	}
 
 	updateControlPoints(chartArea) {
@@ -202,7 +221,7 @@ class Line extends Element {
 			return;
 		}
 		const options = me.options;
-		if (options.tension && !options.steppedLine) {
+		if (options.tension && !options.stepped) {
 			const loop = options.spanGaps ? me._loop : me._fullLoop;
 			_updateBezierControlPoints(me._points, options, chartArea, loop);
 		}
@@ -272,7 +291,7 @@ class Line extends Element {
 				continue;
 			}
 			const t = Math.abs((value - p1[property]) / (p2[property] - p1[property]));
-			let interpolated = _interpolate(p1, p2, t, options.steppedLine);
+			const interpolated = _interpolate(p1, p2, t, options.stepped);
 			interpolated[property] = point[property];
 			result.push(interpolated);
 		}
@@ -299,19 +318,16 @@ class Line extends Element {
 	/**
 	 * Append all segments of this line to current path.
 	 * @param {CanvasRenderingContext2D} ctx
-	 * @param {object} params
-	 * @param {object} params.move - move to starting point (vs line to it)
-	 * @param {object} params.reverse - path the segment from end to start
 	 * @returns {undefined|boolean} - true if line is a full loop (path should be closed)
 	 */
-	path(ctx, params) {
+	path(ctx) {
 		const me = this;
 		const segments = me.segments;
 		const ilen = segments.length;
 		const segmentMethod = _getSegmentMethod(me);
 		let loop = me._loop;
 		for (let i = 0; i < ilen; ++i) {
-			loop &= segmentMethod(ctx, me, segments[i], params);
+			loop &= segmentMethod(ctx, me, segments[i]);
 		}
 		return !!loop;
 	}
@@ -341,7 +357,3 @@ class Line extends Element {
 		ctx.restore();
 	}
 }
-
-Line.prototype._type = 'line';
-
-export default Line;

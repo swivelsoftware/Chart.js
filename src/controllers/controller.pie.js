@@ -1,11 +1,9 @@
-'use strict';
-
 import DoughnutController from './controller.doughnut';
 import defaults from '../core/core.defaults';
-import helpers from '../helpers';
+import {clone} from '../helpers/helpers.core';
 
-defaults._set('pie', helpers.clone(defaults.doughnut));
-defaults._set('pie', {
+defaults.set('pie', clone(defaults.doughnut));
+defaults.set('pie', {
 	cutoutPercentage: 0
 });
 

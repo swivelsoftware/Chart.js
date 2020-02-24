@@ -1,6 +1,9 @@
-'use strict';
-
 import {_angleBetween, _angleDiff, _normalizeAngle} from './helpers.math';
+
+/**
+ * @typedef { import("../elements/element.line").default } Line
+ * @typedef { import("../elements/element.point").default } Point
+ */
 
 function propertyFn(property) {
 	if (property === 'angle') {
@@ -29,6 +32,7 @@ function getSegment(segment, points, bounds) {
 	const {property, start: startBound, end: endBound} = bounds;
 	const {between, normalize} = propertyFn(property);
 	const count = points.length;
+	// eslint-disable-next-line prefer-const
 	let {start, end, loop} = segment;
 	let i, ilen;
 
@@ -59,10 +63,11 @@ function getSegment(segment, points, bounds) {
  * @param {number} segment.end - end index of the segment, referring the points array
  * @param {boolean} segment.loop - indicates that the segment is a loop
  * @param {Point[]} points - the points that this segment refers to
- * @param {object} bounds
+ * @param {object} [bounds]
  * @param {string} bounds.property - the property of a `Point` we are bounding. `x`, `y` or `angle`.
  * @param {number} bounds.start - start value of the property
  * @param {number} bounds.end - end value of the property
+ * @private
  **/
 export function _boundSegment(segment, points, bounds) {
 	if (!bounds) {
@@ -109,16 +114,18 @@ export function _boundSegment(segment, points, bounds) {
 /**
  * Returns the segments of the line that are inside given bounds
  * @param {Line} line
- * @param {object} bounds
+ * @param {object} [bounds]
  * @param {string} bounds.property - the property we are bounding with. `x`, `y` or `angle`.
  * @param {number} bounds.start - start value of the `property`
  * @param {number} bounds.end - end value of the `property`
+ * @private
  */
 export function _boundSegments(line, bounds) {
 	const result = [];
+	const segments = line.segments;
 
-	for (let segment of line.segments) {
-		let sub = _boundSegment(segment, line.points, bounds);
+	for (let i = 0; i < segments.length; i++) {
+		const sub = _boundSegment(segments[i], line.points, bounds);
 		if (sub.length) {
 			result.push(...sub);
 		}
@@ -183,6 +190,7 @@ function solidSegments(points, start, max, loop) {
 			if (!prev.skip) {
 				loop = false;
 				result.push({start: start % count, end: (end - 1) % count, loop});
+				// @ts-ignore
 				start = last = cur.stop ? end : null;
 			}
 		} else {
@@ -205,6 +213,7 @@ function solidSegments(points, start, max, loop) {
  * Compute the continuous segments that define the whole line
  * There can be skipped points within a segment, if spanGaps is true.
  * @param {Line} line
+ * @private
  */
 export function _computeSegments(line) {
 	const points = line.points;

@@ -1,13 +1,10 @@
-'use strict';
-
 import DatasetController from '../core/core.datasetController';
 import defaults from '../core/core.defaults';
 import Arc from '../elements/element.arc';
-import helpers from '../helpers';
+import {toRadians} from '../helpers/helpers.math';
+import {resolve} from '../helpers/helpers.options';
 
-const resolve = helpers.options.resolve;
-
-defaults._set('polarArea', {
+defaults.set('polarArea', {
 	animation: {
 		numbers: {
 			type: 'number',
@@ -35,12 +32,12 @@ defaults._set('polarArea', {
 	startAngle: 0,
 	legend: {
 		labels: {
-			generateLabels: function(chart) {
-				var data = chart.data;
+			generateLabels(chart) {
+				const data = chart.data;
 				if (data.labels.length && data.datasets.length) {
-					return data.labels.map(function(label, i) {
-						var meta = chart.getDatasetMeta(0);
-						var style = meta.controller.getStyle(i);
+					return data.labels.map((label, i) => {
+						const meta = chart.getDatasetMeta(0);
+						const style = meta.controller.getStyle(i);
 
 						return {
 							text: label,
@@ -58,10 +55,10 @@ defaults._set('polarArea', {
 			}
 		},
 
-		onClick: function(e, legendItem) {
-			var index = legendItem.index;
-			var chart = this.chart;
-			var i, ilen, meta;
+		onClick(e, legendItem) {
+			const index = legendItem.index;
+			const chart = this.chart;
+			let i, ilen, meta;
 
 			for (i = 0, ilen = (chart.data.datasets || []).length; i < ilen; ++i) {
 				meta = chart.getDatasetMeta(i);
@@ -75,10 +72,10 @@ defaults._set('polarArea', {
 	// Need to override these to give a nice default
 	tooltips: {
 		callbacks: {
-			title: function() {
+			title() {
 				return '';
 			},
-			label: function(item, data) {
+			label(item, data) {
 				return data.labels[item.index] + ': ' + item.value;
 			}
 		}
@@ -88,66 +85,58 @@ defaults._set('polarArea', {
 function getStartAngleRadians(deg) {
 	// radialLinear scale draws angleLines using startAngle. 0 is expected to be at top.
 	// Here we adjust to standard unit circle used in drawing, where 0 is at right.
-	return helpers.math.toRadians(deg) - 0.5 * Math.PI;
+	return toRadians(deg) - 0.5 * Math.PI;
 }
 
-export default DatasetController.extend({
+export default class PolarAreaController extends DatasetController {
 
-	dataElementType: Arc,
+	constructor(chart, datasetIndex) {
+		super(chart, datasetIndex);
 
-	/**
-	 * @private
-	 */
-	_dataElementOptions: [
-		'backgroundColor',
-		'borderColor',
-		'borderWidth',
-		'borderAlign',
-		'hoverBackgroundColor',
-		'hoverBorderColor',
-		'hoverBorderWidth',
-	],
+		this.innerRadius = undefined;
+		this.outerRadius = undefined;
+	}
 
 	/**
-	 * @private
+	 * @protected
 	 */
-	_getIndexScaleId: function() {
+	getIndexScaleId() {
 		return this._cachedMeta.rAxisID;
-	},
+	}
 
 	/**
-	 * @private
+	 * @protected
 	 */
-	_getValueScaleId: function() {
+	getValueScaleId() {
 		return this._cachedMeta.rAxisID;
-	},
+	}
 
-	update: function(mode) {
+	update(mode) {
 		const arcs = this._cachedMeta.data;
 
 		this._updateRadius();
 		this.updateElements(arcs, 0, mode);
-	},
+	}
 
 	/**
 	 * @private
 	 */
-	_updateRadius: function() {
-		var me = this;
-		var chart = me.chart;
-		var chartArea = chart.chartArea;
-		var opts = chart.options;
-		var minSize = Math.min(chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
+	_updateRadius() {
+		const me = this;
+		const chart = me.chart;
+		const chartArea = chart.chartArea;
+		const opts = chart.options;
+		const minSize = Math.min(chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
 
-		chart.outerRadius = Math.max(minSize / 2, 0);
-		chart.innerRadius = Math.max(opts.cutoutPercentage ? (chart.outerRadius / 100) * (opts.cutoutPercentage) : 1, 0);
-		chart.radiusLength = (chart.outerRadius - chart.innerRadius) / chart.getVisibleDatasetCount();
+		const outerRadius = Math.max(minSize / 2, 0);
+		const innerRadius = Math.max(opts.cutoutPercentage ? (outerRadius / 100) * (opts.cutoutPercentage) : 1, 0);
+		const radiusLength = (outerRadius - innerRadius) / chart.getVisibleDatasetCount();
 
-		me.outerRadius = chart.outerRadius - (chart.radiusLength * me.index);
-		me.innerRadius = me.outerRadius - chart.radiusLength;
-	},
+		me.outerRadius = outerRadius - (radiusLength * me.index);
+		me.innerRadius = me.outerRadius - radiusLength;
+	}
 
-	updateElements: function(arcs, start, mode) {
+	updateElements(arcs, start, mode) {
 		const me = this;
 		const reset = mode === 'reset';
 		const chart = me.chart;
@@ -191,45 +180,45 @@ export default DatasetController.extend({
 				outerRadius,
 				startAngle,
 				endAngle,
-				options: me._resolveDataElementOptions(index)
+				options: me.resolveDataElementOptions(index)
 			};
 
-			me._updateElement(arc, index, properties, mode);
+			me.updateElement(arc, index, properties, mode);
 		}
-	},
+	}
 
-	countVisibleElements: function() {
-		var dataset = this.getDataset();
-		var meta = this._cachedMeta;
-		var count = 0;
+	countVisibleElements() {
+		const dataset = this.getDataset();
+		const meta = this._cachedMeta;
+		let count = 0;
 
-		meta.data.forEach(function(element, index) {
+		meta.data.forEach((element, index) => {
 			if (!isNaN(dataset.data[index]) && !element.hidden) {
 				count++;
 			}
 		});
 
 		return count;
-	},
+	}
 
 	/**
 	 * @private
 	 */
-	_computeAngle: function(index) {
-		var me = this;
-		var meta = me._cachedMeta;
-		var count = meta.count;
-		var dataset = me.getDataset();
+	_computeAngle(index) {
+		const me = this;
+		const meta = me._cachedMeta;
+		const count = meta.count;
+		const dataset = me.getDataset();
 
 		if (isNaN(dataset.data[index]) || meta.data[index].hidden) {
 			return 0;
 		}
 
 		// Scriptable options
-		var context = {
+		const context = {
 			chart: me.chart,
 			dataIndex: index,
-			dataset: dataset,
+			dataset,
 			datasetIndex: me.index
 		};
 
@@ -238,4 +227,16 @@ export default DatasetController.extend({
 			(2 * Math.PI) / count
 		], context, index);
 	}
-});
+}
+
+PolarAreaController.prototype.dataElementType = Arc;
+
+PolarAreaController.prototype.dataElementOptions = [
+	'backgroundColor',
+	'borderColor',
+	'borderWidth',
+	'borderAlign',
+	'hoverBackgroundColor',
+	'hoverBorderColor',
+	'hoverBorderWidth'
+];

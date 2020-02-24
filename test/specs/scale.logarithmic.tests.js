@@ -679,7 +679,7 @@ describe('Logarithmic Scale tests', function() {
 			}
 		});
 
-		expect(getLabels(chart.scales.y)).toEqual(['8e+1', '7e+1', '6e+1', '5e+1', '4e+1', '3e+1', '2e+1', '1e+1', '9e+0', '8e+0', '7e+0', '6e+0', '5e+0', '4e+0', '3e+0', '2e+0', '1e+0']);
+		expect(getLabels(chart.scales.y)).toEqual(['80', '70', '60', '50', '40', '30', '20', '10', '9', '8', '7', '6', '5', '4', '3', '2', '1']);
 	});
 
 	it('should build labels using the user supplied callback', function() {
@@ -842,7 +842,7 @@ describe('Logarithmic Scale tests', function() {
 			scaleConfig[setup.axis] = {
 				type: 'logarithmic'
 			};
-			Chart.helpers.extend(scaleConfig, setup.scale);
+			Object.assign(scaleConfig, setup.scale);
 			scaleConfig[setup.axis].type = 'logarithmic';
 
 			var description = 'dataset has stack option and ' + setup.describe
@@ -987,9 +987,9 @@ describe('Logarithmic Scale tests', function() {
 								data: setup.dataset
 							}],
 						};
-						Chart.helpers.extend(xConfig, setup.scale);
-						Chart.helpers.extend(yConfig, setup.scale);
-						Chart.helpers.extend(data, setup.data || {});
+						Object.assign(xConfig, setup.scale);
+						Object.assign(yConfig, setup.scale);
+						Object.assign(data, setup.data || {});
 						this.chart = window.acquireChart({
 							type: 'line',
 							data: data,
@@ -1109,9 +1109,9 @@ describe('Logarithmic Scale tests', function() {
 								data: setup.dataset
 							}],
 						};
-						Chart.helpers.extend(xConfig, setup.scale);
-						Chart.helpers.extend(yConfig, setup.scale);
-						Chart.helpers.extend(data, setup.data || {});
+						Object.assign(xConfig, setup.scale);
+						Object.assign(yConfig, setup.scale);
+						Object.assign(data, setup.data || {});
 						this.chart = window.acquireChart({
 							type: 'line',
 							data: data,

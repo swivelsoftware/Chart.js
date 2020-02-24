@@ -1,33 +1,22 @@
-'use strict';
-
-import color from 'chartjs-color';
+/* eslint-disable import/no-namespace */
 
 import * as coreHelpers from './helpers.core';
 import * as canvas from './helpers.canvas';
 import * as curve from './helpers.curve';
 import * as dom from './helpers.dom';
-import * as easing from './helpers.easing';
+import effects from './helpers.easing';
 import * as options from './helpers.options';
 import * as math from './helpers.math';
 import * as rtl from './helpers.rtl';
 
-const colorHelper =
-	function(value) {
-		if (value instanceof CanvasGradient || value instanceof CanvasPattern) {
-			// TODO: figure out what this should be. Previously returned
-			// the default color
-			return value;
-		}
-
-		return color(value);
-	};
+import {color, getHoverColor} from './helpers.color';
 
 export default {
 	...coreHelpers,
 	canvas,
 	curve,
 	dom,
-	easing,
+	easing: {effects},
 	options,
 	math,
 	rtl,
@@ -42,13 +31,9 @@ export default {
 		return window.requestAnimationFrame;
 	}()),
 	// -- Canvas methods
-	fontString: function(pixelSize, fontStyle, fontFamily) {
+	fontString(pixelSize, fontStyle, fontFamily) {
 		return fontStyle + ' ' + pixelSize + 'px ' + fontFamily;
 	},
-	color: colorHelper,
-	getHoverColor: function(colorValue) {
-		return (colorValue instanceof CanvasPattern || colorValue instanceof CanvasGradient) ?
-			colorValue :
-			colorHelper(colorValue).saturate(0.5).darken(0.1).rgbString();
-	}
+	color,
+	getHoverColor
 };

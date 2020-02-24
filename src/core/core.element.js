@@ -1,16 +1,21 @@
-'use strict';
-
-import {extend, inherits} from '../helpers/helpers.core';
+import {inherits} from '../helpers/helpers.core';
 import {isNumber} from '../helpers/helpers.math';
 
-class Element {
+export default class Element {
 
-	constructor(configuration) {
-		if (configuration) {
-			extend(this, configuration);
+	static extend = inherits;
+
+	/**
+	 * @param {object} [cfg] optional configuration
+	 */
+	constructor(cfg) {
+		this.x = undefined;
+		this.y = undefined;
+		this.hidden = undefined;
+
+		if (cfg) {
+			Object.assign(this, cfg);
 		}
-
-		// this.hidden = false; we assume Element has an attribute called hidden, but do not initialize to save memory
 	}
 
 	tooltipPosition() {
@@ -24,6 +29,3 @@ class Element {
 		return isNumber(this.x) && isNumber(this.y);
 	}
 }
-
-Element.extend = inherits;
-export default Element;

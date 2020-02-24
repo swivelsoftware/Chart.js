@@ -1,10 +1,11 @@
-'use strict';
-
 import {isNullOrUndef, valueOrDefault} from '../helpers/helpers.core';
 import {almostEquals, almostWhole, log10, _decimalPlaces, _setMinAndMaxByKey, sign} from '../helpers/helpers.math';
 import Scale from '../core/core.scale';
 
-// Implementation of the nice number algorithm used in determining where axis labels will go
+/**
+ * Implementation of the nice number algorithm used in determining where axis labels will go
+ * @return {number}
+ */
 function niceNum(range, round) {
 	const exponent = Math.floor(log10(range));
 	const fraction = range / Math.pow(10, exponent);
@@ -37,7 +38,7 @@ function niceNum(range, round) {
  * Generate a set of linear ticks
  * @param generationOptions the options used to generate the ticks
  * @param dataRange the range of the data
- * @returns {number[]} array of tick values
+ * @returns {object[]} array of tick objects
  */
 function generateTicks(generationOptions, dataRange) {
 	const ticks = [];
@@ -97,7 +98,7 @@ function generateTicks(generationOptions, dataRange) {
 	niceMin = Math.round(niceMin * factor) / factor;
 	niceMax = Math.round(niceMax * factor) / factor;
 	ticks.push({value: isNullOrUndef(min) ? niceMin : min});
-	for (var j = 1; j < numSpaces; ++j) {
+	for (let j = 1; j < numSpaces; ++j) {
 		ticks.push({value: Math.round((niceMin + j * spacing) * factor) / factor});
 	}
 	ticks.push({value: isNullOrUndef(max) ? niceMax : max});
@@ -105,12 +106,27 @@ function generateTicks(generationOptions, dataRange) {
 	return ticks;
 }
 
-class LinearScaleBase extends Scale {
-	_parse(raw, index) { // eslint-disable-line no-unused-vars
+export default class LinearScaleBase extends Scale {
+
+	constructor(cfg) {
+		super(cfg);
+
+		/** @type {number} */
+		this.start = undefined;
+		/** @type {number} */
+		this.end = undefined;
+		/** @type {number} */
+		this._startValue = undefined;
+		/** @type {number} */
+		this._endValue = undefined;
+		this._valueRange = 0;
+	}
+
+	parse(raw, index) { // eslint-disable-line no-unused-vars
 		if (isNullOrUndef(raw)) {
 			return NaN;
 		}
-		if ((typeof raw === 'number' || raw instanceof Number) && !isFinite(raw)) {
+		if ((typeof raw === 'number' || raw instanceof Number) && !isFinite(+raw)) {
 			return NaN;
 		}
 
@@ -186,13 +202,14 @@ class LinearScaleBase extends Scale {
 	getTickLimit() {
 		const me = this;
 		const tickOpts = me.options.ticks;
+		// eslint-disable-next-line prefer-const
 		let {maxTicksLimit, stepSize} = tickOpts;
 		let maxTicks;
 
 		if (stepSize) {
 			maxTicks = Math.ceil(me.max / stepSize) - Math.floor(me.min / stepSize) + 1;
 		} else {
-			maxTicks = me._computeTickLimit();
+			maxTicks = me.computeTickLimit();
 			maxTicksLimit = maxTicksLimit || 11;
 		}
 
@@ -203,11 +220,17 @@ class LinearScaleBase extends Scale {
 		return maxTicks;
 	}
 
-	_computeTickLimit() {
+	/**
+	 * @protected
+	 */
+	computeTickLimit() {
 		return Number.POSITIVE_INFINITY;
 	}
 
-	_handleDirectionalChanges(ticks) {
+	/**
+	 * @protected
+	 */
+	handleDirectionalChanges(ticks) {
 		return ticks;
 	}
 
@@ -224,7 +247,7 @@ class LinearScaleBase extends Scale {
 		maxTicks = Math.max(2, maxTicks);
 
 		const numericGeneratorOptions = {
-			maxTicks: maxTicks,
+			maxTicks,
 			min: opts.min,
 			max: opts.max,
 			precision: tickOpts.precision,
@@ -232,7 +255,7 @@ class LinearScaleBase extends Scale {
 		};
 		let ticks = generateTicks(numericGeneratorOptions, me);
 
-		ticks = me._handleDirectionalChanges(ticks);
+		ticks = me.handleDirectionalChanges(ticks);
 
 		// At this point, we need to update our max and min given the tick values since we have expanded the
 		// range of the scale
@@ -251,13 +274,16 @@ class LinearScaleBase extends Scale {
 		return ticks;
 	}
 
-	_configure() {
+	/**
+	 * @protected
+	 */
+	configure() {
 		const me = this;
 		const ticks = me.ticks;
 		let start = me.min;
 		let end = me.max;
 
-		Scale.prototype._configure.call(me);
+		super.configure();
 
 		if (me.options.offset && ticks.length) {
 			const offset = (end - start) / Math.max(ticks.length - 1, 1) / 2;
@@ -270,8 +296,6 @@ class LinearScaleBase extends Scale {
 	}
 
 	getLabelForValue(value) {
-		return new Intl.NumberFormat().format(value);
+		return new Intl.NumberFormat(this.options.locale).format(value);
 	}
 }
-
-export default LinearScaleBase;

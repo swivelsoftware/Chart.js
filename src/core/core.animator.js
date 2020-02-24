@@ -1,6 +1,8 @@
-'use strict';
+import helpers from '../helpers/index';
 
-import helpers from '../helpers';
+/**
+ * @typedef { import("./core.controller").default } Chart
+ */
 
 function drawFPS(chart, count, date, lastDate) {
 	const fps = (1000 / (date - lastDate)) | 0;
@@ -16,11 +18,15 @@ function drawFPS(chart, count, date, lastDate) {
 	ctx.restore();
 }
 
-class Animator {
+/**
+ * Please use the module's default export which provides a singleton instance
+ */
+export class Animator {
 	constructor() {
 		this._request = null;
 		this._charts = new Map();
 		this._running = false;
+		this._lastDate = undefined;
 	}
 
 	/**
@@ -31,7 +37,7 @@ class Animator {
 		const numSteps = anims.duration;
 
 		callbacks.forEach(fn => fn({
-			chart: chart,
+			chart,
 			numSteps,
 			currentStep: date - anims.start
 		}));
@@ -48,7 +54,7 @@ class Animator {
 		}
 		me._running = true;
 
-		me._request = helpers.requestAnimFrame.call(window, function() {
+		me._request = helpers.requestAnimFrame.call(window, () => {
 			me._update();
 			me._request = null;
 
@@ -66,7 +72,7 @@ class Animator {
 		const date = Date.now();
 		let remaining = 0;
 
-		me._charts.forEach(function(anims, chart) {
+		me._charts.forEach((anims, chart) => {
 			if (!anims.running || !anims.items.length) {
 				return;
 			}
@@ -91,9 +97,10 @@ class Animator {
 
 			if (draw) {
 				chart.draw();
-				if (chart.options.animation.debug) {
-					drawFPS(chart, items.length, date, me._lastDate);
-				}
+			}
+
+			if (chart.options.animation.debug) {
+				drawFPS(chart, items.length, date, me._lastDate);
 			}
 
 			me._notify(chart, anims, date, 'progress');
@@ -113,6 +120,9 @@ class Animator {
 		}
 	}
 
+	/**
+	 * @private
+	 */
 	_getAnims(chart) {
 		const charts = this._charts;
 		let anims = charts.get(chart);
@@ -203,8 +213,15 @@ class Animator {
 		anims.items = [];
 		this._notify(chart, anims, Date.now(), 'complete');
 	}
+
+	/**
+	 * Remove chart from Animator
+	 * @param {Chart} chart
+	 */
+	remove(chart) {
+		return this._charts.delete(chart);
+	}
 }
 
-const instance = new Animator();
-
-export default instance;
+// singleton instance
+export default new Animator();

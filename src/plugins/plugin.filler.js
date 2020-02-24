@@ -4,16 +4,14 @@
  * @see https://github.com/chartjs/Chart.js/issues/2440#issuecomment-256461897
  */
 
-'use strict';
-
 import defaults from '../core/core.defaults';
 import Line from '../elements/element.line';
 import {_boundSegment, _boundSegments} from '../helpers/helpers.segment';
 import {clipArea, unclipArea} from '../helpers/helpers.canvas';
-import {valueOrDefault, isFinite, isArray, extend} from '../helpers/helpers.core';
+import {isArray, isFinite, valueOrDefault} from '../helpers/helpers.core';
 import {_normalizeAngle} from '../helpers/helpers.math';
 
-defaults._set('plugins', {
+defaults.set('plugins', {
 	filler: {
 		propagate: true
 	}
@@ -47,7 +45,7 @@ function parseFillOption(line) {
 // @todo if (fill[0] === '#')
 function decodeFill(line, index, count) {
 	const fill = parseFillOption(line);
-	let target = parseFloat(fill, 10);
+	let target = parseFloat(fill);
 
 	if (isFinite(target) && Math.floor(target) === target) {
 		if (fill[0] === '-' || fill[0] === '+') {
@@ -66,8 +64,8 @@ function decodeFill(line, index, count) {
 
 function computeLinearBoundary(source) {
 	const {scale = {}, fill} = source;
-	var target = null;
-	var horizontal;
+	let target = null;
+	let horizontal;
 
 	if (fill === 'start') {
 		target = scale.bottom;
@@ -91,7 +89,9 @@ function computeLinearBoundary(source) {
 // TODO: use elements.Arc instead
 class simpleArc {
 	constructor(opts) {
-		extend(this, opts);
+		this.x = opts.x;
+		this.y = opts.y;
+		this.radius = opts.radius;
 	}
 
 	pathSegment(ctx, bounds, opts) {
@@ -121,16 +121,12 @@ class simpleArc {
 function computeCircularBoundary(source) {
 	const {scale, fill} = source;
 	const options = scale.options;
-	const length = scale._getLabels().length;
+	const length = scale.getLabels().length;
 	const target = [];
-	let start, end, value, i, center;
-
-	start = options.reverse ? scale.max : scale.min;
-	end = options.reverse ? scale.min : scale.max;
-
-	value = fill === 'start' ? start
-		: fill === 'end' ? end
-		: scale.getBaseValue();
+	const start = options.reverse ? scale.max : scale.min;
+	const end = options.reverse ? scale.min : scale.max;
+	const value = fill === 'start' ? start : fill === 'end' ? end : scale.getBaseValue();
+	let i, center;
 
 	if (options.gridLines.circular) {
 		center = scale.getPointPositionForValue(0, start);
@@ -148,7 +144,7 @@ function computeCircularBoundary(source) {
 }
 
 function computeBoundary(source) {
-	var scale = source.scale || {};
+	const scale = source.scale || {};
 
 	if (scale.getPointPositionForValue) {
 		return computeCircularBoundary(source);
@@ -192,6 +188,7 @@ function getTarget(source) {
 
 	if (isArray(boundary)) {
 		_loop = true;
+		// @ts-ignore
 		points = boundary;
 	} else {
 		points = pointsFromSegments(boundary, line);
@@ -207,10 +204,10 @@ function getTarget(source) {
 }
 
 function resolveTarget(sources, index, propagate) {
-	var source = sources[index];
-	var fill = source.fill;
-	var visited = [index];
-	var target;
+	const source = sources[index];
+	let fill = source.fill;
+	const visited = [index];
+	let target;
 
 	if (!propagate) {
 		return fill;
@@ -268,6 +265,7 @@ function _getEdge(a, b, prop, fn) {
 }
 
 function _segments(line, target, property) {
+	const segments = line.segments;
 	const points = line.points;
 	const tpoints = target.points;
 	const parts = [];
@@ -283,7 +281,8 @@ function _segments(line, target, property) {
 		}
 	}
 
-	for (let segment of line.segments) {
+	for (let i = 0; i < segments.length; i++) {
+		const segment = segments[i];
 		const bounds = getBounds(property, points[segment.start], points[segment.end], segment.loop);
 
 		if (!target.segments) {
@@ -301,13 +300,14 @@ function _segments(line, target, property) {
 		// Get all segments from `target` that intersect the bounds of current segment of `line`
 		const subs = _boundSegments(target, bounds);
 
-		for (let sub of subs) {
+		for (let j = 0; j < subs.length; ++j) {
+			const sub = subs[j];
 			const subBounds = getBounds(property, tpoints[sub.start], tpoints[sub.end], sub.loop);
 			const fillSources = _boundSegment(segment, points, subBounds);
 
-			for (let source of fillSources) {
+			for (let k = 0; k < fillSources.length; k++) {
 				parts.push({
-					source,
+					source: fillSources[k],
 					target: sub,
 					start: {
 						[property]: _getEdge(bounds, subBounds, 'start', Math.max)
@@ -354,14 +354,15 @@ function _fill(ctx, cfg) {
 
 		ctx.beginPath();
 
-		let loop = !!line.pathSegment(ctx, src);
-		if (loop) {
+		const lineLoop = !!line.pathSegment(ctx, src);
+		if (lineLoop) {
 			ctx.closePath();
 		} else {
 			interpolatedLineTo(ctx, target, end, property);
 		}
 
-		loop &= target.pathSegment(ctx, tgt, {move: loop, reverse: true});
+		const targetLoop = !!target.pathSegment(ctx, tgt, {move: lineLoop, reverse: true});
+		const loop = lineLoop && targetLoop;
 		if (!loop) {
 			interpolatedLineTo(ctx, target, start, property);
 		}
@@ -394,11 +395,11 @@ function doFill(ctx, cfg) {
 export default {
 	id: 'filler',
 
-	afterDatasetsUpdate: function(chart, options) {
-		var count = (chart.data.datasets || []).length;
-		var propagate = options.propagate;
-		var sources = [];
-		var meta, i, line, source;
+	afterDatasetsUpdate(chart, options) {
+		const count = (chart.data.datasets || []).length;
+		const propagate = options.propagate;
+		const sources = [];
+		let meta, i, line, source;
 
 		for (i = 0; i < count; ++i) {
 			meta = chart.getDatasetMeta(i);
@@ -409,9 +410,10 @@ export default {
 				source = {
 					visible: chart.isDatasetVisible(i),
 					fill: decodeFill(line, i, count),
-					chart: chart,
+					chart,
 					scale: meta.vScale,
-					line
+					line,
+					target: undefined
 				};
 			}
 
@@ -430,10 +432,9 @@ export default {
 		}
 	},
 
-	beforeDatasetsDraw: function(chart) {
-		const metasets = chart._getSortedVisibleDatasetMetas();
+	beforeDatasetsDraw(chart) {
+		const metasets = chart.getSortedVisibleDatasetMetas();
 		const area = chart.chartArea;
-		const ctx = chart.ctx;
 		let i, meta;
 
 		for (i = metasets.length - 1; i >= 0; --i) {
@@ -443,23 +444,26 @@ export default {
 				meta.line.updateControlPoints(area);
 			}
 		}
+	},
 
-		for (i = metasets.length - 1; i >= 0; --i) {
-			meta = metasets[i].$filler;
+	beforeDatasetDraw(chart, args) {
+		const area = chart.chartArea;
+		const ctx = chart.ctx;
+		const meta = args.meta.$filler;
 
-			if (!meta || meta.fill === false) {
-				continue;
-			}
-			const {line, target, scale} = meta;
-			const lineOpts = line.options;
-			const fillOption = lineOpts.fill;
-			const color = lineOpts.backgroundColor || defaults.color;
-			const {above = color, below = color} = fillOption || {};
-			if (target && line.points.length) {
-				clipArea(ctx, area);
-				doFill(ctx, {line, target, above, below, area, scale});
-				unclipArea(ctx);
-			}
+		if (!meta || meta.fill === false) {
+			return;
+		}
+
+		const {line, target, scale} = meta;
+		const lineOpts = line.options;
+		const fillOption = lineOpts.fill;
+		const color = lineOpts.backgroundColor || defaults.color;
+		const {above = color, below = color} = fillOption || {};
+		if (target && line.points.length) {
+			clipArea(ctx, area);
+			doFill(ctx, {line, target, above, below, area, scale});
+			unclipArea(ctx);
 		}
 	}
 };

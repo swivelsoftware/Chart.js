@@ -1,9 +1,7 @@
-'use strict';
-
 import BarController from './controller.bar';
 import defaults from '../core/core.defaults';
 
-defaults._set('horizontalBar', {
+defaults.set('horizontalBar', {
 	hover: {
 		mode: 'index',
 		axis: 'y'
@@ -42,18 +40,19 @@ defaults._set('horizontalBar', {
 	}
 });
 
-export default BarController.extend({
-	/**
-	 * @private
-	 */
-	_getValueScaleId: function() {
-		return this._cachedMeta.xAxisID;
-	},
+export default class HorizontalBarController extends BarController {
 
 	/**
-	 * @private
+	 * @protected
 	 */
-	_getIndexScaleId: function() {
+	getValueScaleId() {
+		return this._cachedMeta.xAxisID;
+	}
+
+	/**
+	 * @protected
+	 */
+	getIndexScaleId() {
 		return this._cachedMeta.yAxisID;
 	}
-});
+}

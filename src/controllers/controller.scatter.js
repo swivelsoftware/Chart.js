@@ -1,9 +1,7 @@
-'use strict';
-
 import LineController from './controller.line';
 import defaults from '../core/core.defaults';
 
-defaults._set('scatter', {
+defaults.set('scatter', {
 	scales: {
 		x: {
 			type: 'linear',
@@ -21,10 +19,10 @@ defaults._set('scatter', {
 
 	tooltips: {
 		callbacks: {
-			title: function() {
+			title() {
 				return '';     // doesn't make sense for scatter since data are formatted as a point
 			},
-			label: function(item) {
+			label(item) {
 				return '(' + item.label + ', ' + item.value + ')';
 			}
 		}

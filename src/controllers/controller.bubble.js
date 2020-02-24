@@ -1,13 +1,9 @@
-'use strict';
-
 import DatasetController from '../core/core.datasetController';
 import defaults from '../core/core.defaults';
 import Point from '../elements/element.point';
-import helpers from '../helpers';
+import {resolve} from '../helpers/helpers.options';
 
-const resolve = helpers.options.resolve;
-
-defaults._set('bubble', {
+defaults.set('bubble', {
 	animation: {
 		numbers: {
 			properties: ['x', 'y', 'borderWidth', 'radius']
@@ -26,7 +22,7 @@ defaults._set('bubble', {
 
 	tooltips: {
 		callbacks: {
-			title: function() {
+			title() {
 				// Title doesn't make sense for scatter since we format the data as a point
 				return '';
 			}
@@ -34,48 +30,31 @@ defaults._set('bubble', {
 	}
 });
 
-export default DatasetController.extend({
-	/**
-	 * @protected
-	 */
-	dataElementType: Point,
-
-	/**
-	 * @private
-	 */
-	_dataElementOptions: [
-		'backgroundColor',
-		'borderColor',
-		'borderWidth',
-		'hitRadius',
-		'radius',
-		'pointStyle',
-		'rotation'
-	],
+export default class BubbleController extends DatasetController {
 
 	/**
 	 * Parse array of objects
-	 * @private
+	 * @protected
 	 */
-	_parseObjectData: function(meta, data, start, count) {
+	parseObjectData(meta, data, start, count) {
 		const {xScale, yScale} = meta;
 		const parsed = [];
 		let i, ilen, item;
 		for (i = start, ilen = start + count; i < ilen; ++i) {
 			item = data[i];
 			parsed.push({
-				x: xScale._parseObject(item, 'x', i),
-				y: yScale._parseObject(item, 'y', i),
+				x: xScale.parseObject(item, 'x', i),
+				y: yScale.parseObject(item, 'y', i),
 				_custom: item && item.r && +item.r
 			});
 		}
 		return parsed;
-	},
+	}
 
 	/**
-	 * @private
+	 * @protected
 	 */
-	_getMaxOverflow: function() {
+	getMaxOverflow() {
 		const me = this;
 		const meta = me._cachedMeta;
 		let i = (meta.data || []).length - 1;
@@ -84,16 +63,16 @@ export default DatasetController.extend({
 			max = Math.max(max, me.getStyle(i, true).radius);
 		}
 		return max > 0 && max;
-	},
+	}
 
 	/**
-	 * @private
+	 * @protected
 	 */
-	_getLabelAndValue: function(index) {
+	getLabelAndValue(index) {
 		const me = this;
 		const meta = me._cachedMeta;
 		const {xScale, yScale} = meta;
-		const parsed = me._getParsed(index);
+		const parsed = me.getParsed(index);
 		const x = xScale.getLabelForValue(parsed.x);
 		const y = yScale.getLabelForValue(parsed.y);
 		const r = parsed._custom;
@@ -102,34 +81,28 @@ export default DatasetController.extend({
 			label: meta.label,
 			value: '(' + x + ', ' + y + (r ? ', ' + r : '') + ')'
 		};
-	},
+	}
 
-	/**
-	 * @protected
-	 */
-	update: function(mode) {
+	update(mode) {
 		const me = this;
 		const points = me._cachedMeta.data;
 
 		// Update Points
 		me.updateElements(points, 0, mode);
-	},
+	}
 
-	/**
-	 * @protected
-	 */
-	updateElements: function(points, start, mode) {
+	updateElements(points, start, mode) {
 		const me = this;
 		const reset = mode === 'reset';
 		const {xScale, yScale} = me._cachedMeta;
-		const firstOpts = me._resolveDataElementOptions(start, mode);
-		const sharedOptions = me._getSharedOptions(mode, points[start], firstOpts);
-		const includeOptions = me._includeOptions(mode, sharedOptions);
+		const firstOpts = me.resolveDataElementOptions(start, mode);
+		const sharedOptions = me.getSharedOptions(mode, points[start], firstOpts);
+		const includeOptions = me.includeOptions(mode, sharedOptions);
 
 		for (let i = 0; i < points.length; i++) {
 			const point = points[i];
 			const index = start + i;
-			const parsed = !reset && me._getParsed(index);
+			const parsed = !reset && me.getParsed(index);
 			const x = reset ? xScale.getPixelForDecimal(0.5) : xScale.getPixelForValue(parsed.x);
 			const y = reset ? yScale.getBasePixel() : yScale.getPixelForValue(parsed.y);
 			const properties = {
@@ -139,40 +112,40 @@ export default DatasetController.extend({
 			};
 
 			if (includeOptions) {
-				properties.options = me._resolveDataElementOptions(i, mode);
+				properties.options = me.resolveDataElementOptions(i, mode);
 
 				if (reset) {
 					properties.options.radius = 0;
 				}
 			}
 
-			me._updateElement(point, index, properties, mode);
+			me.updateElement(point, index, properties, mode);
 		}
 
-		me._updateSharedOptions(sharedOptions, mode);
-	},
+		me.updateSharedOptions(sharedOptions, mode);
+	}
 
 	/**
-	 * @private
+	 * @protected
 	 */
-	_resolveDataElementOptions: function(index, mode) {
-		var me = this;
-		var chart = me.chart;
-		var dataset = me.getDataset();
-		var parsed = me._getParsed(index);
-		var values = DatasetController.prototype._resolveDataElementOptions.apply(me, arguments);
+	resolveDataElementOptions(index, mode) {
+		const me = this;
+		const chart = me.chart;
+		const dataset = me.getDataset();
+		const parsed = me.getParsed(index);
+		let values = super.resolveDataElementOptions(index, mode);
 
 		// Scriptable options
-		var context = {
-			chart: chart,
+		const context = {
+			chart,
 			dataIndex: index,
-			dataset: dataset,
+			dataset,
 			datasetIndex: me.index
 		};
 
 		// In case values were cached (and thus frozen), we need to clone the values
 		if (values.$shared) {
-			values = helpers.extend({}, values, {$shared: false});
+			values = Object.assign({}, values, {$shared: false});
 		}
 
 
@@ -188,4 +161,16 @@ export default DatasetController.extend({
 
 		return values;
 	}
-});
+}
+
+BubbleController.prototype.dataElementType = Point;
+
+BubbleController.prototype.dataElementOptions = [
+	'backgroundColor',
+	'borderColor',
+	'borderWidth',
+	'hitRadius',
+	'radius',
+	'pointStyle',
+	'rotation'
+];

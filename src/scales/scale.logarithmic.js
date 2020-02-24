@@ -1,5 +1,3 @@
-'use strict';
-
 import {isFinite} from '../helpers/helpers.core';
 import {_setMinAndMaxByKey, log10} from '../helpers/helpers.math';
 import Scale from '../core/core.scale';
@@ -19,7 +17,7 @@ function finiteOrDefault(value, def) {
  * Generate a set of logarithmic ticks
  * @param generationOptions the options used to generate the ticks
  * @param dataRange the range of the data
- * @returns {number[]} array of tick values
+ * @returns {object[]} array of tick objects
  */
 function generateTicks(generationOptions, dataRange) {
 	const endExp = Math.floor(log10(dataRange.max));
@@ -52,16 +50,32 @@ function generateTicks(generationOptions, dataRange) {
 const defaultConfig = {
 	// label settings
 	ticks: {
-		callback: Ticks.formatters.logarithmic,
+		callback: Ticks.formatters.numeric,
 		major: {
 			enabled: true
 		}
 	}
 };
 
-class LogarithmicScale extends Scale {
-	_parse(raw, index) { // eslint-disable-line no-unused-vars
-		const value = LinearScaleBase.prototype._parse.apply(this, arguments);
+export default class LogarithmicScale extends Scale {
+
+	// INTERNAL: static default options, registered in src/index.js
+	static _defaults = defaultConfig;
+
+	constructor(cfg) {
+		super(cfg);
+
+		/** @type {number} */
+		this.start = undefined;
+		/** @type {number} */
+		this.end = undefined;
+		/** @type {number} */
+		this._startValue = undefined;
+		this._valueRange = 0;
+	}
+
+	parse(raw, index) {
+		const value = LinearScaleBase.prototype.parse.apply(this, [raw, index]);
 		if (value === 0) {
 			return undefined;
 		}
@@ -70,7 +84,7 @@ class LogarithmicScale extends Scale {
 
 	determineDataLimits() {
 		const me = this;
-		const minmax = me._getMinMax(true);
+		const minmax = me.getMinMax(true);
 		const min = minmax.min;
 		const max = minmax.max;
 
@@ -135,8 +149,12 @@ class LogarithmicScale extends Scale {
 		return ticks;
 	}
 
+	/**
+	 * @param {number} value
+	 * @return {string}
+	 */
 	getLabelForValue(value) {
-		return value === undefined ? 0 : new Intl.NumberFormat().format(value);
+		return value === undefined ? '0' : new Intl.NumberFormat(this.options.locale).format(value);
 	}
 
 	getPixelForTick(index) {
@@ -147,11 +165,14 @@ class LogarithmicScale extends Scale {
 		return this.getPixelForValue(ticks[index].value);
 	}
 
-	_configure() {
+	/**
+	 * @protected
+	 */
+	configure() {
 		const me = this;
-		let start = me.min;
+		const start = me.min;
 
-		Scale.prototype._configure.call(me);
+		super.configure();
 
 		me._startValue = log10(start);
 		me._valueRange = log10(me.max) - log10(start);
@@ -173,7 +194,3 @@ class LogarithmicScale extends Scale {
 		return Math.pow(10, me._startValue + decimal * me._valueRange);
 	}
 }
-
-// INTERNAL: static default options, registered in src/index.js
-LogarithmicScale._defaults = defaultConfig;
-export default LogarithmicScale;

@@ -4,10 +4,6 @@
  * @private
  */
 
-'use strict';
-
-import {extend} from '../helpers/helpers.core';
-
 /**
  * @return {*}
  */
@@ -28,7 +24,7 @@ function abstract() {
  * @memberof Chart._adapters._date
  */
 
-class DateAdapter {
+export class DateAdapter {
 
 	constructor(options) {
 		this.options = options || {};
@@ -88,7 +84,7 @@ class DateAdapter {
 	/**
 	 * Returns start of `unit` for the given `timestamp`.
 	 * @param {number} timestamp - the input timestamp
-	 * @param {Unit} unit - the unit as string
+	 * @param {Unit|'isoWeek'} unit - the unit as string
 	 * @param {number} [weekday] - the ISO day of the week with 1 being Monday
 	 * and 7 being Sunday (only needed if param *unit* is `isoWeek`).
 	 * @return {number}
@@ -100,7 +96,7 @@ class DateAdapter {
 	/**
 	 * Returns end of `unit` for the given `timestamp`.
 	 * @param {number} timestamp - the input timestamp
-	 * @param {Unit} unit - the unit as string
+	 * @param {Unit|'isoWeek'} unit - the unit as string
 	 * @return {number}
 	 */
 	endOf(timestamp, unit) { // eslint-disable-line no-unused-vars
@@ -110,7 +106,7 @@ class DateAdapter {
 }
 
 DateAdapter.override = function(members) {
-	extend(DateAdapter.prototype, members);
+	Object.assign(DateAdapter.prototype, members);
 };
 
 export default {

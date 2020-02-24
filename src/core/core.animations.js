@@ -1,41 +1,69 @@
-'use strict';
-
 import Animator from './core.animator';
 import Animation from './core.animation';
 import defaults from '../core/core.defaults';
-import {noop, extend, isObject} from '../helpers/helpers.core';
+import {noop, isObject} from '../helpers/helpers.core';
 
-defaults._set('animation', {
+const numbers = ['x', 'y', 'borderWidth', 'radius', 'tension'];
+const colors = ['borderColor', 'backgroundColor'];
+
+defaults.set('animation', {
+	// Plain properties can be overridden in each object
 	duration: 1000,
 	easing: 'easeOutQuart',
+	onProgress: noop,
+	onComplete: noop,
+
+	// Property sets
+	colors: {
+		type: 'color',
+		properties: colors
+	},
+	numbers: {
+		type: 'number',
+		properties: numbers
+	},
+
+	// Update modes. These are overrides / additions to the above animations.
 	active: {
 		duration: 400
 	},
 	resize: {
 		duration: 0
 	},
-	numbers: {
-		type: 'number',
-		properties: ['x', 'y', 'borderWidth', 'radius', 'tension']
+	show: {
+		colors: {
+			type: 'color',
+			properties: colors,
+			from: 'transparent'
+		},
+		visible: {
+			type: 'boolean',
+			duration: 0 // show immediately
+		},
 	},
-	colors: {
-		type: 'color',
-		properties: ['borderColor', 'backgroundColor']
-	},
-	onProgress: noop,
-	onComplete: noop
+	hide: {
+		colors: {
+			type: 'color',
+			properties: colors,
+			to: 'transparent'
+		},
+		visible: {
+			type: 'boolean',
+			easing: 'easeInExpo' // for keeping the dataset visible almost all the way through the animation
+		},
+	}
 });
 
 function copyOptions(target, values) {
-	let oldOpts = target.options;
-	let newOpts = values.options;
+	const oldOpts = target.options;
+	const newOpts = values.options;
 	if (!oldOpts || !newOpts || newOpts.$shared) {
 		return;
 	}
 	if (oldOpts.$shared) {
-		target.options = extend({}, oldOpts, newOpts, {$shared: false});
+		target.options = Object.assign({}, oldOpts, newOpts, {$shared: false});
 	} else {
-		extend(oldOpts, newOpts);
+		Object.assign(oldOpts, newOpts);
 	}
 	delete values.options;
 }
@@ -71,13 +99,13 @@ export default class Animations {
 			if (!isObject(cfg)) {
 				return;
 			}
-			(cfg.properties || [key]).forEach(function(prop) {
+			(cfg.properties || [key]).forEach((prop) => {
 				// Can have only one config per animation.
 				if (!animatedProps.has(prop)) {
-					animatedProps.set(prop, extend({}, animDefaults, cfg));
+					animatedProps.set(prop, Object.assign({}, animDefaults, cfg));
 				} else if (prop === key) {
 					// Single property targetting config wins over multi-targetting.
-					animatedProps.set(prop, extend({}, animatedProps.get(prop), cfg));
+					animatedProps.set(prop, Object.assign({}, animatedProps.get(prop), cfg));
 				}
 			});
 		});
@@ -102,7 +130,7 @@ export default class Animations {
 			if (options.$shared) {
 				// If the current / old options are $shared, meaning other elements are
 				// using the same options, we need to clone to become unique.
-				target.options = options = extend({}, options, {$shared: false, $animations: {}});
+				target.options = options = Object.assign({}, options, {$shared: false, $animations: {}});
 			}
 			animations = this._createAnimations(options, newOptions);
 		} else {
@@ -122,16 +150,20 @@ export default class Animations {
 		let i;
 
 		for (i = props.length - 1; i >= 0; --i) {
-			let prop = props[i];
+			const prop = props[i];
 			if (prop.charAt(0) === '$') {
 				continue;
 			}
 
 			if (prop === 'options') {
-				animations.push.apply(animations, this._animateOptions(target, values));
+				animations.push(...this._animateOptions(target, values));
 				continue;
 			}
-			let value = values[prop];
+			const value = values[prop];
+			let animation = running[prop];
+			if (animation) {
+				animation.cancel();
+			}
 
 			const cfg = animatedProps.get(prop);
 			if (!cfg || !cfg.duration) {
@@ -140,10 +172,6 @@ export default class Animations {
 				continue;
 			}
 
-			let animation = running[prop];
-			if (animation) {
-				animation.cancel();
-			}
 			running[prop] = animation = new Animation(cfg, target, prop, value);
 			animations.push(animation);
 		}
@@ -164,7 +192,7 @@ export default class Animations {
 			copyOptions(target, values);
 			// copyOptions removes the `options` from `values`,
 			// unless it can be directly assigned.
-			extend(target, values);
+			Object.assign(target, values);
 			return;
 		}
 

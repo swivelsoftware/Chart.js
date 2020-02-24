@@ -1,8 +1,8 @@
-/* eslint-env es6 */
+/* eslint-disable import/no-commonjs */
 
-const commonjs = require('rollup-plugin-commonjs');
-const istanbul = require('rollup-plugin-istanbul');
-const resolve = require('rollup-plugin-node-resolve');
+const babel = require('rollup-plugin-babel');
+const commonjs = require('@rollup/plugin-commonjs');
+const resolve = require('@rollup/plugin-node-resolve');
 const builds = require('./rollup.config');
 
 module.exports = function(karma) {
@@ -67,7 +67,8 @@ module.exports = function(karma) {
 		rollupPreprocessor: {
 			plugins: [
 				resolve(),
-				commonjs()
+				babel({exclude: 'node_modules/**'}), // use babel since we have ES proposal features
+				commonjs({exclude: ['src/**', 'test/**']})
 			],
 			output: {
 				name: 'test',
@@ -102,14 +103,5 @@ module.exports = function(karma) {
 				{type: 'lcovonly', subdir: '.'}
 			]
 		};
-		[
-			karma.rollupPreprocessor,
-			karma.customPreprocessors.sources.options
-		].forEach(v => {
-			(v.plugins || (v.plugins = [])).unshift(
-				istanbul({
-					include: 'src/**/*.js'
-				}));
-		});
 	}
 };

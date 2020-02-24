@@ -9,8 +9,8 @@ function isConstrainedValue(value) {
 /**
  * @private
  */
-function _getParentNode(domNode) {
-	var parent = domNode.parentNode;
+export function _getParentNode(domNode) {
+	let parent = domNode.parentNode;
 	if (parent && parent.toString() === '[object ShadowRoot]') {
 		parent = parent.host;
 	}
@@ -19,7 +19,7 @@ function _getParentNode(domNode) {
 
 // Private helper function to convert max-width/max-height values that may be percentages into a number
 function parseMaxStyle(styleValue, node, parentProperty) {
-	var valueInPixels;
+	let valueInPixels;
 	if (typeof styleValue === 'string') {
 		valueInPixels = parseInt(styleValue, 10);
 
@@ -39,24 +39,23 @@ function parseMaxStyle(styleValue, node, parentProperty) {
  * @param {HTMLElement} domNode - the node to check the constraint on
  * @param {string} maxStyle - the style that defines the maximum for the direction we are using ('max-width' / 'max-height')
  * @param {string} percentageProperty - property of parent to use when calculating width as a percentage
+ * @return {number=} number or undefined if no constraint
  * @see {@link https://www.nathanaeljones.com/blog/2013/reading-max-width-cross-browser}
  */
 function getConstraintDimension(domNode, maxStyle, percentageProperty) {
-	var view = document.defaultView;
-	var parentNode = _getParentNode(domNode);
-	var constrainedNode = view.getComputedStyle(domNode)[maxStyle];
-	var constrainedContainer = view.getComputedStyle(parentNode)[maxStyle];
-	var hasCNode = isConstrainedValue(constrainedNode);
-	var hasCContainer = isConstrainedValue(constrainedContainer);
-	var infinity = Number.POSITIVE_INFINITY;
+	const view = document.defaultView;
+	const parentNode = _getParentNode(domNode);
+	const constrainedNode = view.getComputedStyle(domNode)[maxStyle];
+	const constrainedContainer = view.getComputedStyle(parentNode)[maxStyle];
+	const hasCNode = isConstrainedValue(constrainedNode);
+	const hasCContainer = isConstrainedValue(constrainedContainer);
+	const infinity = Number.POSITIVE_INFINITY;
 
 	if (hasCNode || hasCContainer) {
 		return Math.min(
 			hasCNode ? parseMaxStyle(constrainedNode, domNode, percentageProperty) : infinity,
 			hasCContainer ? parseMaxStyle(constrainedContainer, parentNode, percentageProperty) : infinity);
 	}
-
-	return 'none';
 }
 
 export function getStyle(el, property) {
@@ -65,12 +64,12 @@ export function getStyle(el, property) {
 		document.defaultView.getComputedStyle(el, null).getPropertyValue(property);
 }
 
-// returns Number or undefined if no constraint
+/** @return {number=} number or undefined if no constraint */
 function getConstraintWidth(domNode) {
 	return getConstraintDimension(domNode, 'max-width', 'clientWidth');
 }
 
-// returns Number or undefined if no constraint
+/** @return {number=} number or undefined if no constraint */
 function getConstraintHeight(domNode) {
 	return getConstraintDimension(domNode, 'max-height', 'clientHeight');
 }
@@ -85,12 +84,12 @@ function _calculatePadding(container, padding, parentDimension) {
 }
 
 export function getRelativePosition(evt, chart) {
-	var mouseX, mouseY;
-	var e = evt.originalEvent || evt;
-	var canvasElement = evt.target || evt.srcElement;
-	var boundingRect = canvasElement.getBoundingClientRect();
+	let mouseX, mouseY;
+	const e = evt.originalEvent || evt;
+	const canvasElement = evt.target || evt.srcElement;
+	const boundingRect = canvasElement.getBoundingClientRect();
 
-	var touches = e.touches;
+	const touches = e.touches;
 	if (touches && touches.length > 0) {
 		mouseX = touches[0].clientX;
 		mouseY = touches[0].clientY;
@@ -103,12 +102,12 @@ export function getRelativePosition(evt, chart) {
 	// Scale mouse coordinates into canvas coordinates
 	// by following the pattern laid out by 'jerryj' in the comments of
 	// https://www.html5canvastutorials.com/advanced/html5-canvas-mouse-coordinates/
-	var paddingLeft = parseFloat(getStyle(canvasElement, 'padding-left'));
-	var paddingTop = parseFloat(getStyle(canvasElement, 'padding-top'));
-	var paddingRight = parseFloat(getStyle(canvasElement, 'padding-right'));
-	var paddingBottom = parseFloat(getStyle(canvasElement, 'padding-bottom'));
-	var width = boundingRect.right - boundingRect.left - paddingLeft - paddingRight;
-	var height = boundingRect.bottom - boundingRect.top - paddingTop - paddingBottom;
+	const paddingLeft = parseFloat(getStyle(canvasElement, 'padding-left'));
+	const paddingTop = parseFloat(getStyle(canvasElement, 'padding-top'));
+	const paddingRight = parseFloat(getStyle(canvasElement, 'padding-right'));
+	const paddingBottom = parseFloat(getStyle(canvasElement, 'padding-bottom'));
+	const width = boundingRect.right - boundingRect.left - paddingLeft - paddingRight;
+	const height = boundingRect.bottom - boundingRect.top - paddingTop - paddingBottom;
 
 	// We divide by the current device pixel ratio, because the canvas is scaled up by that amount in each direction. However
 	// the backend model is in unscaled coordinates. Since we are going to deal with our model coordinates, we go back here
@@ -122,32 +121,38 @@ export function getRelativePosition(evt, chart) {
 }
 
 export function getMaximumWidth(domNode) {
-	var container = _getParentNode(domNode);
+	const container = _getParentNode(domNode);
 	if (!container) {
-		return domNode.clientWidth;
+		if (typeof domNode.clientWidth === 'number') {
+			return domNode.clientWidth;
+		}
+		return domNode.width;
 	}
 
-	var clientWidth = container.clientWidth;
-	var paddingLeft = _calculatePadding(container, 'padding-left', clientWidth);
-	var paddingRight = _calculatePadding(container, 'padding-right', clientWidth);
+	const clientWidth = container.clientWidth;
+	const paddingLeft = _calculatePadding(container, 'padding-left', clientWidth);
+	const paddingRight = _calculatePadding(container, 'padding-right', clientWidth);
 
-	var w = clientWidth - paddingLeft - paddingRight;
-	var cw = getConstraintWidth(domNode);
+	const w = clientWidth - paddingLeft - paddingRight;
+	const cw = getConstraintWidth(domNode);
 	return isNaN(cw) ? w : Math.min(w, cw);
 }
 
 export function getMaximumHeight(domNode) {
-	var container = _getParentNode(domNode);
+	const container = _getParentNode(domNode);
 	if (!container) {
-		return domNode.clientHeight;
+		if (typeof domNode.clientHeight === 'number') {
+			return domNode.clientHeight;
+		}
+		return domNode.height;
 	}
 
-	var clientHeight = container.clientHeight;
-	var paddingTop = _calculatePadding(container, 'padding-top', clientHeight);
-	var paddingBottom = _calculatePadding(container, 'padding-bottom', clientHeight);
+	const clientHeight = container.clientHeight;
+	const paddingTop = _calculatePadding(container, 'padding-top', clientHeight);
+	const paddingBottom = _calculatePadding(container, 'padding-bottom', clientHeight);
 
-	var h = clientHeight - paddingTop - paddingBottom;
-	var ch = getConstraintHeight(domNode);
+	const h = clientHeight - paddingTop - paddingBottom;
+	const ch = getConstraintHeight(domNode);
 	return isNaN(ch) ? h : Math.min(h, ch);
 }
 
@@ -162,7 +167,7 @@ export function retinaScale(chart, forceRatio) {
 	// If no style has been set on the canvas, the render size is used as display size,
 	// making the chart visually bigger, so let's enforce it to the "correct" values.
 	// See https://github.com/chartjs/Chart.js/issues/3575
-	if (!canvas.style.height && !canvas.style.width) {
+	if (canvas.style && !canvas.style.height && !canvas.style.width) {
 		canvas.style.height = height + 'px';
 		canvas.style.width = width + 'px';
 	}

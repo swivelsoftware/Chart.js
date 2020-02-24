@@ -1,5 +1,3 @@
-'use strict';
-
 import {isFinite, valueOrDefault} from '../helpers/helpers.core';
 import {_parseFont} from '../helpers/helpers.options';
 import LinearScaleBase from './scale.linearbase';
@@ -7,17 +5,21 @@ import Ticks from '../core/core.ticks';
 
 const defaultConfig = {
 	ticks: {
-		callback: Ticks.formatters.linear
+		callback: Ticks.formatters.numeric
 	}
 };
 
-class LinearScale extends LinearScaleBase {
+export default class LinearScale extends LinearScaleBase {
+
+	// INTERNAL: static default options, registered in src/index.js
+	static _defaults = defaultConfig;
+
 	determineDataLimits() {
 		const me = this;
 		const options = me.options;
-		const minmax = me._getMinMax(true);
-		let min = minmax.min;
-		let max = minmax.max;
+		const minmax = me.getMinMax(true);
+		const min = minmax.min;
+		const max = minmax.max;
 
 		me.min = isFinite(min) ? min : valueOrDefault(options.suggestedMin, 0);
 		me.max = isFinite(max) ? max : valueOrDefault(options.suggestedMax, 1);
@@ -31,30 +33,32 @@ class LinearScale extends LinearScaleBase {
 		me.handleTickRangeOptions();
 	}
 
-	// Returns the maximum number of ticks based on the scale dimension
-	_computeTickLimit() {
-		var me = this;
-		var tickFont;
+	/**
+	 * Returns the maximum number of ticks based on the scale dimension
+	 * @protected
+ 	 */
+	computeTickLimit() {
+		const me = this;
 
 		if (me.isHorizontal()) {
 			return Math.ceil(me.width / 40);
 		}
-		tickFont = _parseFont(me.options.ticks);
+		const tickFont = _parseFont(me.options.ticks);
 		return Math.ceil(me.height / tickFont.lineHeight);
 	}
 
 	/**
 	 * Called after the ticks are built
-	 * @private
+	 * @protected
 	 */
-	_handleDirectionalChanges(ticks) {
+	handleDirectionalChanges(ticks) {
 		// If we are in a vertical orientation the top value is the highest so reverse the array
 		return this.isHorizontal() ? ticks : ticks.reverse();
 	}
 
 	// Utils
 	getPixelForValue(value) {
-		var me = this;
+		const me = this;
 		return me.getPixelForDecimal((value - me._startValue) / me._valueRange);
 	}
 
@@ -70,7 +74,3 @@ class LinearScale extends LinearScaleBase {
 		return this.getPixelForValue(ticks[index].value);
 	}
 }
-
-// INTERNAL: static default options, registered in src/index.js
-LinearScale._defaults = defaultConfig;
-export default LinearScale;

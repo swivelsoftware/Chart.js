@@ -1,6 +1,14 @@
 # Chart.js 3.x Migration Guide
 
-Chart.js 3.0 introduces a number of breaking changes. Chart.js 2.0 was released in April 2016. In the years since then, as Chart.js has grown in popularity and feature set, we've learned some lessons about how to better create a charting library. In order to improve performance, offer new features, and improve maintainability, it was necessary to break backwards compatibility, but we aimed to do so only when necessary.
+Chart.js 3.0 introduces a number of breaking changes. Chart.js 2.0 was released in April 2016. In the years since then, as Chart.js has grown in popularity and feature set, we've learned some lessons about how to better create a charting library. In order to improve performance, offer new features, and improve maintainability, it was necessary to break backwards compatibility, but we aimed to do so only when worth the benefit. Some major highlights of v3 include:
+
+* Large [performance](../general/performance.md) improvements including the ability to skip data parsing and render charts in parallel via webworkers
+* Additional configurability and scriptable options with better defaults
+* Completely rewritten animation system
+* Rewritten filler plugin with numerous bug fixes
+* API Documentation generated and verified by TypeScript
+* No more CSS injection
+* Tons of bug fixes
 
 ## End user migration
 
@@ -13,6 +21,7 @@ Chart.js 3.0 introduces a number of breaking changes. Chart.js 2.0 was released 
 
 * `options.ticks.userCallback` was renamed to `options.ticks.callback`
 * `options.ticks.major` and `options.ticks.minor` were replaced with scriptable options for tick fonts.
+* `Chart.Ticks.formatters.linear` and `Chart.Ticks.formatters.logarithmic` were replaced with `Chart.Ticks.formatters.numeric`.
 
 ### Tooltip
 
@@ -59,10 +68,12 @@ Chart.js 3.0 introduces a number of breaking changes. Chart.js 2.0 was released 
 * `scales.[x/y]Axes.ticks.reverse` was renamed to `scales[id].reverse`
 * `scales.[x/y]Axes.ticks.suggestedMax` was renamed to `scales[id].suggestedMax`
 * `scales.[x/y]Axes.ticks.suggestedMin` was renamed to `scales[id].suggestedMin`
+* `scales.[x/y]Axes.ticks.unitStepSize` was removed. Use `scales[id].ticks.stepSize`
 * `scales.[x/y]Axes.time.format` was renamed to `scales[id].time.parser`
 * `scales.[x/y]Axes.time.max` was renamed to `scales[id].max`
 * `scales.[x/y]Axes.time.min` was renamed to `scales[id].min`
-* The dataset option `tension` was renamed to `lineTension`
+* The dataset option `steppedLine` was removed. Use `stepped`
+* The dataset option `tension` was removed. Use `lineTension`
 * To override the platform class used in a chart instance, pass `platform: PlatformClass` in the config object. Note that the class should be passed, not an instance of the class.
 
 ### Animations
@@ -76,9 +87,16 @@ Animation system was completely rewritten in Chart.js v3. Each property can now 
 
 ### Removed
 
+* `Chart.borderWidth`
 * `Chart.chart.chart`
 * `Chart.Controller`
+* `Chart.innerRadius`
+* `Chart.offsetX`
+* `Chart.offsetY`
+* `Chart.outerRadius`
 * `Chart.prototype.generateLegend`
+* `Chart.platform`. It only contained `disableCSSInjection`. CSS is never injected in v3.
+* `Chart.radiusLength`
 * `Chart.types`
 * `Chart.Tooltip` is now provided by the tooltip plugin. The positioners can be accessed from `tooltipPlugin.positioners`
 * `DatasetController.addElementAndReset`
@@ -94,6 +112,7 @@ Animation system was completely rewritten in Chart.js v3. Each property can now 
 * `helpers.findIndex`
 * `helpers.findNextWhere`
 * `helpers.findPreviousWhere`
+* `helpers.extend`. Use `Object.assign` instead
 * `helpers.indexOf`
 * `helpers.lineTo`
 * `helpers.longestText` was moved to the `helpers.canvas` namespace and made private
@@ -110,15 +129,19 @@ Animation system was completely rewritten in Chart.js v3. Each property can now 
 * `helpers.where`
 * `ILayoutItem.minSize`
 * `IPlugin.afterScaleUpdate`. Use `afterLayout` instead
+* `Legend.margins` is now private
 * `Line.calculatePointY`
 * `LogarithmicScale.minNotZero`
 * `Scale.getRightValue`
-* `Scale.handleDirectionalChanges` is now private
 * `Scale.longestLabelWidth`
 * `Scale.longestTextCache` is now private
+* `Scale.margins` is now private
 * `Scale.mergeTicksOptions`
 * `Scale.ticksAsNumbers`
 * `Scale.tickValues` is now private
+* `TimeScale.getLabelCapacity` is now private
+* `TimeScale.tickFormatFunction` is now private
+* `Title.margins` is now private
 * The tooltip item's `x` and `y` attributes were removed. Use `datasetIndex` and `index` to get the element and any corresponding data from it
 
 #### Removal of private APIs
@@ -128,7 +151,7 @@ Animation system was completely rewritten in Chart.js v3. Each property can now 
 * `Element._model`
 * `Element._view`
 * `LogarithmicScale._valueOffset`
-* `TimeScale._getPixelForOffset`
+* `TimeScale.getPixelForOffset`
 * `TimeScale.getLabelWidth`
 * `Tooltip._lastActive`
 
@@ -160,16 +183,39 @@ Animation system was completely rewritten in Chart.js v3. Each property can now 
 * `helpers.toDegrees` was renamed to `helpers.math.toDegrees`
 * `helpers.toRadians` was renamed to `helpers.math.toRadians`
 * `Scale.calculateTickRotation` was renamed to `Scale.calculateLabelRotation`
-* `TimeScale.getLabelCapacity` was renamed to `TimeScale._getLabelCapacity`
-* `TimeScale.getPixelForOffset` was renamed to `TimeScale._getPixelForOffset`
-* `TimeScale.tickFormatFunction` was renamed to `TimeScale._tickFormatFunction`
 * `Tooltip.options.legendColorBackgroupd` was renamed to `Tooltip.options.multiKeyBackground`
 
 #### Renamed private APIs
 
+* `BarController.calculateBarIndexPixels` was renamed to `BarController._calculateBarIndexPixels`
+* `BarController.calculateBarValuePixels` was renamed to `BarController._calculateBarValuePixels`
+* `BarController.getStackCount` was renamed to `BarController._getStackCount`
+* `BarController.getStackIndex` was renamed to `BarController._getStackIndex`
+* `BarController.getRuler` was renamed to `BarController._getRuler`
+* `Chart.destroyDatasetMeta` was renamed to `Chart._destroyDatasetMeta`
+* `Chart.drawDataset` was renamed to `Chart._drawDataset`
+* `Chart.drawDatasets` was renamed to `Chart._drawDatasets`
+* `Chart.eventHandler` was renamed to `Chart._eventHandler`
+* `Chart.handleEvent` was renamed to `Chart._handleEvent`
+* `Chart.initialize` was renamed to `Chart._initialize`
+* `Chart.resetElements` was renamed to `Chart._resetElements`
+* `Chart.unbindEvents` was renamed to `Chart._unbindEvents`
+* `Chart.updateDataset` was renamed to `Chart._updateDataset`
+* `Chart.updateDatasets` was renamed to `Chart._updateDatasets`
+* `Chart.updateLayout` was renamed to `Chart._updateLayout`
+* `DatasetController.destroy` was renamed to `DatasetController._destroy`
+* `DatasetController.insertElements` was renamed to `DatasetController._insertElements`
+* `DatasetController.onDataPop` was renamed to `DatasetController._onDataPop`
+* `DatasetController.onDataPush` was renamed to `DatasetController._onDataPush`
+* `DatasetController.onDataShift` was renamed to `DatasetController._onDataShift`
+* `DatasetController.onDataSplice` was renamed to `DatasetController._onDataSplice`
+* `DatasetController.onDataUnshift` was renamed to `DatasetController._onDataUnshift`
+* `DatasetController.removeElements` was renamed to `DatasetController._removeElements`
+* `DatasetController.resyncElements` was renamed to `DatasetController._resyncElements`
+* `RadialLinearScale.setReductions` was renamed to `RadialLinearScale._setReductions`
+* `Scale.handleMargins` was renamed to `Scale._handleMargins`
 * `helpers._alignPixel` was renamed to `helpers.canvas._alignPixel`
 * `helpers._decimalPlaces` was renamed to `helpers.math._decimalPlaces`
-* `chart.initialize` was renamed to `chart._initialize` (labeled as private but not named as such)
 
 ### Changed
 
@@ -217,6 +263,6 @@ Animation system was completely rewritten in Chart.js v3. Each property can now 
 
 #### Platform
 
-* `Chart.platform` is no longer the platform object used by charts. It contains only a single configuration option, `disableCSSInjection`. Every chart instance now has a separate platform instance.
+* `Chart.platform` is no longer the platform object used by charts. Every chart instance now has a separate platform instance.
 * `Chart.platforms` is an object that contains two usable platform classes, `BasicPlatform` and `DomPlatform`. It also contains `BasePlatform`, a class that all platforms must extend from.
 * If the canvas passed in is an instance of `OffscreenCanvas`, the `BasicPlatform` is automatically used.

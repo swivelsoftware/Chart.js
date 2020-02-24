@@ -1,5 +1,3 @@
-'use strict';
-
 import Animator from './core.animator';
 import controllers from '../controllers/index';
 import defaults from './core.defaults';
@@ -9,6 +7,13 @@ import layouts from './core.layouts';
 import {BasicPlatform, DomPlatform} from '../platform/platforms';
 import plugins from './core.plugins';
 import scaleService from '../core/core.scaleService';
+import {getMaximumWidth, getMaximumHeight} from '../helpers/helpers.dom';
+// @ts-ignore
+import {version} from '../../package.json';
+
+/**
+ * @typedef { import("../platform/platform.base").IEvent } IEvent
+ */
 
 const valueOrDefault = helpers.valueOrDefault;
 
@@ -61,9 +66,9 @@ function mergeScaleConfig(config, options) {
  * default scale options for the `scales` and `scale` properties, then returns
  * a deep copy of the result, thus doesn't alter inputs.
  */
-function mergeConfig(/* config objects ... */) {
-	return helpers.merge({}, [].slice.call(arguments), {
-		merger: function(key, target, source, options) {
+function mergeConfig(...args/* config objects ... */) {
+	return helpers.merge({}, args, {
+		merger(key, target, source, options) {
 			if (key !== 'scales' && key !== 'scale') {
 				helpers._merger(key, target, source, options);
 			}
@@ -76,7 +81,7 @@ function initConfig(config) {
 
 	// Do NOT use mergeConfig for the data object because this method merges arrays
 	// and so would change references to labels and datasets, preventing data updates.
-	const data = config.data = config.data || {};
+	const data = config.data = config.data || {datasets: [], labels: []};
 	data.datasets = data.datasets || [];
 	data.labels = data.labels || [];
 
@@ -97,9 +102,9 @@ function isAnimationDisabled(config) {
 }
 
 function updateConfig(chart) {
-	var newOptions = chart.options;
+	let newOptions = chart.options;
 
-	helpers.each(chart.scales, function(scale) {
+	helpers.each(chart.scales, (scale) => {
 		layouts.removeBox(chart, scale);
 	});
 
@@ -146,7 +151,7 @@ function onAnimationProgress(ctx) {
 }
 
 function isDomSupported() {
-	return typeof window !== undefined && typeof document !== undefined;
+	return typeof window !== 'undefined' && typeof document !== 'undefined';
 }
 
 /**
@@ -168,40 +173,65 @@ function getCanvas(item) {
 	return item;
 }
 
-class Chart {
+export default class Chart {
+
+	static version = version;
+
+	/**
+	 * NOTE(SB) We actually don't use this container anymore but we need to keep it
+	 * for backward compatibility. Though, it can still be useful for plugins that
+	 * would need to work on multiple charts?!
+	 */
+	static instances = {};
+
 	constructor(item, config) {
 		const me = this;
 
 		config = initConfig(config);
 		const initialCanvas = getCanvas(item);
-		me._initializePlatform(initialCanvas, config);
+		this.platform = me._initializePlatform(initialCanvas, config);
 
 		const context = me.platform.acquireContext(initialCanvas, config);
 		const canvas = context && context.canvas;
 		const height = canvas && canvas.height;
 		const width = canvas && canvas.width;
 
-		me.id = helpers.uid();
-		me.ctx = context;
-		me.canvas = canvas;
-		me.config = config;
-		me.width = width;
-		me.height = height;
-		me.aspectRatio = height ? width / height : null;
-		me.options = config.options;
-		me._bufferedRender = false;
-		me._layers = [];
-		me._metasets = [];
+		this.id = helpers.uid();
+		this.ctx = context;
+		this.canvas = canvas;
+		this.config = config;
+		this.width = width;
+		this.height = height;
+		this.aspectRatio = height ? width / height : null;
+		this.options = config.options;
+		this._bufferedRender = false;
+		this._layers = [];
+		this._metasets = [];
+		this.boxes = [];
+		this.currentDevicePixelRatio = undefined;
+		this.chartArea = undefined;
+		this.data = undefined;
+		this.active = undefined;
+		this.lastActive = undefined;
+		this._lastEvent = undefined;
+		/** @type {{resize?: function}} */
+		this._listeners = {};
+		this._sortedMetasets = [];
+		this._updating = false;
+		this.scales = {};
+		this.scale = undefined;
+		this.$plugins = undefined;
+		this.$proxies = {};
 
 		// Add the chart instance to the global namespace
 		Chart.instances[me.id] = me;
 
 		// Define alias to the config data: `chart.data === chart.config.data`
 		Object.defineProperty(me, 'data', {
-			get: function() {
+			get() {
 				return me.config.data;
 			},
-			set: function(value) {
+			set(value) {
 				me.config.data = value;
 			}
 		});
@@ -231,14 +261,14 @@ class Chart {
 		// Before init plugin notification
 		plugins.notify(me, 'beforeInit');
 
-		helpers.dom.retinaScale(me, me.options.devicePixelRatio);
-
-		me.bindEvents();
-
 		if (me.options.responsive) {
 			// Initial resize before chart draws (must be silent to preserve initial animations).
 			me.resize(true);
+		} else {
+			helpers.dom.retinaScale(me, me.options.devicePixelRatio);
 		}
+
+		me.bindEvents();
 
 		// After init plugin notification
 		plugins.notify(me, 'afterInit');
@@ -250,17 +280,12 @@ class Chart {
 	 * @private
 	 */
 	_initializePlatform(canvas, config) {
-		const me = this;
-
 		if (config.platform) {
-			me.platform = new config.platform();
-		} else if (!isDomSupported()) {
-			me.platform = new BasicPlatform();
-		} else if (window.OffscreenCanvas && canvas instanceof window.OffscreenCanvas) {
-			me.platform = new BasicPlatform();
-		} else {
-			me.platform = new DomPlatform();
+			return new config.platform();
+		} else if (!isDomSupported() || (typeof OffscreenCanvas !== 'undefined' && canvas instanceof OffscreenCanvas)) {
+			return new BasicPlatform();
 		}
+		return new DomPlatform();
 	}
 
 	clear() {
@@ -273,19 +298,25 @@ class Chart {
 		return this;
 	}
 
-	resize(silent) {
+	resize(silent, width, height) {
 		const me = this;
 		const options = me.options;
 		const canvas = me.canvas;
-		const aspectRatio = (options.maintainAspectRatio && me.aspectRatio) || null;
-		const oldRatio = me.currentDevicePixelRatio;
+		const aspectRatio = options.maintainAspectRatio && me.aspectRatio;
 
+		if (width === undefined || height === undefined) {
+			width = getMaximumWidth(canvas);
+			height = getMaximumHeight(canvas);
+		}
 		// the canvas render width and height will be casted to integers so make sure that
 		// the canvas display style uses the same integer values to avoid blurring effect.
 
 		// Set to 0 instead of canvas.size because the size defaults to 300x150 if the element is collapsed
-		const newWidth = Math.max(0, Math.floor(helpers.dom.getMaximumWidth(canvas)));
-		const newHeight = Math.max(0, Math.floor(aspectRatio ? newWidth / aspectRatio : helpers.dom.getMaximumHeight(canvas)));
+		const newWidth = Math.max(0, Math.floor(width));
+		const newHeight = Math.max(0, Math.floor(aspectRatio ? newWidth / aspectRatio : height));
+
+		// detect devicePixelRation changes
+		const oldRatio = me.currentDevicePixelRatio;
 		const newRatio = options.devicePixelRatio || me.platform.getDevicePixelRatio();
 
 		if (me.width === newWidth && me.height === newHeight && oldRatio === newRatio) {
@@ -294,8 +325,10 @@ class Chart {
 
 		canvas.width = me.width = newWidth;
 		canvas.height = me.height = newHeight;
-		canvas.style.width = newWidth + 'px';
-		canvas.style.height = newHeight + 'px';
+		if (canvas.style) {
+			canvas.style.width = newWidth + 'px';
+			canvas.style.height = newHeight + 'px';
+		}
 
 		helpers.dom.retinaScale(me, newRatio);
 
@@ -319,7 +352,7 @@ class Chart {
 		const scalesOptions = options.scales || {};
 		const scaleOptions = options.scale;
 
-		helpers.each(scalesOptions, function(axisOptions, axisID) {
+		helpers.each(scalesOptions, (axisOptions, axisID) => {
 			axisOptions.id = axisID;
 		});
 
@@ -336,7 +369,7 @@ class Chart {
 		const options = me.options;
 		const scaleOpts = options.scales;
 		const scales = me.scales || {};
-		const updated = Object.keys(scales).reduce(function(obj, id) {
+		const updated = Object.keys(scales).reduce((obj, id) => {
 			obj[id] = false;
 			return obj;
 		}, {});
@@ -344,7 +377,7 @@ class Chart {
 
 		if (scaleOpts) {
 			items = items.concat(
-				Object.keys(scaleOpts).map(function(axisID) {
+				Object.keys(scaleOpts).map((axisID) => {
 					const axisOptions = scaleOpts[axisID];
 					const isRadial = axisID.charAt(0).toLowerCase() === 'r';
 					const isHorizontal = axisID.charAt(0).toLowerCase() === 'x';
@@ -357,7 +390,7 @@ class Chart {
 			);
 		}
 
-		helpers.each(items, function(item) {
+		helpers.each(items, (item) => {
 			const scaleOptions = item.options;
 			const id = scaleOptions.id;
 			const scaleType = valueOrDefault(scaleOptions.type, item.dtype);
@@ -379,7 +412,7 @@ class Chart {
 					return;
 				}
 				scale = new scaleClass({
-					id: id,
+					id,
 					type: scaleType,
 					options: scaleOptions,
 					ctx: me.ctx,
@@ -391,8 +424,8 @@ class Chart {
 			scale.axis = scale.options.position === 'chartArea' ? 'r' : scale.isHorizontal() ? 'x' : 'y';
 
 			// parse min/max value, so we can properly determine min/max for other scales
-			scale._userMin = scale._parse(scale.options.min);
-			scale._userMax = scale._parse(scale.options.max);
+			scale._userMin = scale.parse(scale.options.min);
+			scale._userMax = scale.parse(scale.options.max);
 
 			// TODO(SB): I think we should be able to remove this custom case (options.scale)
 			// and consider it as a regular scale part of the "scales"" map only! This would
@@ -402,7 +435,7 @@ class Chart {
 			}
 		});
 		// clear up discarded scales
-		helpers.each(updated, function(hasUpdated, id) {
+		helpers.each(updated, (hasUpdated, id) => {
 			if (!hasUpdated) {
 				delete scales[id];
 			}
@@ -441,7 +474,7 @@ class Chart {
 
 		if (numMeta > numData) {
 			for (let i = numData; i < numMeta; ++i) {
-				me.destroyDatasetMeta(i);
+				me._destroyDatasetMeta(i);
 			}
 			metasets.splice(numData, numMeta - numData);
 		}
@@ -460,7 +493,7 @@ class Chart {
 			const type = dataset.type || me.config.type;
 
 			if (meta.type && meta.type !== type) {
-				me.destroyDatasetMeta(i);
+				me._destroyDatasetMeta(i);
 				meta = me.getDatasetMeta(i);
 			}
 			meta.type = type;
@@ -491,9 +524,9 @@ class Chart {
 	 * Reset the elements of all datasets
 	 * @private
 	 */
-	resetElements() {
+	_resetElements() {
 		const me = this;
-		helpers.each(me.data.datasets, function(dataset, datasetIndex) {
+		helpers.each(me.data.datasets, (dataset, datasetIndex) => {
 			me.getDatasetMeta(datasetIndex).controller.reset();
 		}, me);
 	}
@@ -502,7 +535,7 @@ class Chart {
 	* Resets the chart back to its state before the initial animation
 	*/
 	reset() {
-		this.resetElements();
+		this._resetElements();
 		plugins.notify(this, 'reset');
 	}
 
@@ -516,7 +549,7 @@ class Chart {
 
 		// plugins options references might have change, let's invalidate the cache
 		// https://github.com/chartjs/Chart.js/issues/5111#issuecomment-355934167
-		plugins._invalidate(me);
+		plugins.invalidate(me);
 
 		if (plugins.notify(me, 'beforeUpdate') === false) {
 			return;
@@ -530,16 +563,16 @@ class Chart {
 			me.getDatasetMeta(i).controller.buildOrUpdateElements();
 		}
 
-		me.updateLayout();
+		me._updateLayout();
 
 		// Can only reset the new controllers after the scales have been updated
 		if (me.options.animation) {
-			helpers.each(newControllers, function(controller) {
+			helpers.each(newControllers, (controller) => {
 				controller.reset();
 			});
 		}
 
-		me.updateDatasets(mode);
+		me._updateDatasets(mode);
 
 		// Do this before render so that any plugins that need final scale updates can use it
 		plugins.notify(me, 'afterUpdate');
@@ -548,7 +581,7 @@ class Chart {
 
 		// Replay last event from before update
 		if (me._lastEvent) {
-			me.eventHandler(me._lastEvent);
+			me._eventHandler(me._lastEvent);
 		}
 
 		me.render();
@@ -561,7 +594,7 @@ class Chart {
 	 * hook, in which case, plugins will not be called on `afterLayout`.
 	 * @private
 	 */
-	updateLayout() {
+	_updateLayout() {
 		const me = this;
 
 		if (plugins.notify(me, 'beforeLayout') === false) {
@@ -571,16 +604,16 @@ class Chart {
 		layouts.update(me, me.width, me.height);
 
 		me._layers = [];
-		helpers.each(me.boxes, function(box) {
-			// _configure is called twice, once in core.scale.update and once here.
+		helpers.each(me.boxes, (box) => {
+			// configure is called twice, once in core.scale.update and once here.
 			// Here the boxes are fully updated and at their final positions.
-			if (box._configure) {
-				box._configure();
+			if (box.configure) {
+				box.configure();
 			}
-			me._layers.push.apply(me._layers, box._layers());
+			me._layers.push(...box._layers());
 		}, me);
 
-		me._layers.forEach(function(item, index) {
+		me._layers.forEach((item, index) => {
 			item._idx = index;
 		});
 
@@ -592,15 +625,16 @@ class Chart {
 	 * hook, in which case, plugins will not be called on `afterDatasetsUpdate`.
 	 * @private
 	 */
-	updateDatasets(mode) {
+	_updateDatasets(mode) {
 		const me = this;
+		const isFunction = typeof mode === 'function';
 
 		if (plugins.notify(me, 'beforeDatasetsUpdate') === false) {
 			return;
 		}
 
 		for (let i = 0, ilen = me.data.datasets.length; i < ilen; ++i) {
-			me.updateDataset(i, mode);
+			me._updateDataset(i, isFunction ? mode({datasetIndex: i}) : mode);
 		}
 
 		plugins.notify(me, 'afterDatasetsUpdate');
@@ -611,7 +645,7 @@ class Chart {
 	 * hook, in which case, plugins will not be called on `afterDatasetUpdate`.
 	 * @private
 	 */
-	updateDataset(index, mode) {
+	_updateDataset(index, mode) {
 		const me = this;
 		const meta = me.getDatasetMeta(index);
 		const args = {meta, index, mode};
@@ -648,7 +682,7 @@ class Chart {
 
 	draw() {
 		const me = this;
-		let i, layers;
+		let i;
 
 		me.clear();
 
@@ -663,12 +697,12 @@ class Chart {
 		// Because of plugin hooks (before/afterDatasetsDraw), datasets can't
 		// currently be part of layers. Instead, we draw
 		// layers <= 0 before(default, backward compat), and the rest after
-		layers = me._layers;
+		const layers = me._layers;
 		for (i = 0; i < layers.length && layers[i].z <= 0; ++i) {
 			layers[i].draw(me.chartArea);
 		}
 
-		me.drawDatasets();
+		me._drawDatasets();
 
 		// Rest of layers
 		for (; i < layers.length; ++i) {
@@ -698,9 +732,10 @@ class Chart {
 	}
 
 	/**
-	 * @private
+	 * Gets the visible dataset metas in drawing order
+	 * @return {object[]}
 	 */
-	_getSortedVisibleDatasetMetas() {
+	getSortedVisibleDatasetMetas() {
 		return this._getSortedDatasetMetas(true);
 	}
 
@@ -709,17 +744,16 @@ class Chart {
 	 * hook, in which case, plugins will not be called on `afterDatasetsDraw`.
 	 * @private
 	 */
-	drawDatasets() {
+	_drawDatasets() {
 		const me = this;
-		let metasets, i;
 
 		if (plugins.notify(me, 'beforeDatasetsDraw') === false) {
 			return;
 		}
 
-		metasets = me._getSortedVisibleDatasetMetas();
-		for (i = metasets.length - 1; i >= 0; --i) {
-			me.drawDataset(metasets[i]);
+		const metasets = me.getSortedVisibleDatasetMetas();
+		for (let i = metasets.length - 1; i >= 0; --i) {
+			me._drawDataset(metasets[i]);
 		}
 
 		plugins.notify(me, 'afterDatasetsDraw');
@@ -730,13 +764,13 @@ class Chart {
 	 * hook, in which case, plugins will not be called on `afterDatasetDraw`.
 	 * @private
 	 */
-	drawDataset(meta) {
+	_drawDataset(meta) {
 		const me = this;
 		const ctx = me.ctx;
 		const clip = meta._clip;
 		const area = me.chartArea;
 		const args = {
-			meta: meta,
+			meta,
 			index: meta.index,
 		};
 
@@ -814,7 +848,7 @@ class Chart {
 	}
 
 	getVisibleDatasetCount() {
-		return this._getSortedVisibleDatasetMetas().length;
+		return this.getSortedVisibleDatasetMetas().length;
 	}
 
 	isDatasetVisible(datasetIndex) {
@@ -841,12 +875,36 @@ class Chart {
 	/**
 	 * @private
 	 */
-	destroyDatasetMeta(datasetIndex) {
+	_updateDatasetVisibility(datasetIndex, visible) {
+		const me = this;
+		const mode = visible ? 'show' : 'hide';
+		const meta = me.getDatasetMeta(datasetIndex);
+		const anims = meta.controller._resolveAnimations(undefined, mode);
+		me.setDatasetVisibility(datasetIndex, visible);
+
+		// Animate visible state, so hide animation can be seen. This could be handled better if update / updateDataset returned a Promise.
+		anims.update(meta, {visible});
+
+		me.update((ctx) => ctx.datasetIndex === datasetIndex ? mode : undefined);
+	}
+
+	hide(datasetIndex) {
+		this._updateDatasetVisibility(datasetIndex, false);
+	}
+
+	show(datasetIndex) {
+		this._updateDatasetVisibility(datasetIndex, true);
+	}
+
+	/**
+	 * @private
+	 */
+	_destroyDatasetMeta(datasetIndex) {
 		const me = this;
 		const meta = me._metasets && me._metasets[datasetIndex];
 
 		if (meta) {
-			meta.controller.destroy();
+			meta.controller._destroy();
 			delete me._metasets[datasetIndex];
 		}
 	}
@@ -857,10 +915,11 @@ class Chart {
 		let i, ilen;
 
 		me.stop();
+		Animator.remove(me);
 
 		// dataset controllers need to cleanup associated data
 		for (i = 0, ilen = me.data.datasets.length; i < ilen; ++i) {
-			me.destroyDatasetMeta(i);
+			me._destroyDatasetMeta(i);
 		}
 
 		if (canvas) {
@@ -876,8 +935,8 @@ class Chart {
 		delete Chart.instances[me.id];
 	}
 
-	toBase64Image() {
-		return this.canvas.toDataURL.apply(this.canvas, arguments);
+	toBase64Image(...args) {
+		return this.canvas.toDataURL(...args);
 	}
 
 	/**
@@ -885,21 +944,21 @@ class Chart {
 	 */
 	bindEvents() {
 		const me = this;
-		const listeners = me._listeners = {};
-		let listener = function() {
-			me.eventHandler.apply(me, arguments);
+		const listeners = me._listeners;
+		let listener = function(e) {
+			me._eventHandler(e);
 		};
 
-		helpers.each(me.options.events, function(type) {
+		helpers.each(me.options.events, (type) => {
 			me.platform.addEventListener(me, type, listener);
 			listeners[type] = listener;
 		});
 
-		// Elements used to detect size change should not be injected for non responsive charts.
-		// See https://github.com/chartjs/Chart.js/issues/2210
 		if (me.options.responsive) {
-			listener = function() {
-				me.resize();
+			listener = function(width, height) {
+				if (me.canvas) {
+					me.resize(false, width, height);
+				}
 			};
 
 			me.platform.addEventListener(me, 'resize', listener);
@@ -918,7 +977,7 @@ class Chart {
 		}
 
 		delete me._listeners;
-		helpers.each(listeners, function(listener, type) {
+		helpers.each(listeners, (listener, type) => {
 			me.platform.removeEventListener(me, type, listener);
 		});
 	}
@@ -962,14 +1021,14 @@ class Chart {
 	/**
 	 * @private
 	 */
-	eventHandler(e) {
+	_eventHandler(e) {
 		const me = this;
 
 		if (plugins.notify(me, 'beforeEvent', [e]) === false) {
 			return;
 		}
 
-		me.handleEvent(e);
+		me._handleEvent(e);
 
 		plugins.notify(me, 'afterEvent', [e]);
 
@@ -980,11 +1039,11 @@ class Chart {
 
 	/**
 	 * Handle an event
-	 * @private
-	 * @param {IEvent} event the event to handle
+	 * @param {IEvent} e the event to handle
 	 * @return {boolean} true if the chart needs to re-render
+	 * @private
 	 */
-	handleEvent(e) {
+	_handleEvent(e) {
 		const me = this;
 		const options = me.options || {};
 		const hoverOptions = options.hover;
@@ -1023,12 +1082,3 @@ class Chart {
 		return changed;
 	}
 }
-
-/**
- * NOTE(SB) We actually don't use this container anymore but we need to keep it
- * for backward compatibility. Though, it can still be useful for plugins that
- * would need to work on multiple charts?!
- */
-Chart.instances = {};
-
-export default Chart;

@@ -1,14 +1,10 @@
-'use strict';
-
 import DatasetController from '../core/core.datasetController';
 import defaults from '../core/core.defaults';
 import Line from '../elements/element.line';
 import Point from '../elements/element.point';
-import helpers from '../helpers';
+import {valueOrDefault} from '../helpers/helpers.core';
 
-const valueOrDefault = helpers.valueOrDefault;
-
-defaults._set('radar', {
+defaults.set('radar', {
 	spanGaps: false,
 	scales: {
 		r: {
@@ -22,92 +18,58 @@ defaults._set('radar', {
 	}
 });
 
-export default DatasetController.extend({
-	datasetElementType: Line,
-
-	dataElementType: Point,
+export default class RadarController extends DatasetController {
 
 	/**
-	 * @private
+	 * @protected
 	 */
-	_datasetElementOptions: [
-		'backgroundColor',
-		'borderWidth',
-		'borderColor',
-		'borderCapStyle',
-		'borderDash',
-		'borderDashOffset',
-		'borderJoinStyle',
-		'fill'
-	],
-
-	/**
-	 * @private
-	 */
-	_dataElementOptions: {
-		backgroundColor: 'pointBackgroundColor',
-		borderColor: 'pointBorderColor',
-		borderWidth: 'pointBorderWidth',
-		hitRadius: 'pointHitRadius',
-		hoverBackgroundColor: 'pointHoverBackgroundColor',
-		hoverBorderColor: 'pointHoverBorderColor',
-		hoverBorderWidth: 'pointHoverBorderWidth',
-		hoverRadius: 'pointHoverRadius',
-		pointStyle: 'pointStyle',
-		radius: 'pointRadius',
-		rotation: 'pointRotation'
-	},
-
-	/**
-	 * @private
-	 */
-	_getIndexScaleId: function() {
+	getIndexScaleId() {
 		return this._cachedMeta.rAxisID;
-	},
+	}
 
 	/**
-	 * @private
+	 * @protected
 	 */
-	_getValueScaleId: function() {
+	getValueScaleId() {
 		return this._cachedMeta.rAxisID;
-	},
+	}
 
 	/**
-	 * @private
+	 * @protected
 	 */
-	_getLabelAndValue: function(index) {
+	getLabelAndValue(index) {
 		const me = this;
 		const vScale = me._cachedMeta.vScale;
-		const parsed = me._getParsed(index);
+		const parsed = me.getParsed(index);
 
 		return {
-			label: vScale._getLabels()[index],
+			label: vScale.getLabels()[index],
 			value: '' + vScale.getLabelForValue(parsed[vScale.axis])
 		};
-	},
+	}
 
-	update: function(mode) {
+	update(mode) {
 		const me = this;
 		const meta = me._cachedMeta;
 		const line = meta.dataset;
 		const points = meta.data || [];
-		const labels = meta.iScale._getLabels();
+		const labels = meta.iScale.getLabels();
 		const properties = {
 			points,
 			_loop: true,
 			_fullLoop: labels.length === points.length,
-			options: me._resolveDatasetElementOptions()
+			options: me.resolveDatasetElementOptions()
 		};
 
-		me._updateElement(line, undefined, properties, mode);
+		me.updateElement(line, undefined, properties, mode);
 
 		// Update Points
 		me.updateElements(points, 0, mode);
 
 		line.updateControlPoints(me.chart.chartArea);
-	},
+	}
 
-	updateElements: function(points, start, mode) {
+	updateElements(points, start, mode) {
 		const me = this;
 		const dataset = me.getDataset();
 		const scale = me.chart.scales.r;
@@ -117,7 +79,7 @@ export default DatasetController.extend({
 		for (i = 0; i < points.length; i++) {
 			const point = points[i];
 			const index = start + i;
-			const options = me._resolveDataElementOptions(index);
+			const options = me.resolveDataElementOptions(index);
 			const pointPosition = scale.getPointPositionForValue(index, dataset.data[index]);
 
 			const x = reset ? scale.xCenter : pointPosition.x;
@@ -131,22 +93,51 @@ export default DatasetController.extend({
 				options
 			};
 
-			me._updateElement(point, index, properties, mode);
+			me.updateElement(point, index, properties, mode);
 		}
-	},
+	}
 
 	/**
-	 * @private
+	 * @protected
 	 */
-	_resolveDatasetElementOptions: function() {
+	resolveDatasetElementOptions(active) {
 		const me = this;
 		const config = me._config;
 		const options = me.chart.options;
-		const values = DatasetController.prototype._resolveDatasetElementOptions.apply(me, arguments);
+		const values = super.resolveDatasetElementOptions(active);
 
 		values.spanGaps = valueOrDefault(config.spanGaps, options.spanGaps);
 		values.tension = valueOrDefault(config.lineTension, options.elements.line.tension);
 
 		return values;
 	}
-});
+}
+
+RadarController.prototype.datasetElementType = Line;
+
+RadarController.prototype.dataElementType = Point;
+
+RadarController.prototype.datasetElementOptions = [
+	'backgroundColor',
+	'borderColor',
+	'borderCapStyle',
+	'borderDash',
+	'borderDashOffset',
+	'borderJoinStyle',
+	'borderWidth',
+	'fill'
+];
+
+RadarController.prototype.dataElementOptions = {
+	backgroundColor: 'pointBackgroundColor',
+	borderColor: 'pointBorderColor',
+	borderWidth: 'pointBorderWidth',
+	hitRadius: 'pointHitRadius',
+	hoverBackgroundColor: 'pointHoverBackgroundColor',
+	hoverBorderColor: 'pointHoverBorderColor',
+	hoverBorderWidth: 'pointHoverBorderWidth',
+	hoverRadius: 'pointHoverRadius',
+	pointStyle: 'pointStyle',
+	radius: 'pointRadius',
+	rotation: 'pointRotation'
+};

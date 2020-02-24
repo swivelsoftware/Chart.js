@@ -1,13 +1,24 @@
-'use strict';
-
 import Scale from '../core/core.scale';
 
 const defaultConfig = {
 };
 
-class CategoryScale extends Scale {
-	_parse(raw, index) {
-		const labels = this._getLabels();
+export default class CategoryScale extends Scale {
+
+	// INTERNAL: static default options, registered in src/index.js
+	static _defaults = defaultConfig;
+
+	constructor(cfg) {
+		super(cfg);
+
+		this._numLabels = 0;
+		/** @type {number} */
+		this._startValue = undefined;
+		this._valueRange = 0;
+	}
+
+	parse(raw, index) {
+		const labels = this.getLabels();
 		if (labels[index] === raw) {
 			return index;
 		}
@@ -18,7 +29,7 @@ class CategoryScale extends Scale {
 
 	determineDataLimits() {
 		const me = this;
-		const max = me._getLabels().length - 1;
+		const max = me.getLabels().length - 1;
 
 		me.min = Math.max(me._userMin || 0, 0);
 		me.max = Math.min(me._userMax || max, max);
@@ -29,7 +40,7 @@ class CategoryScale extends Scale {
 		const min = me.min;
 		const max = me.max;
 		const offset = me.options.offset;
-		let labels = me._getLabels();
+		let labels = me.getLabels();
 
 		// If we are viewing some subset of labels, slice the original array
 		labels = (min === 0 && max === labels.length - 1) ? labels : labels.slice(min, max + 1);
@@ -38,14 +49,12 @@ class CategoryScale extends Scale {
 		me._valueRange = Math.max(labels.length - (offset ? 0 : 1), 1);
 		me._startValue = me.min - (offset ? 0.5 : 0);
 
-		return labels.map(function(l) {
-			return {value: l};
-		});
+		return labels.map((l) => ({value: l}));
 	}
 
 	getLabelForValue(value) {
 		const me = this;
-		const labels = me._getLabels();
+		const labels = me.getLabels();
 
 		if (value >= 0 && value < labels.length) {
 			return labels[value];
@@ -53,10 +62,13 @@ class CategoryScale extends Scale {
 		return value;
 	}
 
-	_configure() {
+	/**
+	 * @protected
+	 */
+	configure() {
 		const me = this;
 
-		Scale.prototype._configure.call(me);
+		super.configure();
 
 		if (!me.isHorizontal()) {
 			// For backward compatibility, vertical category scale reverse is inverted.
@@ -66,10 +78,10 @@ class CategoryScale extends Scale {
 
 	// Used to get data value locations. Value can either be an index or a numerical value
 	getPixelForValue(value) {
-		var me = this;
+		const me = this;
 
 		if (typeof value !== 'number') {
-			value = me._parse(value);
+			value = me.parse(value);
 		}
 
 		return me.getPixelForDecimal((value - me._startValue) / me._valueRange);
@@ -94,7 +106,3 @@ class CategoryScale extends Scale {
 		return this.bottom;
 	}
 }
-
-// INTERNAL: static default options, registered in src/index.js
-CategoryScale._defaults = defaultConfig;
-export default CategoryScale;

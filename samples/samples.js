@@ -157,6 +157,9 @@
 		}, {
 			title: 'Center Positioning',
 			path: 'scales/axis-center-position.html'
+		}, {
+			title: 'Custom major ticks',
+			path: 'scales/financial.html'
 		}]
 	}, {
 		title: 'Legend',
@@ -239,14 +242,8 @@
 	}, {
 		title: 'Advanced',
 		items: [{
-			title: 'Custom minor and major ticks',
-			path: 'advanced/financial.html'
-		}, {
 			title: 'Progress bar',
 			path: 'advanced/progress-bar.html'
-		}, {
-			title: 'Content Security Policy',
-			path: 'advanced/content-security-policy.html'
 		}, {
 			title: 'Polar Area Radial Gradient',
 			path: 'advanced/radial-gradient.html'

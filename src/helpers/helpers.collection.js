@@ -1,4 +1,25 @@
-'use strict';
+/**
+ * Binary search
+ * @param {array} table - the table search. must be sorted!
+ * @param {number} value - value to find
+ * @private
+ */
+export function _lookup(table, value) {
+	let hi = table.length - 1;
+	let lo = 0;
+	let mid;
+
+	while (hi - lo > 1) {
+		mid = (lo + hi) >> 1;
+		if (table[mid] < value) {
+			lo = mid;
+		} else {
+			hi = mid;
+		}
+	}
+
+	return {lo, hi};
+}
 
 /**
  * Binary search
@@ -7,7 +28,7 @@
  * @param {number} value - value to find
  * @private
  */
-export function _lookup(table, key, value) {
+export function _lookupByKey(table, key, value) {
 	let hi = table.length - 1;
 	let lo = 0;
 	let mid;
@@ -31,7 +52,7 @@ export function _lookup(table, key, value) {
  * @param {number} value - value to find
  * @private
  */
-export function _rlookup(table, key, value) {
+export function _rlookupByKey(table, key, value) {
 	let hi = table.length - 1;
 	let lo = 0;
 	let mid;
