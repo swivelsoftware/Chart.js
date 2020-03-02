@@ -1,6 +1,6 @@
 import DatasetController from '../core/core.datasetController';
 import defaults from '../core/core.defaults';
-import Arc from '../elements/element.arc';
+import {Arc} from '../elements/index';
 import {isArray, valueOrDefault} from '../helpers/helpers.core';
 
 /**
@@ -36,7 +36,7 @@ defaults.set('doughnut', {
 							fillStyle: style.backgroundColor,
 							strokeStyle: style.borderColor,
 							lineWidth: style.borderWidth,
-							hidden: isNaN(data.datasets[0].data[i]) || meta.data[i].hidden,
+							hidden: !chart.getDataVisibility(i),
 
 							// Extra data used for toggling the correct item
 							index: i
@@ -50,10 +50,10 @@ defaults.set('doughnut', {
 		onClick(e, legendItem) {
 			const index = legendItem.index;
 			const chart = this.chart;
-			let i, ilen, meta;
+			let meta;
 
 			meta = chart.getDatasetMeta(0);
-			var hiddens = meta.data.map(function(m) {
+			const hiddens = meta.data.map(function(m) {
 				return m.hidden;
 			});
 
@@ -62,7 +62,7 @@ defaults.set('doughnut', {
 			 * by kennysng@hotmail.com.hk
 			 */
 
-			var allHidden = hiddens.reduce(function(result, flag, i) {
+			const allHidden = hiddens.reduce(function(result, flag, i) {
 				if (i !== index && (flag || false) === false) {
 					result += 1;
 				}
@@ -70,15 +70,8 @@ defaults.set('doughnut', {
 			}, 0);
 
 			if (allHidden > 1) {
-				for (i = 0, ilen = (chart.data.datasets || []).length; i < ilen; ++i) {
-					meta = chart.getDatasetMeta(i);
-					// toggle visibility of index if exists
-					if (meta.data[index]) {
-						meta.data[index].hidden = !meta.data[index].hidden;
-					}
-				}
-
-				chart.update();
+				this.chart.toggleDataVisibility(index);
+				this.chart.update();
 			}
 		}
 	},
@@ -221,7 +214,7 @@ export default class DoughnutController extends DatasetController {
 		const me = this;
 		const opts = me.chart.options;
 		const meta = me._cachedMeta;
-		return reset && opts.animation.animateRotate ? 0 : meta.data[i].hidden ? 0 : me.calculateCircumference(meta._parsed[i] * opts.circumference / DOUBLE_PI);
+		return reset && opts.animation.animateRotate ? 0 : this.chart.getDataVisibility(i) ? me.calculateCircumference(meta._parsed[i] * opts.circumference / DOUBLE_PI) : 0;
 	}
 
 	updateElements(arcs, start, mode) {
@@ -277,7 +270,7 @@ export default class DoughnutController extends DatasetController {
 
 		for (i = 0; i < metaData.length; i++) {
 			const value = meta._parsed[i];
-			if (!isNaN(value) && !metaData[i].hidden) {
+			if (!isNaN(value) && this.chart.getDataVisibility(i)) {
 				total += Math.abs(value);
 			}
 		}

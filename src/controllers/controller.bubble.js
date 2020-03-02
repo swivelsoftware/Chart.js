@@ -1,6 +1,6 @@
 import DatasetController from '../core/core.datasetController';
 import defaults from '../core/core.defaults';
-import Point from '../elements/element.point';
+import {Point} from '../elements/index';
 import {resolve} from '../helpers/helpers.options';
 
 defaults.set('bubble', {
@@ -11,12 +11,10 @@ defaults.set('bubble', {
 	},
 	scales: {
 		x: {
-			type: 'linear',
-			position: 'bottom'
+			type: 'linear'
 		},
 		y: {
-			type: 'linear',
-			position: 'left'
+			type: 'linear'
 		}
 	},
 
@@ -126,6 +124,8 @@ export default class BubbleController extends DatasetController {
 	}
 
 	/**
+	 * @param {number} index
+	 * @param {string} [mode]
 	 * @protected
 	 */
 	resolveDataElementOptions(index, mode) {

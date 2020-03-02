@@ -2268,6 +2268,11 @@ chardet@^0.7.0:
   resolved "https://registry.yarnpkg.com/chardet/-/chardet-0.7.0.tgz#90094849f0937f2eedc2425d0d28a9e5f0cbad9e"
   integrity sha512-mT8iDcrh03qDGRRmoA2hmBJnxpllMR+0/0qlzjqZES6NdiWDcZkCNAk4rPFZ9Q85r27unkiNNg8ZOiwZXBHwcA==
 
+chartjs-adapter-moment@^0.1.1:
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/chartjs-adapter-moment/-/chartjs-adapter-moment-0.1.1.tgz#e7d515d6ce596a9102fac10b1ae1d08d362d5acf"
+  integrity sha512-lFGCiqpn+0e6CEbEKdG1L3LYR0jnKFqtXsExzmEWXGCxdymTFSqntiWAqWAYDblL/QB3sUk881xVGzhWZdn4kQ==
+
 chmodr@~1.0.2:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/chmodr/-/chmodr-1.0.2.tgz#04662b932d0f02ec66deaa2b0ea42811968e3eb9"

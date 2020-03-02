@@ -1,3 +1,5 @@
+/* eslint-disable import/no-namespace, import/namespace */
+
 /**
  * @namespace Chart
  */
@@ -12,7 +14,7 @@ import controllers from './controllers/index';
 import DatasetController from './core/core.datasetController';
 import defaults from './core/core.defaults';
 import Element from './core/core.element';
-import elements from './elements/index';
+import * as elements from './elements/index';
 import Interaction from './core/core.interaction';
 import layouts from './core/core.layouts';
 import platforms from './platform/platforms';
@@ -40,14 +42,8 @@ Chart.scaleService = scaleService;
 Chart.Ticks = Ticks;
 
 // Register built-in scales
-import scales from './scales/index';
-Object.keys(scales).forEach((type) => {
-	const scale = scales[type];
-	Chart.scaleService.registerScaleType(type, scale, scale._defaults);
-});
-
-// Load to register built-in adapters (as side effects)
-import './adapters/index';
+import * as scales from './scales/index';
+Object.keys(scales).forEach(key => Chart.scaleService.registerScale(scales[key]));
 
 // Loading built-in plugins
 import plugins from './plugins/index';
