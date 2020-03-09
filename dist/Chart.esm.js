@@ -1,5 +1,5 @@
 /*!
- * Chart.js v3.0.0-dev
+ * Chart.js v3.0.0-alpha
  * https://www.chartjs.org
  * (c) 2020 Chart.js Contributors
  * Released under the MIT License
@@ -6632,7 +6632,7 @@ var scaleService = {
   }
 };
 
-var version = "3.0.0-dev";
+var version = "3.0.0-alpha";
 
 var valueOrDefault$1 = helpers.valueOrDefault;
 function mergeScaleConfig(config, options) {
@@ -11367,6 +11367,8 @@ function resolveOptions(options) {
   options.bodyFontFamily = valueOrDefault$3(options.bodyFontFamily, defaults.fontFamily);
   options.bodyFontStyle = valueOrDefault$3(options.bodyFontStyle, defaults.fontStyle);
   options.bodyFontSize = valueOrDefault$3(options.bodyFontSize, defaults.fontSize);
+  options.boxHeight = valueOrDefault$3(options.boxHeight, options.bodyFontSize);
+  options.boxWidth = valueOrDefault$3(options.boxWidth, options.bodyFontSize);
   options.titleFontFamily = valueOrDefault$3(options.titleFontFamily, defaults.fontFamily);
   options.titleFontStyle = valueOrDefault$3(options.titleFontStyle, defaults.fontStyle);
   options.titleFontSize = valueOrDefault$3(options.titleFontSize, defaults.fontSize);
@@ -11386,10 +11388,13 @@ function getTooltipSize(tooltip) {
   var {
     bodyFontSize,
     footerFontSize,
-    titleFontSize
+    titleFontSize,
+    boxWidth,
+    boxHeight
   } = options;
   var titleLineCount = title.length;
   var footerLineCount = footer.length;
+  var bodyLineItemCount = body.length;
   var height = options.yPadding * 2;
   var width = 0;
   var combinedBodyLength = body.reduce((count, bodyItem) => count + bodyItem.before.length + bodyItem.lines.length + bodyItem.after.length, 0);
@@ -11398,7 +11403,8 @@ function getTooltipSize(tooltip) {
     height += titleLineCount * titleFontSize + (titleLineCount - 1) * options.titleSpacing + options.titleMarginBottom;
   }
   if (combinedBodyLength) {
-    height += combinedBodyLength * bodyFontSize + (combinedBodyLength - 1) * options.bodySpacing;
+    var bodyLineHeight = options.displayColors ? Math.max(boxHeight, bodyFontSize) : bodyFontSize;
+    height += bodyLineItemCount * bodyLineHeight + (combinedBodyLength - bodyLineItemCount) * bodyFontSize + (combinedBodyLength - 1) * options.bodySpacing;
   }
   if (footerLineCount) {
     height += options.footerMarginTop + footerLineCount * footerFontSize + (footerLineCount - 1) * options.footerSpacing;
@@ -11412,7 +11418,7 @@ function getTooltipSize(tooltip) {
   helpers.each(tooltip.title, maxLineWidth);
   ctx.font = helpers.fontString(bodyFontSize, options.bodyFontStyle, options.bodyFontFamily);
   helpers.each(tooltip.beforeBody.concat(tooltip.afterBody), maxLineWidth);
-  widthPadding = options.displayColors ? bodyFontSize + 2 : 0;
+  widthPadding = options.displayColors ? boxWidth + 2 : 0;
   helpers.each(body, bodyItem => {
     helpers.each(bodyItem.before, maxLineWidth);
     helpers.each(bodyItem.lines, maxLineWidth);
@@ -11799,16 +11805,22 @@ class Tooltip extends Element$1 {
     var me = this;
     var options = me.options;
     var labelColors = me.labelColors[i];
-    var bodyFontSize = options.bodyFontSize;
+    var {
+      boxHeight,
+      boxWidth,
+      bodyFontSize
+    } = options;
     var colorX = getAlignedX(me, 'left');
     var rtlColorX = rtlHelper.x(colorX);
+    var yOffSet = boxHeight < bodyFontSize ? (bodyFontSize - boxHeight) / 2 : 0;
+    var colorY = pt.y + yOffSet;
     ctx.fillStyle = options.multiKeyBackground;
-    ctx.fillRect(rtlHelper.leftForLtr(rtlColorX, bodyFontSize), pt.y, bodyFontSize, bodyFontSize);
+    ctx.fillRect(rtlHelper.leftForLtr(rtlColorX, boxWidth), colorY, boxWidth, boxHeight);
     ctx.lineWidth = 1;
     ctx.strokeStyle = labelColors.borderColor;
-    ctx.strokeRect(rtlHelper.leftForLtr(rtlColorX, bodyFontSize), pt.y, bodyFontSize, bodyFontSize);
+    ctx.strokeRect(rtlHelper.leftForLtr(rtlColorX, boxWidth), colorY, boxWidth, boxHeight);
     ctx.fillStyle = labelColors.backgroundColor;
-    ctx.fillRect(rtlHelper.leftForLtr(rtlHelper.xPlus(rtlColorX, 1), bodyFontSize - 2), pt.y + 1, bodyFontSize - 2, bodyFontSize - 2);
+    ctx.fillRect(rtlHelper.leftForLtr(rtlHelper.xPlus(rtlColorX, 1), boxWidth - 2), colorY + 1, boxWidth - 2, boxHeight - 2);
     ctx.fillStyle = me.labelTextColors[i];
   }
   _drawColorDot(ctx, pt, i, rtlHelper, meta) {
@@ -11818,7 +11830,6 @@ class Tooltip extends Element$1 {
     var bodyFontSize = options.bodyFontSize;
     var colorX = getAlignedX(me, 'left');
     var rtlColorX = rtlHelper.x(colorX);
-    var style = meta.controller.getStyle(undefined);
     var x = rtlColorX;
     var y = pt.y;
     var fontSize = bodyFontSize;
@@ -11826,11 +11837,11 @@ class Tooltip extends Element$1 {
     ctx.fillStyle = 'transparent';
     ctx.strokeStyle = labelColors.borderColor;
     ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
-    var radius = fontSize * Math.sqrt(5) / 5;
+    options.radius = fontSize * Math.sqrt(5) / 5;
     var centerX = x + boxWidth / 2;
     var centerY = y + fontSize / 2;
     ctx.lineWidth *= Math.SQRT2 / 2;
-    helpers.canvas.drawPoint(ctx, style.pointStyle, radius, centerX, centerY, style.rotation);
+    helpers.canvas.drawPoint(ctx, options, centerX, centerY);
     ctx.fillStyle = me.labelTextColors[i];
   }
   drawBody(pt, ctx) {
@@ -11844,13 +11855,16 @@ class Tooltip extends Element$1 {
       bodyFontSize,
       bodySpacing,
       bodyAlign,
-      displayColors
+      displayColors,
+      boxHeight,
+      boxWidth
     } = options;
+    var bodyLineHeight = bodyFontSize;
     var xLinePadding = 0;
     var rtlHelper = getRtlHelper(options.rtl, me.x, me.width);
     var fillLineOfText = function fillLineOfText(line) {
-      ctx.fillText(line, rtlHelper.x(pt.x + xLinePadding), pt.y + bodyFontSize / 2);
-      pt.y += bodyFontSize + bodySpacing;
+      ctx.fillText(line, rtlHelper.x(pt.x + xLinePadding), pt.y + bodyLineHeight / 2);
+      pt.y += bodyLineHeight + bodySpacing;
     };
     var bodyAlignForCalculation = rtlHelper.textAlign(bodyAlign);
     var bodyItem, textColor, lines, i, j, ilen, jlen;
@@ -11860,7 +11874,7 @@ class Tooltip extends Element$1 {
     pt.x = getAlignedX(me, bodyAlignForCalculation);
     ctx.fillStyle = options.bodyFontColor;
     helpers.each(me.beforeBody, fillLineOfText);
-    xLinePadding = displayColors && bodyAlignForCalculation !== 'right' ? bodyAlign === 'center' ? bodyFontSize / 2 + 1 : bodyFontSize + 2 : 0;
+    xLinePadding = displayColors && bodyAlignForCalculation !== 'right' ? bodyAlign === 'center' ? boxWidth / 2 + 1 : boxWidth + 2 : 0;
     for (i = 0, ilen = body.length; i < ilen; ++i) {
       var point = me.dataPoints[i];
       var meta = ci.getDatasetMeta(point.datasetIndex);
@@ -11874,14 +11888,17 @@ class Tooltip extends Element$1 {
           me._drawColorDot(ctx, pt, i, rtlHelper, meta);
         } else {
           me._drawColorBox(ctx, pt, i, rtlHelper);
+          bodyLineHeight = Math.max(bodyFontSize, boxHeight);
         }
       }
       for (j = 0, jlen = lines.length; j < jlen; ++j) {
         fillLineOfText(lines[j]);
+        bodyLineHeight = bodyFontSize;
       }
       helpers.each(bodyItem.after, fillLineOfText);
     }
     xLinePadding = 0;
+    bodyLineHeight = bodyFontSize;
     helpers.each(me.afterBody, fillLineOfText);
     pt.y -= bodySpacing;
   }

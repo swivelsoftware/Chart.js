@@ -8034,6 +8034,11 @@ rollup-plugin-terser@^5.2.0:
     serialize-javascript "^2.1.2"
     terser "^4.6.2"
 
+rollup-plugin-web-worker-loader@^0.8.1:
+  version "0.8.1"
+  resolved "https://registry.yarnpkg.com/rollup-plugin-web-worker-loader/-/rollup-plugin-web-worker-loader-0.8.1.tgz#4eb83100015f4f14ab051cb5e4c535bbb464cab2"
+  integrity sha512-hppK5fkE/RpMw+oCv7idcdmj40WzapwN4Jw3b3/vqpaCZYJO/Djd2PjJ8difu5Uk22dnvwNrQ49CZgsnaEdR6A==
+
 rollup-pluginutils@^2.3.3, rollup-pluginutils@^2.8.1, rollup-pluginutils@^2.8.2:
   version "2.8.2"
   resolved "https://registry.yarnpkg.com/rollup-pluginutils/-/rollup-pluginutils-2.8.2.tgz#72f2af0748b592364dbd3389e600e5a9444a351e"
