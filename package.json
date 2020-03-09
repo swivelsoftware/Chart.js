@@ -2,7 +2,7 @@
   "name": "@swivelsoftware/chart.js",
   "homepage": "https://www.chartjs.org",
   "description": "Customized version of chart.js. Simple HTML5 charts using the canvas element.",
-  "version": "3.0.0-dev",
+  "version": "3.0.0-alpha",
   "license": "MIT",
   "jsdelivr": "dist/Chart.min.js",
   "unpkg": "dist/Chart.min.js",
@@ -76,6 +76,7 @@
     "rollup-plugin-babel": "^4.3.3",
     "rollup-plugin-cleanup": "^3.1.1",
     "rollup-plugin-terser": "^5.2.0",
+    "rollup-plugin-web-worker-loader": "^0.8.1",
     "typedoc": "^0.16.10",
     "typescript": "^3.8.2",
     "yargs": "^14.2.2"
