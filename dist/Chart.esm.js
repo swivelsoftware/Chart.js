@@ -2053,6 +2053,18 @@ class Animation {
   active() {
     return this._active;
   }
+  update(cfg, to, date) {
+    var me = this;
+    if (me._active) {
+      var currentValue = me._target[me._prop];
+      var elapsed = date - me._start;
+      var remain = me._duration - elapsed;
+      me._start = date;
+      me._duration = Math.floor(Math.max(remain, cfg.duration));
+      me._to = resolve([cfg.to, to, currentValue, cfg.from]);
+      me._from = resolve([cfg.from, currentValue, to]);
+    }
+  }
   cancel() {
     var me = this;
     if (me._active) {
@@ -2205,6 +2217,7 @@ class Animations {
     var animations = [];
     var running = target.$animations || (target.$animations = {});
     var props = Object.keys(values);
+    var date = Date.now();
     var i;
     for (i = props.length - 1; i >= 0; --i) {
       var prop = props[i];
@@ -2217,10 +2230,15 @@ class Animations {
       }
       var value = values[prop];
       var animation = running[prop];
-      if (animation) {
-        animation.cancel();
-      }
       var cfg = animatedProps.get(prop);
+      if (animation) {
+        if (cfg && animation.active()) {
+          animation.update(cfg, value, date);
+          continue;
+        } else {
+          animation.cancel();
+        }
+      }
       if (!cfg || !cfg.duration) {
         target[prop] = value;
         continue;
@@ -6859,7 +6877,6 @@ class Chart {
       if (options.onResize) {
         options.onResize(me, newSize);
       }
-      me.stop();
       me.update('resize');
     }
   }
