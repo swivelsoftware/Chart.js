@@ -1443,7 +1443,7 @@ function _calculatePadding(container, padding, parentDimension) {
 function getRelativePosition(evt, chart) {
   var mouseX, mouseY;
   var e = evt.originalEvent || evt;
-  var canvasElement = evt.target || evt.srcElement;
+  var canvasElement = chart.canvas;
   var boundingRect = canvasElement.getBoundingClientRect();
   var touches = e.touches;
   if (touches && touches.length > 0) {
@@ -8336,7 +8336,7 @@ function getEvenSpacing(arr) {
   }
   return diff;
 }
-function calculateSpacing(majorIndices, ticks, axisLength, ticksLimit) {
+function calculateSpacing(majorIndices, ticks, ticksLimit) {
   var evenMajorSpacing = getEvenSpacing(majorIndices);
   var spacing = ticks.length / ticksLimit;
   if (!evenMajorSpacing) {
@@ -8918,11 +8918,11 @@ function (_Element) {
   }, {
     key: "getPixelForTick",
     value: function getPixelForTick(index) {
-      var me = this;
-      var offset = me.options.offset;
-      var numTicks = me.ticks.length;
-      var tickWidth = 1 / Math.max(numTicks - (offset ? 0 : 1), 1);
-      return index < 0 || index > numTicks - 1 ? null : me.getPixelForDecimal(index * tickWidth + (offset ? tickWidth / 2 : 0));
+      var ticks = this.ticks;
+      if (index < 0 || index > ticks.length - 1) {
+        return null;
+      }
+      return this.getPixelForValue(ticks[index].value);
     }
   }, {
     key: "getPixelForDecimal",
@@ -8956,8 +8956,7 @@ function (_Element) {
     value: function _autoSkip(ticks) {
       var me = this;
       var tickOpts = me.options.ticks;
-      var axisLength = me._length;
-      var ticksLimit = tickOpts.maxTicksLimit || axisLength / me._tickSize();
+      var ticksLimit = tickOpts.maxTicksLimit || me._length / me._tickSize();
       var majorIndices = tickOpts.major.enabled ? getMajorIndices(ticks) : [];
       var numMajorIndices = majorIndices.length;
       var first = majorIndices[0];
@@ -8967,7 +8966,7 @@ function (_Element) {
         skipMajors(ticks, newTicks, majorIndices, numMajorIndices / ticksLimit);
         return newTicks;
       }
-      var spacing = calculateSpacing(majorIndices, ticks, axisLength, ticksLimit);
+      var spacing = calculateSpacing(majorIndices, ticks, ticksLimit);
       if (numMajorIndices > 0) {
         var i, ilen;
         var avgMajorSpacing = numMajorIndices > 1 ? Math.round((last - first) / (numMajorIndices - 1)) : null;
@@ -9855,15 +9854,6 @@ function (_LinearScaleBase) {
     value: function getValueForPixel(pixel) {
       return this._startValue + this.getDecimalForPixel(pixel) * this._valueRange;
     }
-  }, {
-    key: "getPixelForTick",
-    value: function getPixelForTick(index) {
-      var ticks = this.ticks;
-      if (index < 0 || index > ticks.length - 1) {
-        return null;
-      }
-      return this.getPixelForValue(ticks[index].value);
-    }
   }]);
   return LinearScale;
 }(LinearScaleBase);
@@ -10001,15 +9991,6 @@ function (_Scale) {
     key: "getLabelForValue",
     value: function getLabelForValue(value) {
       return value === undefined ? '0' : new Intl.NumberFormat(this.options.locale).format(value);
-    }
-  }, {
-    key: "getPixelForTick",
-    value: function getPixelForTick(index) {
-      var ticks = this.ticks;
-      if (index < 0 || index > ticks.length - 1) {
-        return null;
-      }
-      return this.getPixelForValue(ticks[index].value);
     }
   }, {
     key: "configure",
@@ -10940,15 +10921,6 @@ function (_Scale) {
       var offsets = me._offsets;
       var pos = interpolate(me._table, 'time', value, 'pos');
       return me.getPixelForDecimal((offsets.start + pos) * offsets.factor);
-    }
-  }, {
-    key: "getPixelForTick",
-    value: function getPixelForTick(index) {
-      var ticks = this.ticks;
-      if (index < 0 || index > ticks.length - 1) {
-        return null;
-      }
-      return this.getPixelForValue(ticks[index].value);
     }
   }, {
     key: "getValueForPixel",
