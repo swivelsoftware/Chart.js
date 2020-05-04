@@ -6017,7 +6017,9 @@ class DomPlatform extends BasePlatform {
       return listenForResize(canvas, proxies, listener);
     }
     var proxy = proxies[type] = throttled(event => {
-      listener(fromNativeEvent(event, chart));
+      if (chart.ctx !== null) {
+        listener(fromNativeEvent(event, chart));
+      }
     }, chart);
     addListener(canvas, type, proxy);
   }
