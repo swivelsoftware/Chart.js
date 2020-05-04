@@ -10,7 +10,6 @@
 .project
 .settings
 .vscode
-bower.json
 *.log
 *.swp
 *.stackdump
