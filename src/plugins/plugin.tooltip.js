@@ -786,9 +786,39 @@ export class Tooltip extends Element {
 		ctx.fillStyle = me.labelTextColors[i];
 	}
 
+	_drawColorDot(ctx, pt, i, rtlHelper) {
+		const me = this;
+		const options = me.options;
+		const labelColors = me.labelColors[i];
+		const bodyFontSize = options.bodyFontSize;
+		const colorX = getAlignedX(me, 'left');
+		const rtlColorX = rtlHelper.x(colorX);
+
+		var x = rtlColorX;
+		var y = pt.y;
+		var fontSize = bodyFontSize;
+		var boxWidth = bodyFontSize;
+
+		ctx.fillStyle = 'transparent';
+		ctx.strokeStyle = labelColors.borderColor;
+
+		// Draw line as legend symbol
+		ctx.strokeRect(rtlHelper.leftForLtr(x, boxWidth), y + fontSize / 2, boxWidth, 0);
+
+		// Draw point at center
+		options.radius = fontSize * Math.sqrt(5) / 5;
+		var centerX = x + boxWidth / 2;
+		var centerY = y + fontSize / 2;
+		ctx.lineWidth *= Math.SQRT2 / 2;
+		drawPoint(ctx, options, centerX, centerY);
+
+		// restore fillStyle
+		ctx.fillStyle = me.labelTextColors[i];
+	}
+
 	drawBody(pt, ctx) {
 		const me = this;
-		const {body, options} = me;
+		const {body, options, _chart: ci} = me;
 		const {bodyFont, bodySpacing, bodyAlign, displayColors, boxHeight, boxWidth} = options;
 		let bodyLineHeight = bodyFont.size;
 		let xLinePadding = 0;
@@ -819,6 +849,9 @@ export class Tooltip extends Element {
 
 		// Draw body lines now
 		for (i = 0, ilen = body.length; i < ilen; ++i) {
+			var point = me.dataPoints[i];
+			var meta = ci.getDatasetMeta(point.datasetIndex);
+
 			bodyItem = body[i];
 			textColor = me.labelTextColors[i];
 
@@ -829,8 +862,13 @@ export class Tooltip extends Element {
 
 			// Draw Legend-like boxes if needed
 			if (displayColors && lines.length) {
-				me._drawColorBox(ctx, pt, i, rtlHelper);
-				bodyLineHeight = Math.max(bodyFont.size, boxHeight);
+				if (meta.type === 'line') {
+					me._drawColorDot(ctx, pt, i, rtlHelper);
+				}
+				else {
+					me._drawColorBox(ctx, pt, i, rtlHelper);
+					bodyLineHeight = Math.max(bodyFont.size, boxHeight);
+				}
 			}
 
 			for (j = 0, jlen = lines.length; j < jlen; ++j) {
