@@ -10013,7 +10013,7 @@ defaults.set('legend', {
   fullWidth: true,
   reverse: false,
   weight: 1000,
-  onClick: function onClick(e, legendItem) {
+  onClick(e, legendItem) {
     var index = legendItem.datasetIndex;
     var ci = this.chart;
     var hiddens = (ci.data.datasets || []).map(function (meta, i) {
@@ -10302,7 +10302,7 @@ class Legend extends Element {
         drawPoint(ctx, drawOptions, _centerX, _centerY);
       } else if (meta.type === 'line') {
         ctx.fillStyle = 'transparent';
-        ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
+        ctx.strokeRect(rtlHelper.leftForLtr(x, boxWidth), y + fontSize / 2, boxWidth, 0);
         var centerX = x + boxWidth / 2;
         var centerY = y + fontSize / 2;
         var _drawOptions = {
@@ -11383,7 +11383,7 @@ class Tooltip extends Element {
     ctx.fillRect(rtlHelper.leftForLtr(rtlHelper.xPlus(rtlColorX, 1), boxWidth - 2), colorY + 1, boxWidth - 2, boxHeight - 2);
     ctx.fillStyle = me.labelTextColors[i];
   }
-  _drawColorDot(ctx, pt, i, rtlHelper, meta) {
+  _drawColorDot(ctx, pt, i, rtlHelper) {
     var me = this;
     var options = me.options;
     var labelColors = me.labelColors[i];
@@ -11396,7 +11396,7 @@ class Tooltip extends Element {
     var boxWidth = bodyFontSize;
     ctx.fillStyle = 'transparent';
     ctx.strokeStyle = labelColors.borderColor;
-    ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
+    ctx.strokeRect(rtlHelper.leftForLtr(x, boxWidth), y + fontSize / 2, boxWidth, 0);
     options.radius = fontSize * Math.sqrt(5) / 5;
     var centerX = x + boxWidth / 2;
     var centerY = y + fontSize / 2;
@@ -11445,7 +11445,7 @@ class Tooltip extends Element {
       lines = bodyItem.lines;
       if (displayColors && lines.length) {
         if (meta.type === 'line') {
-          me._drawColorDot(ctx, pt, i, rtlHelper, meta);
+          me._drawColorDot(ctx, pt, i, rtlHelper);
         } else {
           me._drawColorBox(ctx, pt, i, rtlHelper);
           bodyLineHeight = Math.max(bodyFont.size, boxHeight);

@@ -11871,7 +11871,7 @@ var Legend = function (_Element) {
           drawPoint(ctx, drawOptions, _centerX, _centerY);
         } else if (meta.type === 'line') {
           ctx.fillStyle = 'transparent';
-          ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
+          ctx.strokeRect(rtlHelper.leftForLtr(x, boxWidth), y + fontSize / 2, boxWidth, 0);
           var centerX = x + boxWidth / 2;
           var centerY = y + fontSize / 2;
           var _drawOptions = {
@@ -13023,7 +13023,7 @@ var Tooltip = function (_Element) {
     }
   }, {
     key: "_drawColorDot",
-    value: function _drawColorDot(ctx, pt, i, rtlHelper, meta) {
+    value: function _drawColorDot(ctx, pt, i, rtlHelper) {
       var me = this;
       var options = me.options;
       var labelColors = me.labelColors[i];
@@ -13036,7 +13036,7 @@ var Tooltip = function (_Element) {
       var boxWidth = bodyFontSize;
       ctx.fillStyle = 'transparent';
       ctx.strokeStyle = labelColors.borderColor;
-      ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
+      ctx.strokeRect(rtlHelper.leftForLtr(x, boxWidth), y + fontSize / 2, boxWidth, 0);
       options.radius = fontSize * Math.sqrt(5) / 5;
       var centerX = x + boxWidth / 2;
       var centerY = y + fontSize / 2;
@@ -13083,7 +13083,7 @@ var Tooltip = function (_Element) {
         lines = bodyItem.lines;
         if (displayColors && lines.length) {
           if (meta.type === 'line') {
-            me._drawColorDot(ctx, pt, i, rtlHelper, meta);
+            me._drawColorDot(ctx, pt, i, rtlHelper);
           } else {
             me._drawColorBox(ctx, pt, i, rtlHelper);
             bodyLineHeight = Math.max(bodyFont.size, boxHeight);
