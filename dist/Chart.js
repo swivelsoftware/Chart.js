@@ -13022,35 +13022,11 @@ var Tooltip = function (_Element) {
       ctx.fillStyle = me.labelTextColors[i];
     }
   }, {
-    key: "_drawColorDot",
-    value: function _drawColorDot(ctx, pt, i, rtlHelper) {
-      var me = this;
-      var options = me.options;
-      var labelColors = me.labelColors[i];
-      var bodyFontSize = options.bodyFontSize;
-      var colorX = getAlignedX(me, 'left');
-      var rtlColorX = rtlHelper.x(colorX);
-      var x = rtlColorX;
-      var y = pt.y;
-      var fontSize = bodyFontSize;
-      var boxWidth = bodyFontSize;
-      ctx.fillStyle = 'transparent';
-      ctx.strokeStyle = labelColors.borderColor;
-      ctx.strokeRect(rtlHelper.leftForLtr(x, boxWidth), y + fontSize / 2, boxWidth, 0);
-      options.radius = fontSize * Math.sqrt(5) / 5;
-      var centerX = x + boxWidth / 2;
-      var centerY = y + fontSize / 2;
-      ctx.lineWidth *= Math.SQRT2 / 2;
-      drawPoint(ctx, options, centerX, centerY);
-      ctx.fillStyle = me.labelTextColors[i];
-    }
-  }, {
     key: "drawBody",
     value: function drawBody(pt, ctx) {
       var me = this;
       var body = me.body,
-          options = me.options,
-          ci = me._chart;
+          options = me.options;
       var bodyFont = options.bodyFont,
           bodySpacing = options.bodySpacing,
           bodyAlign = options.bodyAlign,
@@ -13074,20 +13050,14 @@ var Tooltip = function (_Element) {
       each(me.beforeBody, fillLineOfText);
       xLinePadding = displayColors && bodyAlignForCalculation !== 'right' ? bodyAlign === 'center' ? boxWidth / 2 + 1 : boxWidth + 2 : 0;
       for (i = 0, ilen = body.length; i < ilen; ++i) {
-        var point = me.dataPoints[i];
-        var meta = ci.getDatasetMeta(point.datasetIndex);
         bodyItem = body[i];
         textColor = me.labelTextColors[i];
         ctx.fillStyle = textColor;
         each(bodyItem.before, fillLineOfText);
         lines = bodyItem.lines;
         if (displayColors && lines.length) {
-          if (meta.type === 'line') {
-            me._drawColorDot(ctx, pt, i, rtlHelper);
-          } else {
-            me._drawColorBox(ctx, pt, i, rtlHelper);
-            bodyLineHeight = Math.max(bodyFont.size, boxHeight);
-          }
+          me._drawColorBox(ctx, pt, i, rtlHelper);
+          bodyLineHeight = Math.max(bodyFont.size, boxHeight);
         }
         for (j = 0, jlen = lines.length; j < jlen; ++j) {
           fillLineOfText(lines[j]);
