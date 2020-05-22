@@ -19,7 +19,7 @@ defaults.set('legend', {
 	weight: 1000,
 
 	// a callback that will handle
-	onClick: function(e, legendItem) {
+	onClick(e, legendItem) {
 		const index = legendItem.datasetIndex;
 		const ci = this.chart;
 

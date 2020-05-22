@@ -1,6 +1,7 @@
 # Deployment
 /coverage
 /custom
+/dist
 /docs/index.md
 /gh-pages
 
@@ -26,5 +27,3 @@ build/
 *.log
 *.swp
 *.stackdump
-
-/dist
