@@ -786,7 +786,7 @@ export class Tooltip extends Element {
 		ctx.fillStyle = me.labelTextColors[i];
 	}
 
-	_drawColorDot(ctx, pt, i, rtlHelper, meta) {
+	_drawColorDot(ctx, pt, i, rtlHelper) {
 		const me = this;
 		const options = me.options;
 		const labelColors = me.labelColors[i];
@@ -803,7 +803,7 @@ export class Tooltip extends Element {
 		ctx.strokeStyle = labelColors.borderColor;
 
 		// Draw line as legend symbol
-		ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
+		ctx.strokeRect(rtlHelper.leftForLtr(x, boxWidth), y + fontSize / 2, boxWidth, 0);
 
 		// Draw point at center
 		options.radius = fontSize * Math.sqrt(5) / 5;
@@ -863,7 +863,7 @@ export class Tooltip extends Element {
 			// Draw Legend-like boxes if needed
 			if (displayColors && lines.length) {
 				if (meta.type === 'line') {
-					me._drawColorDot(ctx, pt, i, rtlHelper, meta);
+					me._drawColorDot(ctx, pt, i, rtlHelper);
 				}
 				else {
 					me._drawColorBox(ctx, pt, i, rtlHelper);

@@ -437,7 +437,7 @@ export class Legend extends Element {
 			} else if (meta.type === 'line') {
 				// Draw line as legend symbol
 				ctx.fillStyle = 'transparent';
-				ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
+				ctx.strokeRect(rtlHelper.leftForLtr(x, boxWidth), y + fontSize / 2, boxWidth, 0);
 
 				// Draw point at center
 				var centerX = x + boxWidth / 2;
