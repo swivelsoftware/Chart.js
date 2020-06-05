@@ -1,5 +1,5 @@
 /* eslint-disable import/no-namespace, import/namespace */
-import {default as Animator} from './core.animator';
+import animator from './core.animator';
 import * as controllers from '../controllers';
 import defaults from './core.defaults';
 import Interaction from './core.interaction';
@@ -172,17 +172,25 @@ function getCanvas(item) {
 	return item;
 }
 
-export default class Chart {
+function computeNewSize(canvas, width, height, aspectRatio) {
+	if (width === undefined || height === undefined) {
+		width = getMaximumWidth(canvas);
+		height = getMaximumHeight(canvas);
+	}
+	// the canvas render width and height will be casted to integers so make sure that
+	// the canvas display style uses the same integer values to avoid blurring effect.
 
-	static version = version;
+	// Minimum values set to 0 instead of canvas.size because the size defaults to 300x150 if the element is collapsed
+	width = Math.max(0, Math.floor(width));
+	return {
+		width,
+		height: Math.max(0, Math.floor(aspectRatio ? width / aspectRatio : height))
+	};
+}
 
-	/**
-	 * NOTE(SB) We actually don't use this container anymore but we need to keep it
-	 * for backward compatibility. Though, it can still be useful for plugins that
-	 * would need to work on multiple charts?!
-	 */
-	static instances = {};
+class Chart {
 
+	// eslint-disable-next-line max-statements
 	constructor(item, config) {
 		const me = this;
 
@@ -246,8 +254,8 @@ export default class Chart {
 			return;
 		}
 
-		Animator.listen(me, 'complete', onAnimationsComplete);
-		Animator.listen(me, 'progress', onAnimationProgress);
+		animator.listen(me, 'complete', onAnimationsComplete);
+		animator.listen(me, 'progress', onAnimationProgress);
 
 		me._initialize();
 		if (me.attached) {
@@ -297,7 +305,7 @@ export default class Chart {
 	}
 
 	stop() {
-		Animator.stop(this);
+		animator.stop(this);
 		return this;
 	}
 
@@ -306,38 +314,27 @@ export default class Chart {
 		const options = me.options;
 		const canvas = me.canvas;
 		const aspectRatio = options.maintainAspectRatio && me.aspectRatio;
-
-		if (width === undefined || height === undefined) {
-			width = getMaximumWidth(canvas);
-			height = getMaximumHeight(canvas);
-		}
-		// the canvas render width and height will be casted to integers so make sure that
-		// the canvas display style uses the same integer values to avoid blurring effect.
-
-		// Set to 0 instead of canvas.size because the size defaults to 300x150 if the element is collapsed
-		const newWidth = Math.max(0, Math.floor(width));
-		const newHeight = Math.max(0, Math.floor(aspectRatio ? newWidth / aspectRatio : height));
+		const newSize = computeNewSize(canvas, width, height, aspectRatio);
 
 		// detect devicePixelRation changes
 		const oldRatio = me.currentDevicePixelRatio;
 		const newRatio = options.devicePixelRatio || me.platform.getDevicePixelRatio();
 
-		if (me.width === newWidth && me.height === newHeight && oldRatio === newRatio) {
+		if (me.width === newSize.width && me.height === newSize.height && oldRatio === newRatio) {
 			return;
 		}
 
-		canvas.width = me.width = newWidth;
-		canvas.height = me.height = newHeight;
+		canvas.width = me.width = newSize.width;
+		canvas.height = me.height = newSize.height;
 		if (canvas.style) {
-			canvas.style.width = newWidth + 'px';
-			canvas.style.height = newHeight + 'px';
+			canvas.style.width = newSize.width + 'px';
+			canvas.style.height = newSize.height + 'px';
 		}
 
 		retinaScale(me, newRatio);
 
 		if (!silent) {
 			// Notify any plugins about the resize
-			const newSize = {width: newWidth, height: newHeight};
 			plugins.notify(me, 'resize', [newSize]);
 
 			// Notify of resize
@@ -668,9 +665,9 @@ export default class Chart {
 			callCallback(animationOptions && animationOptions.onComplete, [], me);
 		};
 
-		if (Animator.has(me)) {
-			if (me.attached && !Animator.running(me)) {
-				Animator.start(me);
+		if (animator.has(me)) {
+			if (me.attached && !animator.running(me)) {
+				animator.start(me);
 			}
 		} else {
 			me.draw();
@@ -913,7 +910,7 @@ export default class Chart {
 		let i, ilen;
 
 		me.stop();
-		Animator.remove(me);
+		animator.remove(me);
 
 		// dataset controllers need to cleanup associated data
 		for (i = 0, ilen = me.data.datasets.length; i < ilen; ++i) {
@@ -1108,12 +1105,12 @@ export default class Chart {
 
 		// Invoke onHover hook
 		// Need to call with native event here to not break backwards compatibility
-		callCallback(options.onHover || options.hover.onHover, [e.native, me.active], me);
+		callCallback(options.onHover || options.hover.onHover, [e.native, me.active, me], me);
 
 		if (e.type === 'mouseup' || e.type === 'click') {
-			if (options.onClick && _isPointInArea(e, me.chartArea)) {
+			if (_isPointInArea(e, me.chartArea)) {
 				// Use e.native here for backwards compatibility
-				options.onClick.call(me, e.native, me.active);
+				callCallback(options.onClick, [e, me.active, me], me);
 			}
 		}
 
@@ -1128,3 +1125,14 @@ export default class Chart {
 		return changed;
 	}
 }
+
+Chart.version = version;
+
+/**
+ * NOTE(SB) We actually don't use this container anymore but we need to keep it
+ * for backward compatibility. Though, it can still be useful for plugins that
+ * would need to work on multiple charts?!
+ */
+Chart.instances = {};
+
+export default Chart;

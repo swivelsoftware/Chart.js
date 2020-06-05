@@ -2,7 +2,7 @@ import defaults from '../core/core.defaults';
 import Element from '../core/core.element';
 import layouts from '../core/core.layouts';
 import {drawPoint} from '../helpers/helpers.canvas';
-import {callback as call, mergeIf, valueOrDefault} from '../helpers/helpers.core';
+import {callback as call, mergeIf, valueOrDefault, isNullOrUndef} from '../helpers/helpers.core';
 import {toFont, toPadding} from '../helpers/helpers.options';
 import {getRtlAdapter, overrideTextDirection, restoreTextDirection} from '../helpers/helpers.rtl';
 
@@ -19,9 +19,9 @@ defaults.set('legend', {
 	weight: 1000,
 
 	// a callback that will handle
-	onClick(e, legendItem) {
+	onClick(e, legendItem, legend) {
 		const index = legendItem.datasetIndex;
-		const ci = this.chart;
+		const ci = legend.chart;
 
 		var hiddens = (ci.data.datasets || []).map(function(meta, i) {
 			return !ci.isDatasetVisible(i);
@@ -105,9 +105,23 @@ defaults.set('legend', {
  * @return {number} width of the color box area
  */
 function getBoxWidth(labelOpts, fontSize) {
-	return labelOpts.usePointStyle && labelOpts.boxWidth > fontSize ?
+	const {boxWidth} = labelOpts;
+	return (labelOpts.usePointStyle && boxWidth > fontSize) || isNullOrUndef(boxWidth) ?
 		fontSize :
-		labelOpts.boxWidth;
+		boxWidth;
+}
+
+/**
+ * Helper function to get the box height
+ * @param {object} labelOpts - the label options on the legend
+ * @param {*} fontSize - the label font size
+ * @return {number} height of the color box area
+ */
+function getBoxHeight(labelOpts, fontSize) {
+	const {boxHeight} = labelOpts;
+	return (labelOpts.usePointStyle && boxHeight > fontSize) || isNullOrUndef(boxHeight) ?
+		fontSize :
+		boxHeight;
 }
 
 export class Legend extends Element {
@@ -254,6 +268,9 @@ export class Legend extends Element {
 		const ctx = me.ctx;
 		const labelFont = toFont(labelOpts.font);
 		const fontSize = labelFont.size;
+		const boxWidth = getBoxWidth(labelOpts, fontSize);
+		const boxHeight = getBoxHeight(labelOpts, fontSize);
+		const itemHeight = Math.max(boxHeight, fontSize);
 
 		// Reset hit boxes
 		const hitboxes = me.legendHitBoxes = [];
@@ -286,11 +303,10 @@ export class Legend extends Element {
 			ctx.textBaseline = 'middle';
 
 			me.legendItems.forEach((legendItem, i) => {
-				const boxWidth = getBoxWidth(labelOpts, fontSize);
 				const width = boxWidth + (fontSize / 2) + ctx.measureText(legendItem.text).width;
 
 				if (i === 0 || lineWidths[lineWidths.length - 1] + width + 2 * labelOpts.padding > minSize.width) {
-					totalHeight += fontSize + labelOpts.padding;
+					totalHeight += itemHeight + labelOpts.padding;
 					lineWidths[lineWidths.length - (i > 0 ? 0 : 1)] = 0;
 				}
 
@@ -299,7 +315,7 @@ export class Legend extends Element {
 					left: 0,
 					top: 0,
 					width,
-					height: fontSize
+					height: itemHeight
 				};
 
 				lineWidths[lineWidths.length - 1] += width + labelOpts.padding;
@@ -317,7 +333,6 @@ export class Legend extends Element {
 
 			const heightLimit = minSize.height - titleHeight;
 			me.legendItems.forEach((legendItem, i) => {
-				const boxWidth = getBoxWidth(labelOpts, fontSize);
 				const itemWidth = boxWidth + (fontSize / 2) + ctx.measureText(legendItem.text).width;
 
 				// If too tall, go to new column
@@ -338,7 +353,7 @@ export class Legend extends Element {
 					left: 0,
 					top: 0,
 					width: itemWidth,
-					height: fontSize
+					height: itemHeight,
 				};
 			});
 
@@ -392,6 +407,8 @@ export class Legend extends Element {
 		ctx.font = labelFont.string;
 
 		const boxWidth = getBoxWidth(labelOpts, fontSize);
+		const boxHeight = getBoxHeight(labelOpts, fontSize);
+		const height = Math.max(fontSize, boxHeight);
 		const hitboxes = me.legendHitBoxes;
 
 		// current position
@@ -400,7 +417,7 @@ export class Legend extends Element {
 			var ci = me.chart;
 			var meta = ci.getDatasetMeta(index);
 			
-			if (isNaN(boxWidth) || boxWidth <= 0) {
+			if (isNaN(boxWidth) || boxWidth <= 0 || isNaN(boxHeight) || boxHeight < 0) {
 				return;
 			}
 
@@ -452,9 +469,12 @@ export class Legend extends Element {
 				drawPoint(ctx, drawOptions, centerX, centerY);
 			} else {
 				// Draw box as legend symbol
-				ctx.fillRect(rtlHelper.leftForLtr(x, boxWidth), y, boxWidth, fontSize);
+				// Adjust position when boxHeight < fontSize (want it centered)
+				const yBoxTop = y + Math.max((fontSize - boxHeight) / 2, 0);
+
+				ctx.fillRect(rtlHelper.leftForLtr(x, boxWidth), yBoxTop, boxWidth, boxHeight);
 				if (lineWidth !== 0) {
-					ctx.strokeRect(rtlHelper.leftForLtr(x, boxWidth), y, boxWidth, fontSize);
+					ctx.strokeRect(rtlHelper.leftForLtr(x, boxWidth), yBoxTop, boxWidth, boxHeight);
 				}
 			}
 
@@ -464,8 +484,7 @@ export class Legend extends Element {
 		const fillText = function(x, y, legendItem, textWidth) {
 			const halfFontSize = fontSize / 2;
 			const xLeft = rtlHelper.xPlus(x, boxWidth + halfFontSize);
-			const yMiddle = y + halfFontSize;
-
+			const yMiddle = y + (height / 2);
 			ctx.fillText(legendItem.text, xLeft, yMiddle);
 
 			if (legendItem.hidden) {
@@ -508,7 +527,7 @@ export class Legend extends Element {
 
 		overrideTextDirection(me.ctx, opts.textDirection);
 
-		const itemHeight = fontSize + labelOpts.padding;
+		const itemHeight = height + labelOpts.padding;
 		me.legendItems.forEach((legendItem, i) => {
 			const textWidth = ctx.measureText(legendItem.text).width;
 			const width = boxWidth + (fontSize / 2) + textWidth;
@@ -694,21 +713,19 @@ export class Legend extends Element {
 		const hoveredItem = me._getLegendItemAt(e.x, e.y);
 
 		if (type === 'click') {
-			if (hoveredItem && opts.onClick) {
-				// use e.native for backwards compatibility
-				opts.onClick.call(me, e.native, hoveredItem);
+			if (hoveredItem) {
+				call(opts.onClick, [e, hoveredItem, me], me);
 			}
 		} else {
 			if (opts.onLeave && hoveredItem !== me._hoveredItem) {
 				if (me._hoveredItem) {
-					opts.onLeave.call(me, e.native, me._hoveredItem);
+					call(opts.onLeave, [e, me._hoveredItem, me], me);
 				}
 				me._hoveredItem = hoveredItem;
 			}
 
-			if (opts.onHover && hoveredItem) {
-				// use e.native for backwards compatibility
-				opts.onHover.call(me, e.native, hoveredItem);
+			if (hoveredItem) {
+				call(opts.onHover, [e, hoveredItem, me], me);
 			}
 		}
 	}

@@ -1,17 +1,21 @@
 module.exports = {
 	config: {
-		type: 'radar',
+		type: 'bar',
 		data: {
 			labels: [0, 1, 2, 3, 4, 5],
 			datasets: [
 				{
 					// option in dataset
-					data: [0, 5, 10, null, -10, -5],
-					backgroundColor: '#ff0000'
+					data: [0, 2, 3, 4, 5, 6],
+					backgroundColor: [
+						'#ff0000',
+						'#00ff00',
+						'#0000ff'
+					]
 				},
 				{
 					// option in element (fallback)
-					data: [4, -5, -10, null, 10, 5]
+					data: [6, 5, 4, 3, 2, 1],
 				}
 			]
 		},
@@ -19,23 +23,22 @@ module.exports = {
 			legend: false,
 			title: false,
 			elements: {
-				line: {
-					backgroundColor: '#00ff00',
-					fill: true,
-				},
-				point: {
-					radius: 10
+				rectangle: {
+					backgroundColor: [
+						'#000000',
+						'#888888'
+					]
 				}
 			},
-			scale: {
-				display: false,
-				min: -15
+			scales: {
+				x: {display: false},
+				y: {display: false}
 			}
 		}
 	},
 	options: {
 		canvas: {
-			height: 512,
+			height: 256,
 			width: 512
 		}
 	}

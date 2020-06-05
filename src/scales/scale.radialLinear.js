@@ -289,11 +289,7 @@ function numberOrZero(param) {
 	return isNumber(param) ? param : 0;
 }
 
-export default class RadialLinearScale extends LinearScaleBase {
-
-	static id = 'radialLinear';
-	// INTERNAL: static default options, registered in src/index.js
-	static defaults = defaultConfig;
+class RadialLinearScale extends LinearScaleBase {
 
 	constructor(cfg) {
 		super(cfg);
@@ -426,6 +422,16 @@ export default class RadialLinearScale extends LinearScaleBase {
 		return (value - me.min) * scalingFactor;
 	}
 
+	getValueForDistanceFromCenter(distance) {
+		if (isNullOrUndef(distance)) {
+			return NaN;
+		}
+
+		const me = this;
+		const scaledDistance = distance / (me.drawingArea / (me.max - me.min));
+		return me.options.reverse ? me.max - scaledDistance : me.min + scaledDistance;
+	}
+
 	getPointPosition(index, distanceFromCenter) {
 		const me = this;
 		const angle = me.getIndexAngle(index) - (Math.PI / 2);
@@ -547,3 +553,10 @@ export default class RadialLinearScale extends LinearScaleBase {
 	 */
 	drawTitle() {}
 }
+
+RadialLinearScale.id = 'radialLinear';
+
+// INTERNAL: default options, registered in src/index.js
+RadialLinearScale.defaults = defaultConfig;
+
+export default RadialLinearScale;

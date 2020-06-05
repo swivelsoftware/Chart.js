@@ -542,11 +542,7 @@ const defaultConfig = {
 	}
 };
 
-export default class TimeScale extends Scale {
-
-	static id = 'time';
-	// INTERNAL: static default options, registered in src/index.js
-	static defaults = defaultConfig;
+class TimeScale extends Scale {
 
 	/**
 	 * @param {object} props
@@ -690,7 +686,7 @@ export default class TimeScale extends Scale {
 		me._majorUnit = !tickOpts.major.enabled || me._unit === 'year' ? undefined
 			: determineMajorUnit(me._unit);
 		me._table = buildLookupTable(getTimestampsForTable(me), min, max, distribution);
-		me._offsets = computeOffsets(me._table, getDataTimestamps(me), min, max, options);
+		me._offsets = computeOffsets(me._table, timestamps, min, max, options);
 
 		if (options.reverse) {
 			ticks.reverse();
@@ -812,3 +808,10 @@ export default class TimeScale extends Scale {
 		return capacity > 0 ? capacity : 1;
 	}
 }
+
+TimeScale.id = 'time';
+
+// INTERNAL: default options, registered in src/index.js
+TimeScale.defaults = defaultConfig;
+
+export default TimeScale;
