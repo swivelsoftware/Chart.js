@@ -4,17 +4,20 @@
  * (c) 2020 Chart.js Contributors
  * Released under the MIT License
  */
-function fontString(pixelSize, fontStyle, fontFamily) {
-	return fontStyle + ' ' + pixelSize + 'px ' + fontFamily;
-}
-const requestAnimFrame = (function() {
-	if (typeof window === 'undefined') {
-		return function(callback) {
-			return callback();
-		};
-	}
-	return window.requestAnimationFrame;
-}());
+import { requestAnimFrame } from '../helpers/extras.js';
+import effects from '../helpers/easing.js';
+import { isObject, noop, valueOrDefault, merge, isArray, resolveObjectKey, mergeIf, _merger, isNullOrUndef, clone, each, uid, callback, _elementsEqual, isFinite as isNumberFinite } from '../helpers/core.js';
+import { r as resolve, d as defaults, t as toPadding, a as toFont } from '../helpers/chunks/helpers.options.js';
+export { d as defaults } from '../helpers/chunks/helpers.options.js';
+import { _steppedLineTo, _bezierCurveTo, _isPointInArea, drawPoint, clipArea, unclipArea, clear, _measureText, _alignPixel, _longestText } from '../helpers/canvas.js';
+import { color, getHoverColor } from '../helpers/color.js';
+import { unlistenArrayEvents, listenArrayEvents, _rlookupByKey, _lookupByKey, _filterBetween, _arrayUnique, _lookup } from '../helpers/collection.js';
+import { sign, isNumber, getAngleFromPoint, _angleBetween, _limitValue, toRadians, log10, toDegrees, _factorize, _normalizeAngle, distanceBetweenPoints, _setMinAndMaxByKey, _decimalPlaces, almostEquals, almostWhole } from '../helpers/math.js';
+import { _steppedInterpolation, _bezierInterpolation, _pointInLine } from '../helpers/interpolation.js';
+import { _computeSegments, _boundSegments, _boundSegment } from '../helpers/segment.js';
+import { _updateBezierControlPoints } from '../helpers/curve.js';
+import { getRelativePosition as getRelativePosition$1, _getParentNode, getStyle, retinaScale, getMaximumWidth, getMaximumHeight } from '../helpers/dom.js';
+import { getRtlAdapter, overrideTextDirection, restoreTextDirection } from '../helpers/rtl.js';
 
 function drawFPS(chart, count, date, lastDate) {
 	const fps = (1000 / (date - lastDate)) | 0;
@@ -165,1291 +168,6 @@ class Animator {
 	}
 }
 var animator = new Animator();
-
-const effects = {
-	linear(t) {
-		return t;
-	},
-	easeInQuad(t) {
-		return t * t;
-	},
-	easeOutQuad(t) {
-		return -t * (t - 2);
-	},
-	easeInOutQuad(t) {
-		if ((t /= 0.5) < 1) {
-			return 0.5 * t * t;
-		}
-		return -0.5 * ((--t) * (t - 2) - 1);
-	},
-	easeInCubic(t) {
-		return t * t * t;
-	},
-	easeOutCubic(t) {
-		return (t -= 1) * t * t + 1;
-	},
-	easeInOutCubic(t) {
-		if ((t /= 0.5) < 1) {
-			return 0.5 * t * t * t;
-		}
-		return 0.5 * ((t -= 2) * t * t + 2);
-	},
-	easeInQuart(t) {
-		return t * t * t * t;
-	},
-	easeOutQuart(t) {
-		return -((t -= 1) * t * t * t - 1);
-	},
-	easeInOutQuart(t) {
-		if ((t /= 0.5) < 1) {
-			return 0.5 * t * t * t * t;
-		}
-		return -0.5 * ((t -= 2) * t * t * t - 2);
-	},
-	easeInQuint(t) {
-		return t * t * t * t * t;
-	},
-	easeOutQuint(t) {
-		return (t -= 1) * t * t * t * t + 1;
-	},
-	easeInOutQuint(t) {
-		if ((t /= 0.5) < 1) {
-			return 0.5 * t * t * t * t * t;
-		}
-		return 0.5 * ((t -= 2) * t * t * t * t + 2);
-	},
-	easeInSine(t) {
-		return -Math.cos(t * (Math.PI / 2)) + 1;
-	},
-	easeOutSine(t) {
-		return Math.sin(t * (Math.PI / 2));
-	},
-	easeInOutSine(t) {
-		return -0.5 * (Math.cos(Math.PI * t) - 1);
-	},
-	easeInExpo(t) {
-		return (t === 0) ? 0 : Math.pow(2, 10 * (t - 1));
-	},
-	easeOutExpo(t) {
-		return (t === 1) ? 1 : -Math.pow(2, -10 * t) + 1;
-	},
-	easeInOutExpo(t) {
-		if (t === 0) {
-			return 0;
-		}
-		if (t === 1) {
-			return 1;
-		}
-		if ((t /= 0.5) < 1) {
-			return 0.5 * Math.pow(2, 10 * (t - 1));
-		}
-		return 0.5 * (-Math.pow(2, -10 * --t) + 2);
-	},
-	easeInCirc(t) {
-		if (t >= 1) {
-			return t;
-		}
-		return -(Math.sqrt(1 - t * t) - 1);
-	},
-	easeOutCirc(t) {
-		return Math.sqrt(1 - (t -= 1) * t);
-	},
-	easeInOutCirc(t) {
-		if ((t /= 0.5) < 1) {
-			return -0.5 * (Math.sqrt(1 - t * t) - 1);
-		}
-		return 0.5 * (Math.sqrt(1 - (t -= 2) * t) + 1);
-	},
-	easeInElastic(t) {
-		let s = 1.70158;
-		let p = 0;
-		let a = 1;
-		if (t === 0) {
-			return 0;
-		}
-		if (t === 1) {
-			return 1;
-		}
-		if (!p) {
-			p = 0.3;
-		}
-		{
-			s = p / (2 * Math.PI) * Math.asin(1 / a);
-		}
-		return -(a * Math.pow(2, 10 * (t -= 1)) * Math.sin((t - s) * (2 * Math.PI) / p));
-	},
-	easeOutElastic(t) {
-		let s = 1.70158;
-		let p = 0;
-		let a = 1;
-		if (t === 0) {
-			return 0;
-		}
-		if (t === 1) {
-			return 1;
-		}
-		if (!p) {
-			p = 0.3;
-		}
-		{
-			s = p / (2 * Math.PI) * Math.asin(1 / a);
-		}
-		return a * Math.pow(2, -10 * t) * Math.sin((t - s) * (2 * Math.PI) / p) + 1;
-	},
-	easeInOutElastic(t) {
-		let s = 1.70158;
-		let p = 0;
-		let a = 1;
-		if (t === 0) {
-			return 0;
-		}
-		if ((t /= 0.5) === 2) {
-			return 1;
-		}
-		if (!p) {
-			p = 0.45;
-		}
-		{
-			s = p / (2 * Math.PI) * Math.asin(1 / a);
-		}
-		if (t < 1) {
-			return -0.5 * (a * Math.pow(2, 10 * (t -= 1)) * Math.sin((t - s) * (2 * Math.PI) / p));
-		}
-		return a * Math.pow(2, -10 * (t -= 1)) * Math.sin((t - s) * (2 * Math.PI) / p) * 0.5 + 1;
-	},
-	easeInBack(t) {
-		const s = 1.70158;
-		return t * t * ((s + 1) * t - s);
-	},
-	easeOutBack(t) {
-		const s = 1.70158;
-		return (t -= 1) * t * ((s + 1) * t + s) + 1;
-	},
-	easeInOutBack(t) {
-		let s = 1.70158;
-		if ((t /= 0.5) < 1) {
-			return 0.5 * (t * t * (((s *= (1.525)) + 1) * t - s));
-		}
-		return 0.5 * ((t -= 2) * t * (((s *= (1.525)) + 1) * t + s) + 2);
-	},
-	easeInBounce(t) {
-		return 1 - effects.easeOutBounce(1 - t);
-	},
-	easeOutBounce(t) {
-		if (t < (1 / 2.75)) {
-			return 7.5625 * t * t;
-		}
-		if (t < (2 / 2.75)) {
-			return 7.5625 * (t -= (1.5 / 2.75)) * t + 0.75;
-		}
-		if (t < (2.5 / 2.75)) {
-			return 7.5625 * (t -= (2.25 / 2.75)) * t + 0.9375;
-		}
-		return 7.5625 * (t -= (2.625 / 2.75)) * t + 0.984375;
-	},
-	easeInOutBounce(t) {
-		if (t < 0.5) {
-			return effects.easeInBounce(t * 2) * 0.5;
-		}
-		return effects.easeOutBounce(t * 2 - 1) * 0.5 + 0.5;
-	}
-};
-
-function noop() {}
-const uid = (function() {
-	let id = 0;
-	return function() {
-		return id++;
-	};
-}());
-function isNullOrUndef(value) {
-	return value === null || typeof value === 'undefined';
-}
-function isArray(value) {
-	if (Array.isArray && Array.isArray(value)) {
-		return true;
-	}
-	const type = Object.prototype.toString.call(value);
-	if (type.substr(0, 7) === '[object' && type.substr(-6) === 'Array]') {
-		return true;
-	}
-	return false;
-}
-function isObject(value) {
-	return value !== null && Object.prototype.toString.call(value) === '[object Object]';
-}
-const isNumberFinite = (value) => (typeof value === 'number' || value instanceof Number) && isFinite(+value);
-function valueOrDefault(value, defaultValue) {
-	return typeof value === 'undefined' ? defaultValue : value;
-}
-function valueAtIndexOrDefault(value, index, defaultValue) {
-	return valueOrDefault(isArray(value) ? value[index] : value, defaultValue);
-}
-function callback(fn, args, thisArg) {
-	if (fn && typeof fn.call === 'function') {
-		return fn.apply(thisArg, args);
-	}
-}
-function each(loopable, fn, thisArg, reverse) {
-	let i, len, keys;
-	if (isArray(loopable)) {
-		len = loopable.length;
-		if (reverse) {
-			for (i = len - 1; i >= 0; i--) {
-				fn.call(thisArg, loopable[i], i);
-			}
-		} else {
-			for (i = 0; i < len; i++) {
-				fn.call(thisArg, loopable[i], i);
-			}
-		}
-	} else if (isObject(loopable)) {
-		keys = Object.keys(loopable);
-		len = keys.length;
-		for (i = 0; i < len; i++) {
-			fn.call(thisArg, loopable[keys[i]], keys[i]);
-		}
-	}
-}
-function arrayEquals(a0, a1) {
-	let i, ilen, v0, v1;
-	if (!a0 || !a1 || a0.length !== a1.length) {
-		return false;
-	}
-	for (i = 0, ilen = a0.length; i < ilen; ++i) {
-		v0 = a0[i];
-		v1 = a1[i];
-		if (v0 instanceof Array && v1 instanceof Array) {
-			if (!arrayEquals(v0, v1)) {
-				return false;
-			}
-		} else if (v0 !== v1) {
-			return false;
-		}
-	}
-	return true;
-}
-function _elementsEqual(a0, a1) {
-	let i, ilen, v0, v1;
-	if (!a0 || !a1 || a0.length !== a1.length) {
-		return false;
-	}
-	for (i = 0, ilen = a0.length; i < ilen; ++i) {
-		v0 = a0[i];
-		v1 = a1[i];
-		if (v0.datasetIndex !== v1.datasetIndex || v0.index !== v1.index) {
-			return false;
-		}
-	}
-	return true;
-}
-function clone(source) {
-	if (isArray(source)) {
-		return source.map(clone);
-	}
-	if (isObject(source)) {
-		const target = Object.create(source);
-		const keys = Object.keys(source);
-		const klen = keys.length;
-		let k = 0;
-		for (; k < klen; ++k) {
-			target[keys[k]] = clone(source[keys[k]]);
-		}
-		return target;
-	}
-	return source;
-}
-function _merger(key, target, source, options) {
-	const tval = target[key];
-	const sval = source[key];
-	if (isObject(tval) && isObject(sval)) {
-		merge(tval, sval, options);
-	} else {
-		target[key] = clone(sval);
-	}
-}
-function merge(target, source, options) {
-	const sources = isArray(source) ? source : [source];
-	const ilen = sources.length;
-	if (!isObject(target)) {
-		return target;
-	}
-	options = options || {};
-	const merger = options.merger || _merger;
-	for (let i = 0; i < ilen; ++i) {
-		source = sources[i];
-		if (!isObject(source)) {
-			continue;
-		}
-		const keys = Object.keys(source);
-		for (let k = 0, klen = keys.length; k < klen; ++k) {
-			merger(keys[k], target, source, options);
-		}
-	}
-	return target;
-}
-function mergeIf(target, source) {
-	return merge(target, source, {merger: _mergerIf});
-}
-function _mergerIf(key, target, source) {
-	const tval = target[key];
-	const sval = source[key];
-	if (isObject(tval) && isObject(sval)) {
-		mergeIf(tval, sval);
-	} else if (!Object.prototype.hasOwnProperty.call(target, key)) {
-		target[key] = clone(sval);
-	}
-}
-function _deprecated(scope, value, previous, current) {
-	if (value !== undefined) {
-		console.warn(scope + ': "' + previous +
-			'" is deprecated. Please use "' + current + '" instead');
-	}
-}
-
-var coreHelpers = /*#__PURE__*/Object.freeze({
-__proto__: null,
-noop: noop,
-uid: uid,
-isNullOrUndef: isNullOrUndef,
-isArray: isArray,
-isObject: isObject,
-isFinite: isNumberFinite,
-valueOrDefault: valueOrDefault,
-valueAtIndexOrDefault: valueAtIndexOrDefault,
-callback: callback,
-each: each,
-arrayEquals: arrayEquals,
-_elementsEqual: _elementsEqual,
-clone: clone,
-_merger: _merger,
-merge: merge,
-mergeIf: mergeIf,
-_mergerIf: _mergerIf,
-_deprecated: _deprecated
-});
-
-class Defaults {
-	constructor() {
-		this.color = 'rgba(0,0,0,0.1)';
-		this.elements = {};
-		this.events = [
-			'mousemove',
-			'mouseout',
-			'click',
-			'touchstart',
-			'touchmove'
-		];
-		this.font = {
-			color: '#666',
-			family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif",
-			size: 12,
-			style: 'normal',
-			lineHeight: 1.2,
-			weight: null,
-			lineWidth: 0,
-			strokeStyle: undefined
-		};
-		this.hover = {
-			onHover: null,
-			mode: 'nearest',
-			intersect: true
-		};
-		this.maintainAspectRatio = true;
-		this.onClick = null;
-		this.responsive = true;
-		this.showLines = true;
-		this.plugins = undefined;
-		this.scale = undefined;
-		this.legend = undefined;
-		this.title = undefined;
-		this.tooltips = undefined;
-		this.doughnut = undefined;
-	}
-	set(scope, values) {
-		return merge(this[scope] || (this[scope] = {}), values);
-	}
-}
-var defaults = new Defaults();
-
-const PI = Math.PI;
-const RAD_PER_DEG = PI / 180;
-const DOUBLE_PI = PI * 2;
-const HALF_PI = PI / 2;
-const QUARTER_PI = PI / 4;
-const TWO_THIRDS_PI = PI * 2 / 3;
-function toFontString(font) {
-	if (!font || isNullOrUndef(font.size) || isNullOrUndef(font.family)) {
-		return null;
-	}
-	return (font.style ? font.style + ' ' : '')
-		+ (font.weight ? font.weight + ' ' : '')
-		+ font.size + 'px '
-		+ font.family;
-}
-function _measureText(ctx, data, gc, longest, string) {
-	let textWidth = data[string];
-	if (!textWidth) {
-		textWidth = data[string] = ctx.measureText(string).width;
-		gc.push(string);
-	}
-	if (textWidth > longest) {
-		longest = textWidth;
-	}
-	return longest;
-}
-function _longestText(ctx, font, arrayOfThings, cache) {
-	cache = cache || {};
-	let data = cache.data = cache.data || {};
-	let gc = cache.garbageCollect = cache.garbageCollect || [];
-	if (cache.font !== font) {
-		data = cache.data = {};
-		gc = cache.garbageCollect = [];
-		cache.font = font;
-	}
-	ctx.save();
-	ctx.font = font;
-	let longest = 0;
-	const ilen = arrayOfThings.length;
-	let i, j, jlen, thing, nestedThing;
-	for (i = 0; i < ilen; i++) {
-		thing = arrayOfThings[i];
-		if (thing !== undefined && thing !== null && isArray(thing) !== true) {
-			longest = _measureText(ctx, data, gc, longest, thing);
-		} else if (isArray(thing)) {
-			for (j = 0, jlen = thing.length; j < jlen; j++) {
-				nestedThing = thing[j];
-				if (nestedThing !== undefined && nestedThing !== null && !isArray(nestedThing)) {
-					longest = _measureText(ctx, data, gc, longest, nestedThing);
-				}
-			}
-		}
-	}
-	ctx.restore();
-	const gcLen = gc.length / 2;
-	if (gcLen > arrayOfThings.length) {
-		for (i = 0; i < gcLen; i++) {
-			delete data[gc[i]];
-		}
-		gc.splice(0, gcLen);
-	}
-	return longest;
-}
-function _alignPixel(chart, pixel, width) {
-	const devicePixelRatio = chart.currentDevicePixelRatio;
-	const halfWidth = width / 2;
-	return Math.round((pixel - halfWidth) * devicePixelRatio) / devicePixelRatio + halfWidth;
-}
-function clear(chart) {
-	chart.ctx.clearRect(0, 0, chart.width, chart.height);
-}
-function drawPoint(ctx, options = {}, x, y) {
-	let type, xOffset, yOffset, size, cornerRadius;
-	const style = options.pointStyle;
-	const rotation = options.rotation;
-	const radius = options.radius;
-	let rad = (rotation || 0) * RAD_PER_DEG;
-	if (style && typeof style === 'object') {
-		type = style.toString();
-		if (type === '[object HTMLImageElement]' || type === '[object HTMLCanvasElement]') {
-			ctx.save();
-			ctx.translate(x, y);
-			ctx.rotate(rad);
-			ctx.drawImage(style, -style.width / 2, -style.height / 2, style.width, style.height);
-			ctx.restore();
-			return;
-		}
-	}
-	if (isNaN(radius) || radius <= 0) {
-		return;
-	}
-	ctx.beginPath();
-	switch (style) {
-	default:
-		ctx.arc(x, y, radius, 0, DOUBLE_PI);
-		ctx.closePath();
-		break;
-	case 'triangle':
-		ctx.moveTo(x + Math.sin(rad) * radius, y - Math.cos(rad) * radius);
-		rad += TWO_THIRDS_PI;
-		ctx.lineTo(x + Math.sin(rad) * radius, y - Math.cos(rad) * radius);
-		rad += TWO_THIRDS_PI;
-		ctx.lineTo(x + Math.sin(rad) * radius, y - Math.cos(rad) * radius);
-		ctx.closePath();
-		break;
-	case 'rectRounded':
-		cornerRadius = radius * 0.516;
-		size = radius - cornerRadius;
-		xOffset = Math.cos(rad + QUARTER_PI) * size;
-		yOffset = Math.sin(rad + QUARTER_PI) * size;
-		ctx.arc(x - xOffset, y - yOffset, cornerRadius, rad - PI, rad - HALF_PI);
-		ctx.arc(x + yOffset, y - xOffset, cornerRadius, rad - HALF_PI, rad);
-		ctx.arc(x + xOffset, y + yOffset, cornerRadius, rad, rad + HALF_PI);
-		ctx.arc(x - yOffset, y + xOffset, cornerRadius, rad + HALF_PI, rad + PI);
-		ctx.closePath();
-		break;
-	case 'rect':
-		if (!rotation) {
-			size = Math.SQRT1_2 * radius;
-			ctx.rect(x - size, y - size, 2 * size, 2 * size);
-			break;
-		}
-		rad += QUARTER_PI;
-	case 'rectRot':
-		xOffset = Math.cos(rad) * radius;
-		yOffset = Math.sin(rad) * radius;
-		ctx.moveTo(x - xOffset, y - yOffset);
-		ctx.lineTo(x + yOffset, y - xOffset);
-		ctx.lineTo(x + xOffset, y + yOffset);
-		ctx.lineTo(x - yOffset, y + xOffset);
-		ctx.closePath();
-		break;
-	case 'crossRot':
-		rad += QUARTER_PI;
-	case 'cross':
-		xOffset = Math.cos(rad) * radius;
-		yOffset = Math.sin(rad) * radius;
-		ctx.moveTo(x - xOffset, y - yOffset);
-		ctx.lineTo(x + xOffset, y + yOffset);
-		ctx.moveTo(x + yOffset, y - xOffset);
-		ctx.lineTo(x - yOffset, y + xOffset);
-		break;
-	case 'star':
-		xOffset = Math.cos(rad) * radius;
-		yOffset = Math.sin(rad) * radius;
-		ctx.moveTo(x - xOffset, y - yOffset);
-		ctx.lineTo(x + xOffset, y + yOffset);
-		ctx.moveTo(x + yOffset, y - xOffset);
-		ctx.lineTo(x - yOffset, y + xOffset);
-		rad += QUARTER_PI;
-		xOffset = Math.cos(rad) * radius;
-		yOffset = Math.sin(rad) * radius;
-		ctx.moveTo(x - xOffset, y - yOffset);
-		ctx.lineTo(x + xOffset, y + yOffset);
-		ctx.moveTo(x + yOffset, y - xOffset);
-		ctx.lineTo(x - yOffset, y + xOffset);
-		break;
-	case 'line':
-		xOffset = Math.cos(rad) * radius;
-		yOffset = Math.sin(rad) * radius;
-		ctx.moveTo(x - xOffset, y - yOffset);
-		ctx.lineTo(x + xOffset, y + yOffset);
-		break;
-	case 'dash':
-		ctx.moveTo(x, y);
-		ctx.lineTo(x + Math.cos(rad) * radius, y + Math.sin(rad) * radius);
-		break;
-	}
-	ctx.fill();
-	if (options.borderWidth > 0) {
-		ctx.stroke();
-	}
-}
-function _isPointInArea(point, area) {
-	const epsilon = 0.5;
-	return point.x > area.left - epsilon && point.x < area.right + epsilon &&
-		point.y > area.top - epsilon && point.y < area.bottom + epsilon;
-}
-function clipArea(ctx, area) {
-	ctx.save();
-	ctx.beginPath();
-	ctx.rect(area.left, area.top, area.right - area.left, area.bottom - area.top);
-	ctx.clip();
-}
-function unclipArea(ctx) {
-	ctx.restore();
-}
-function _steppedLineTo(ctx, previous, target, flip, mode) {
-	if (!previous) {
-		return ctx.lineTo(target.x, target.y);
-	}
-	if (mode === 'middle') {
-		const midpoint = (previous.x + target.x) / 2.0;
-		ctx.lineTo(midpoint, previous.y);
-		ctx.lineTo(midpoint, target.y);
-	} else if (mode === 'after' !== !!flip) {
-		ctx.lineTo(previous.x, target.y);
-	} else {
-		ctx.lineTo(target.x, previous.y);
-	}
-	ctx.lineTo(target.x, target.y);
-}
-function _bezierCurveTo(ctx, previous, target, flip) {
-	if (!previous) {
-		return ctx.lineTo(target.x, target.y);
-	}
-	ctx.bezierCurveTo(
-		flip ? previous.controlPointPreviousX : previous.controlPointNextX,
-		flip ? previous.controlPointPreviousY : previous.controlPointNextY,
-		flip ? target.controlPointNextX : target.controlPointPreviousX,
-		flip ? target.controlPointNextY : target.controlPointPreviousY,
-		target.x,
-		target.y);
-}
-
-var canvas = /*#__PURE__*/Object.freeze({
-__proto__: null,
-toFontString: toFontString,
-_measureText: _measureText,
-_longestText: _longestText,
-_alignPixel: _alignPixel,
-clear: clear,
-drawPoint: drawPoint,
-_isPointInArea: _isPointInArea,
-clipArea: clipArea,
-unclipArea: unclipArea,
-_steppedLineTo: _steppedLineTo,
-_bezierCurveTo: _bezierCurveTo
-});
-
-function toLineHeight(value, size) {
-	const matches = ('' + value).match(/^(normal|(\d+(?:\.\d+)?)(px|em|%)?)$/);
-	if (!matches || matches[1] === 'normal') {
-		return size * 1.2;
-	}
-	value = +matches[2];
-	switch (matches[3]) {
-	case 'px':
-		return value;
-	case '%':
-		value /= 100;
-		break;
-	}
-	return size * value;
-}
-function toPadding(value) {
-	let t, r, b, l;
-	if (isObject(value)) {
-		t = +value.top || 0;
-		r = +value.right || 0;
-		b = +value.bottom || 0;
-		l = +value.left || 0;
-	} else {
-		t = r = b = l = +value || 0;
-	}
-	return {
-		top: t,
-		right: r,
-		bottom: b,
-		left: l,
-		height: t + b,
-		width: l + r
-	};
-}
-function toFont(options) {
-	const defaultFont = defaults.font;
-	options = options || {};
-	let size = valueOrDefault(options.size, defaultFont.size);
-	if (typeof size === 'string') {
-		size = parseInt(size, 10);
-	}
-	const font = {
-		color: valueOrDefault(options.color, defaultFont.color),
-		family: valueOrDefault(options.family, defaultFont.family),
-		lineHeight: toLineHeight(valueOrDefault(options.lineHeight, defaultFont.lineHeight), size),
-		lineWidth: valueOrDefault(options.lineWidth, defaultFont.lineWidth),
-		size,
-		style: valueOrDefault(options.style, defaultFont.style),
-		weight: valueOrDefault(options.weight, defaultFont.weight),
-		strokeStyle: valueOrDefault(options.strokeStyle, defaultFont.strokeStyle),
-		string: ''
-	};
-	font.string = toFontString(font);
-	return font;
-}
-function resolve(inputs, context, index, info) {
-	let cacheable = true;
-	let i, ilen, value;
-	for (i = 0, ilen = inputs.length; i < ilen; ++i) {
-		value = inputs[i];
-		if (value === undefined) {
-			continue;
-		}
-		if (context !== undefined && typeof value === 'function') {
-			value = value(context);
-			cacheable = false;
-		}
-		if (index !== undefined && isArray(value)) {
-			value = value[index % value.length];
-			cacheable = false;
-		}
-		if (value !== undefined) {
-			if (info && !cacheable) {
-				info.cacheable = false;
-			}
-			return value;
-		}
-	}
-}
-
-var options = /*#__PURE__*/Object.freeze({
-__proto__: null,
-toLineHeight: toLineHeight,
-toPadding: toPadding,
-toFont: toFont,
-resolve: resolve
-});
-
-/*!
- * @kurkle/color v0.1.8
- * https://github.com/kurkle/color#readme
- * (c) 2020 Jukka Kurkela
- * Released under the MIT License
- */
-const map = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, A: 10, B: 11, C: 12, D: 13, E: 14, F: 15, a: 10, b: 11, c: 12, d: 13, e: 14, f: 15};
-const hex = '0123456789ABCDEF';
-const h1 = (b) => hex[b & 0xF];
-const h2 = (b) => hex[(b & 0xF0) >> 4] + hex[b & 0xF];
-const eq = (b) => (((b & 0xF0) >> 4) === (b & 0xF));
-function isShort(v) {
-	return eq(v.r) && eq(v.g) && eq(v.b) && eq(v.a);
-}
-function hexParse(str) {
-	var len = str.length;
-	var ret;
-	if (str[0] === '#') {
-		if (len === 4 || len === 5) {
-			ret = {
-				r: 255 & map[str[1]] * 17,
-				g: 255 & map[str[2]] * 17,
-				b: 255 & map[str[3]] * 17,
-				a: len === 5 ? map[str[4]] * 17 : 255
-			};
-		} else if (len === 7 || len === 9) {
-			ret = {
-				r: map[str[1]] << 4 | map[str[2]],
-				g: map[str[3]] << 4 | map[str[4]],
-				b: map[str[5]] << 4 | map[str[6]],
-				a: len === 9 ? (map[str[7]] << 4 | map[str[8]]) : 255
-			};
-		}
-	}
-	return ret;
-}
-function hexString(v) {
-	var f = isShort(v) ? h1 : h2;
-	return v
-		? '#' + f(v.r) + f(v.g) + f(v.b) + (v.a < 255 ? f(v.a) : '')
-		: v;
-}
-function round(v) {
-	return v + 0.5 | 0;
-}
-const lim = (v, l, h) => Math.max(Math.min(v, h), l);
-function p2b(v) {
-	return lim(round(v * 2.55), 0, 255);
-}
-function n2b(v) {
-	return lim(round(v * 255), 0, 255);
-}
-function b2n(v) {
-	return lim(round(v / 2.55) / 100, 0, 1);
-}
-function n2p(v) {
-	return lim(round(v * 100), 0, 100);
-}
-const RGB_RE = /^rgba?\(\s*([-+.\d]+)(%)?[\s,]+([-+.e\d]+)(%)?[\s,]+([-+.e\d]+)(%)?(?:[\s,/]+([-+.e\d]+)(%)?)?\s*\)$/;
-function rgbParse(str) {
-	const m = RGB_RE.exec(str);
-	let a = 255;
-	let r, g, b;
-	if (!m) {
-		return;
-	}
-	if (m[7] !== r) {
-		const v = +m[7];
-		a = 255 & (m[8] ? p2b(v) : v * 255);
-	}
-	r = +m[1];
-	g = +m[3];
-	b = +m[5];
-	r = 255 & (m[2] ? p2b(r) : r);
-	g = 255 & (m[4] ? p2b(g) : g);
-	b = 255 & (m[6] ? p2b(b) : b);
-	return {
-		r: r,
-		g: g,
-		b: b,
-		a: a
-	};
-}
-function rgbString(v) {
-	return v && (
-		v.a < 255
-			? `rgba(${v.r}, ${v.g}, ${v.b}, ${b2n(v.a)})`
-			: `rgb(${v.r}, ${v.g}, ${v.b})`
-	);
-}
-const HUE_RE = /^(hsla?|hwb|hsv)\(\s*([-+.e\d]+)(?:deg)?[\s,]+([-+.e\d]+)%[\s,]+([-+.e\d]+)%(?:[\s,]+([-+.e\d]+)(%)?)?\s*\)$/;
-function hsl2rgbn(h, s, l) {
-	const a = s * Math.min(l, 1 - l);
-	const f = (n, k = (n + h / 30) % 12) => l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-	return [f(0), f(8), f(4)];
-}
-function hsv2rgbn(h, s, v) {
-	const f = (n, k = (n + h / 60) % 6) => v - v * s * Math.max(Math.min(k, 4 - k, 1), 0);
-	return [f(5), f(3), f(1)];
-}
-function hwb2rgbn(h, w, b) {
-	const rgb = hsl2rgbn(h, 1, 0.5);
-	let i;
-	if (w + b > 1) {
-		i = 1 / (w + b);
-		w *= i;
-		b *= i;
-	}
-	for (i = 0; i < 3; i++) {
-		rgb[i] *= 1 - w - b;
-		rgb[i] += w;
-	}
-	return rgb;
-}
-function rgb2hsl(v) {
-	const range = 255;
-	const r = v.r / range;
-	const g = v.g / range;
-	const b = v.b / range;
-	const max = Math.max(r, g, b);
-	const min = Math.min(r, g, b);
-	const l = (max + min) / 2;
-	let h, s, d;
-	if (max !== min) {
-		d = max - min;
-		s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-		h = max === r
-			? ((g - b) / d) + (g < b ? 6 : 0)
-			: max === g
-				? (b - r) / d + 2
-				: (r - g) / d + 4;
-		h = h * 60 + 0.5;
-	}
-	return [h | 0, s || 0, l];
-}
-function calln(f, a, b, c) {
-	return (
-		Array.isArray(a)
-			? f(a[0], a[1], a[2])
-			: f(a, b, c)
-	).map(n2b);
-}
-function hsl2rgb(h, s, l) {
-	return calln(hsl2rgbn, h, s, l);
-}
-function hwb2rgb(h, w, b) {
-	return calln(hwb2rgbn, h, w, b);
-}
-function hsv2rgb(h, s, v) {
-	return calln(hsv2rgbn, h, s, v);
-}
-function hue(h) {
-	return (h % 360 + 360) % 360;
-}
-function hueParse(str) {
-	const m = HUE_RE.exec(str);
-	let a = 255;
-	let v;
-	if (!m) {
-		return;
-	}
-	if (m[5] !== v) {
-		a = m[6] ? p2b(+m[5]) : n2b(+m[5]);
-	}
-	const h = hue(+m[2]);
-	const p1 = +m[3] / 100;
-	const p2 = +m[4] / 100;
-	if (m[1] === 'hwb') {
-		v = hwb2rgb(h, p1, p2);
-	} else if (m[1] === 'hsv') {
-		v = hsv2rgb(h, p1, p2);
-	} else {
-		v = hsl2rgb(h, p1, p2);
-	}
-	return {
-		r: v[0],
-		g: v[1],
-		b: v[2],
-		a: a
-	};
-}
-function rotate(v, deg) {
-	var h = rgb2hsl(v);
-	h[0] = hue(h[0] + deg);
-	h = hsl2rgb(h);
-	v.r = h[0];
-	v.g = h[1];
-	v.b = h[2];
-}
-function hslString(v) {
-	if (!v) {
-		return;
-	}
-	const a = rgb2hsl(v);
-	const h = a[0];
-	const s = n2p(a[1]);
-	const l = n2p(a[2]);
-	return v.a < 255
-		? `hsla(${h}, ${s}%, ${l}%, ${b2n(v.a)})`
-		: `hsl(${h}, ${s}%, ${l}%)`;
-}
-var map$1 = {
-	x: 'dark',
-	Z: 'light',
-	Y: 're',
-	X: 'blu',
-	W: 'gr',
-	V: 'medium',
-	U: 'slate',
-	A: 'ee',
-	T: 'ol',
-	S: 'or',
-	B: 'ra',
-	C: 'lateg',
-	D: 'ights',
-	R: 'in',
-	Q: 'turquois',
-	E: 'hi',
-	P: 'ro',
-	O: 'al',
-	N: 'le',
-	M: 'de',
-	L: 'yello',
-	F: 'en',
-	K: 'ch',
-	G: 'arks',
-	H: 'ea',
-	I: 'ightg',
-	J: 'wh'
-};
-function unpack(obj) {
-	var unpacked = {};
-	var keys = Object.keys(obj);
-	var tkeys = Object.keys(map$1);
-	var i, j, k, ok, nk;
-	for (i = 0; i < keys.length; i++) {
-		ok = nk = keys[i];
-		for (j = 0; j < tkeys.length; j++) {
-			k = tkeys[j];
-			nk = nk.replace(k, map$1[k]);
-		}
-		k = parseInt(obj[ok], 16);
-		unpacked[nk] = [k >> 16 & 0xFF, k >> 8 & 0xFF, k & 0xFF];
-	}
-	return unpacked;
-}
-const names = unpack({
-	OiceXe: 'f0f8ff',
-	antiquewEte: 'faebd7',
-	aqua: 'ffff',
-	aquamarRe: '7fffd4',
-	azuY: 'f0ffff',
-	beige: 'f5f5dc',
-	bisque: 'ffe4c4',
-	black: '0',
-	blanKedOmond: 'ffebcd',
-	Xe: 'ff',
-	XeviTet: '8a2be2',
-	bPwn: 'a52a2a',
-	burlywood: 'deb887',
-	caMtXe: '5f9ea0',
-	KartYuse: '7fff00',
-	KocTate: 'd2691e',
-	cSO: 'ff7f50',
-	cSnflowerXe: '6495ed',
-	cSnsilk: 'fff8dc',
-	crimson: 'dc143c',
-	cyan: 'ffff',
-	xXe: '8b',
-	xcyan: '8b8b',
-	xgTMnPd: 'b8860b',
-	xWay: 'a9a9a9',
-	xgYF: '6400',
-	xgYy: 'a9a9a9',
-	xkhaki: 'bdb76b',
-	xmagFta: '8b008b',
-	xTivegYF: '556b2f',
-	xSange: 'ff8c00',
-	xScEd: '9932cc',
-	xYd: '8b0000',
-	xsOmon: 'e9967a',
-	xsHgYF: '8fbc8f',
-	xUXe: '483d8b',
-	xUWay: '2f4f4f',
-	xUgYy: '2f4f4f',
-	xQe: 'ced1',
-	xviTet: '9400d3',
-	dAppRk: 'ff1493',
-	dApskyXe: 'bfff',
-	dimWay: '696969',
-	dimgYy: '696969',
-	dodgerXe: '1e90ff',
-	fiYbrick: 'b22222',
-	flSOwEte: 'fffaf0',
-	foYstWAn: '228b22',
-	fuKsia: 'ff00ff',
-	gaRsbSo: 'dcdcdc',
-	ghostwEte: 'f8f8ff',
-	gTd: 'ffd700',
-	gTMnPd: 'daa520',
-	Way: '808080',
-	gYF: '8000',
-	gYFLw: 'adff2f',
-	gYy: '808080',
-	honeyMw: 'f0fff0',
-	hotpRk: 'ff69b4',
-	RdianYd: 'cd5c5c',
-	Rdigo: '4b0082',
-	ivSy: 'fffff0',
-	khaki: 'f0e68c',
-	lavFMr: 'e6e6fa',
-	lavFMrXsh: 'fff0f5',
-	lawngYF: '7cfc00',
-	NmoncEffon: 'fffacd',
-	ZXe: 'add8e6',
-	ZcSO: 'f08080',
-	Zcyan: 'e0ffff',
-	ZgTMnPdLw: 'fafad2',
-	ZWay: 'd3d3d3',
-	ZgYF: '90ee90',
-	ZgYy: 'd3d3d3',
-	ZpRk: 'ffb6c1',
-	ZsOmon: 'ffa07a',
-	ZsHgYF: '20b2aa',
-	ZskyXe: '87cefa',
-	ZUWay: '778899',
-	ZUgYy: '778899',
-	ZstAlXe: 'b0c4de',
-	ZLw: 'ffffe0',
-	lime: 'ff00',
-	limegYF: '32cd32',
-	lRF: 'faf0e6',
-	magFta: 'ff00ff',
-	maPon: '800000',
-	VaquamarRe: '66cdaa',
-	VXe: 'cd',
-	VScEd: 'ba55d3',
-	VpurpN: '9370db',
-	VsHgYF: '3cb371',
-	VUXe: '7b68ee',
-	VsprRggYF: 'fa9a',
-	VQe: '48d1cc',
-	VviTetYd: 'c71585',
-	midnightXe: '191970',
-	mRtcYam: 'f5fffa',
-	mistyPse: 'ffe4e1',
-	moccasR: 'ffe4b5',
-	navajowEte: 'ffdead',
-	navy: '80',
-	Tdlace: 'fdf5e6',
-	Tive: '808000',
-	TivedBb: '6b8e23',
-	Sange: 'ffa500',
-	SangeYd: 'ff4500',
-	ScEd: 'da70d6',
-	pOegTMnPd: 'eee8aa',
-	pOegYF: '98fb98',
-	pOeQe: 'afeeee',
-	pOeviTetYd: 'db7093',
-	papayawEp: 'ffefd5',
-	pHKpuff: 'ffdab9',
-	peru: 'cd853f',
-	pRk: 'ffc0cb',
-	plum: 'dda0dd',
-	powMrXe: 'b0e0e6',
-	purpN: '800080',
-	YbeccapurpN: '663399',
-	Yd: 'ff0000',
-	Psybrown: 'bc8f8f',
-	PyOXe: '4169e1',
-	saddNbPwn: '8b4513',
-	sOmon: 'fa8072',
-	sandybPwn: 'f4a460',
-	sHgYF: '2e8b57',
-	sHshell: 'fff5ee',
-	siFna: 'a0522d',
-	silver: 'c0c0c0',
-	skyXe: '87ceeb',
-	UXe: '6a5acd',
-	UWay: '708090',
-	UgYy: '708090',
-	snow: 'fffafa',
-	sprRggYF: 'ff7f',
-	stAlXe: '4682b4',
-	tan: 'd2b48c',
-	teO: '8080',
-	tEstN: 'd8bfd8',
-	tomato: 'ff6347',
-	Qe: '40e0d0',
-	viTet: 'ee82ee',
-	JHt: 'f5deb3',
-	wEte: 'ffffff',
-	wEtesmoke: 'f5f5f5',
-	Lw: 'ffff00',
-	LwgYF: '9acd32'
-});
-names.transparent = [0, 0, 0, 0];
-function nameParse(str) {
-	var a = names[str.toLowerCase()];
-	return a && {
-		r: a[0],
-		g: a[1],
-		b: a[2],
-		a: a.length === 4 ? a[3] : 255
-	};
-}
-function modHSL(v, i, ratio) {
-	if (v) {
-		let tmp = rgb2hsl(v);
-		tmp[i] = Math.max(0, Math.min(tmp[i] + tmp[i] * ratio, i === 0 ? 360 : 1));
-		tmp = hsl2rgb(tmp);
-		v.r = tmp[0];
-		v.g = tmp[1];
-		v.b = tmp[2];
-	}
-}
-function clone$1(v, proto) {
-	return v ? Object.assign(proto || {}, v) : v;
-}
-function fromObject(input) {
-	var v = {r: 0, g: 0, b: 0, a: 255};
-	if (Array.isArray(input)) {
-		if (input.length >= 3) {
-			v = {r: input[0], g: input[1], b: input[2], a: 255};
-			if (input.length > 3) {
-				v.a = n2b(input[3]);
-			}
-		}
-	} else {
-		v = clone$1(input, {r: 0, g: 0, b: 0, a: 1});
-		v.a = n2b(v.a);
-	}
-	return v;
-}
-function functionParse(str) {
-	if (str.charAt(0) === 'r') {
-		return rgbParse(str);
-	}
-	return hueParse(str);
-}
-class Color {
-	constructor(input) {
-		if (input instanceof Color) {
-			return input;
-		}
-		const type = typeof input;
-		let v;
-		if (type === 'object') {
-			v = fromObject(input);
-		} else if (type === 'string') {
-			v = hexParse(input) || nameParse(input) || functionParse(input);
-		}
-		this._rgb = v;
-		this._valid = !!v;
-	}
-	get valid() {
-		return this._valid;
-	}
-	get rgb() {
-		var v = clone$1(this._rgb);
-		if (v) {
-			v.a = b2n(v.a);
-		}
-		return v;
-	}
-	set rgb(obj) {
-		this._rgb = fromObject(obj);
-	}
-	rgbString() {
-		return this._valid ? rgbString(this._rgb) : this._rgb;
-	}
-	hexString() {
-		return this._valid ? hexString(this._rgb) : this._rgb;
-	}
-	hslString() {
-		return this._valid ? hslString(this._rgb) : this._rgb;
-	}
-	mix(color, weight) {
-		const me = this;
-		if (color) {
-			const c1 = me.rgb;
-			const c2 = color.rgb;
-			let w2;
-			const p = weight === w2 ? 0.5 : weight;
-			const w = 2 * p - 1;
-			const a = c1.a - c2.a;
-			const w1 = ((w * a === -1 ? w : (w + a) / (1 + w * a)) + 1) / 2.0;
-			w2 = 1 - w1;
-			c1.r = 0xFF & w1 * c1.r + w2 * c2.r + 0.5;
-			c1.g = 0xFF & w1 * c1.g + w2 * c2.g + 0.5;
-			c1.b = 0xFF & w1 * c1.b + w2 * c2.b + 0.5;
-			c1.a = p * c1.a + (1 - p) * c2.a;
-			me.rgb = c1;
-		}
-		return me;
-	}
-	clone() {
-		return new Color(this.rgb);
-	}
-	alpha(a) {
-		this._rgb.a = n2b(a);
-		return this;
-	}
-	clearer(ratio) {
-		const rgb = this._rgb;
-		rgb.a *= 1 - ratio;
-		return this;
-	}
-	greyscale() {
-		const rgb = this._rgb;
-		const val = round(rgb.r * 0.3 + rgb.g * 0.59 + rgb.b * 0.11);
-		rgb.r = rgb.g = rgb.b = val;
-		return this;
-	}
-	opaquer(ratio) {
-		const rgb = this._rgb;
-		rgb.a *= 1 + ratio;
-		return this;
-	}
-	negate() {
-		const v = this._rgb;
-		v.r = 255 - v.r;
-		v.g = 255 - v.g;
-		v.b = 255 - v.b;
-		return this;
-	}
-	lighten(ratio) {
-		modHSL(this._rgb, 2, ratio);
-		return this;
-	}
-	darken(ratio) {
-		modHSL(this._rgb, 2, -ratio);
-		return this;
-	}
-	saturate(ratio) {
-		modHSL(this._rgb, 1, ratio);
-		return this;
-	}
-	desaturate(ratio) {
-		modHSL(this._rgb, 1, -ratio);
-		return this;
-	}
-	rotate(deg) {
-		rotate(this._rgb, deg);
-		return this;
-	}
-}
-function index_esm(input) {
-	return new Color(input);
-}
-
-const isPatternOrGradient = (value) => value instanceof CanvasGradient || value instanceof CanvasPattern;
-function color(value) {
-	return isPatternOrGradient(value) ? value : index_esm(value);
-}
-function getHoverColor(value) {
-	return isPatternOrGradient(value)
-		? value
-		: index_esm(value).saturate(0.5).darken(0.1).hexString();
-}
 
 const transparent = 'transparent';
 const interpolators = {
@@ -1690,167 +408,6 @@ class Animations {
 	}
 }
 
-const PI$1 = Math.PI;
-const TAU = 2 * PI$1;
-const PITAU = TAU + PI$1;
-function _factorize(value) {
-	const result = [];
-	const sqrt = Math.sqrt(value);
-	let i;
-	for (i = 1; i < sqrt; i++) {
-		if (value % i === 0) {
-			result.push(i);
-			result.push(value / i);
-		}
-	}
-	if (sqrt === (sqrt | 0)) {
-		result.push(sqrt);
-	}
-	result.sort((a, b) => a - b).pop();
-	return result;
-}
-const log10 = Math.log10 || function(x) {
-	const exponent = Math.log(x) * Math.LOG10E;
-	const powerOf10 = Math.round(exponent);
-	const isPowerOf10 = x === Math.pow(10, powerOf10);
-	return isPowerOf10 ? powerOf10 : exponent;
-};
-function isNumber(n) {
-	return !isNaN(parseFloat(n)) && isFinite(n);
-}
-function almostEquals(x, y, epsilon) {
-	return Math.abs(x - y) < epsilon;
-}
-function almostWhole(x, epsilon) {
-	const rounded = Math.round(x);
-	return ((rounded - epsilon) <= x) && ((rounded + epsilon) >= x);
-}
-function _setMinAndMaxByKey(array, target, property) {
-	let i, ilen, value;
-	for (i = 0, ilen = array.length; i < ilen; i++) {
-		value = array[i][property];
-		if (!isNaN(value)) {
-			target.min = Math.min(target.min, value);
-			target.max = Math.max(target.max, value);
-		}
-	}
-}
-const sign = Math.sign ?
-	function(x) {
-		return Math.sign(x);
-	} :
-	function(x) {
-		x = +x;
-		if (x === 0 || isNaN(x)) {
-			return x;
-		}
-		return x > 0 ? 1 : -1;
-	};
-function toRadians(degrees) {
-	return degrees * (PI$1 / 180);
-}
-function toDegrees(radians) {
-	return radians * (180 / PI$1);
-}
-function _decimalPlaces(x) {
-	if (!isNumberFinite(x)) {
-		return;
-	}
-	let e = 1;
-	let p = 0;
-	while (Math.round(x * e) / e !== x) {
-		e *= 10;
-		p++;
-	}
-	return p;
-}
-function getAngleFromPoint(centrePoint, anglePoint) {
-	const distanceFromXCenter = anglePoint.x - centrePoint.x;
-	const distanceFromYCenter = anglePoint.y - centrePoint.y;
-	const radialDistanceFromCenter = Math.sqrt(distanceFromXCenter * distanceFromXCenter + distanceFromYCenter * distanceFromYCenter);
-	let angle = Math.atan2(distanceFromYCenter, distanceFromXCenter);
-	if (angle < (-0.5 * PI$1)) {
-		angle += TAU;
-	}
-	return {
-		angle,
-		distance: radialDistanceFromCenter
-	};
-}
-function distanceBetweenPoints(pt1, pt2) {
-	return Math.sqrt(Math.pow(pt2.x - pt1.x, 2) + Math.pow(pt2.y - pt1.y, 2));
-}
-function _angleDiff(a, b) {
-	return (a - b + PITAU) % TAU - PI$1;
-}
-function _normalizeAngle(a) {
-	return (a % TAU + TAU) % TAU;
-}
-function _angleBetween(angle, start, end) {
-	const a = _normalizeAngle(angle);
-	const s = _normalizeAngle(start);
-	const e = _normalizeAngle(end);
-	const angleToStart = _normalizeAngle(s - a);
-	const angleToEnd = _normalizeAngle(e - a);
-	const startToAngle = _normalizeAngle(a - s);
-	const endToAngle = _normalizeAngle(a - e);
-	return a === s || a === e || (angleToStart > angleToEnd && startToAngle < endToAngle);
-}
-function _limitValue(value, min, max) {
-	return Math.max(min, Math.min(max, value));
-}
-
-var math = /*#__PURE__*/Object.freeze({
-__proto__: null,
-_factorize: _factorize,
-log10: log10,
-isNumber: isNumber,
-almostEquals: almostEquals,
-almostWhole: almostWhole,
-_setMinAndMaxByKey: _setMinAndMaxByKey,
-sign: sign,
-toRadians: toRadians,
-toDegrees: toDegrees,
-_decimalPlaces: _decimalPlaces,
-getAngleFromPoint: getAngleFromPoint,
-distanceBetweenPoints: distanceBetweenPoints,
-_angleDiff: _angleDiff,
-_normalizeAngle: _normalizeAngle,
-_angleBetween: _angleBetween,
-_limitValue: _limitValue
-});
-
-const arrayEvents = ['push', 'pop', 'shift', 'splice', 'unshift'];
-function listenArrayEvents(array, listener) {
-	if (array._chartjs) {
-		array._chartjs.listeners.push(listener);
-		return;
-	}
-	Object.defineProperty(array, '_chartjs', {
-		configurable: true,
-		enumerable: false,
-		value: {
-			listeners: [listener]
-		}
-	});
-	arrayEvents.forEach((key) => {
-		const method = '_onData' + key.charAt(0).toUpperCase() + key.slice(1);
-		const base = array[key];
-		Object.defineProperty(array, key, {
-			configurable: true,
-			enumerable: false,
-			value(...args) {
-				const res = base.apply(this, args);
-				array._chartjs.listeners.forEach((object) => {
-					if (typeof object[method] === 'function') {
-						object[method](...args);
-					}
-				});
-				return res;
-			}
-		});
-	});
-}
 function scaleClip(scale, allowedOverflow) {
 	const opts = scale && scale.options || {};
 	const reverse = opts.reverse;
@@ -1890,24 +447,6 @@ function toClip(value) {
 		bottom: b,
 		left: l
 	};
-}
-function unlistenArrayEvents(array, listener) {
-	const stub = array._chartjs;
-	if (!stub) {
-		return;
-	}
-	const listeners = stub.listeners;
-	const index = listeners.indexOf(listener);
-	if (index !== -1) {
-		listeners.splice(index, 1);
-	}
-	if (listeners.length > 0) {
-		return;
-	}
-	arrayEvents.forEach((key) => {
-		delete array[key];
-	});
-	delete array._chartjs;
 }
 function getSortedDatasetIndices(chart, filterVisible) {
 	const keys = [];
@@ -1988,6 +527,12 @@ function getFirstScaleId(chart, axis) {
 	const scales = chart.scales;
 	return Object.keys(scales).filter(key => scales[key].axis === axis).shift();
 }
+function optionKeys(optionNames) {
+	return isArray(optionNames) ? optionNames : Object.keys(optionNames);
+}
+function optionKey(key, active) {
+	return active ? 'hover' + key.charAt(0).toUpperCase() + key.slice(1) : key;
+}
 class DatasetController {
 	constructor(chart, datasetIndex) {
 		this.chart = chart;
@@ -2000,11 +545,7 @@ class DatasetController {
 		this._config = undefined;
 		this._parsing = false;
 		this._data = undefined;
-		this._dataCopy = undefined;
-		this._dataModified = false;
 		this._objectData = undefined;
-		this._labels = undefined;
-		this._scaleStacked = {};
 		this.initialize();
 	}
 	initialize() {
@@ -2023,14 +564,18 @@ class DatasetController {
 		const chart = me.chart;
 		const meta = me._cachedMeta;
 		const dataset = me.getDataset();
-		const xid = meta.xAxisID = dataset.xAxisID || getFirstScaleId(chart, 'x');
-		const yid = meta.yAxisID = dataset.yAxisID || getFirstScaleId(chart, 'y');
-		const rid = meta.rAxisID = dataset.rAxisID || getFirstScaleId(chart, 'r');
+		const chooseId = (axis, x, y, r) => axis === 'x' ? x : axis === 'r' ? r : y;
+		const xid = meta.xAxisID = valueOrDefault(dataset.xAxisID, getFirstScaleId(chart, 'x'));
+		const yid = meta.yAxisID = valueOrDefault(dataset.yAxisID, getFirstScaleId(chart, 'y'));
+		const rid = meta.rAxisID = valueOrDefault(dataset.rAxisID, getFirstScaleId(chart, 'r'));
+		const indexAxis = meta.indexAxis;
+		const iid = meta.iAxisID = chooseId(indexAxis, xid, yid, rid);
+		const vid = meta.vAxisID = chooseId(indexAxis, yid, xid, rid);
 		meta.xScale = me.getScaleForId(xid);
 		meta.yScale = me.getScaleForId(yid);
 		meta.rScale = me.getScaleForId(rid);
-		meta.iScale = me._getIndexScale();
-		meta.vScale = me._getValueScale();
+		meta.iScale = me.getScaleForId(iid);
+		meta.vScale = me.getScaleForId(vid);
 	}
 	getDataset() {
 		return this.chart.data.datasets[this.index];
@@ -2040,18 +585,6 @@ class DatasetController {
 	}
 	getScaleForId(scaleID) {
 		return this.chart.scales[scaleID];
-	}
-	getValueScaleId() {
-		return this._cachedMeta.yAxisID;
-	}
-	getIndexScaleId() {
-		return this._cachedMeta.xAxisID;
-	}
-	_getValueScale() {
-		return this.getScaleForId(this.getValueScaleId());
-	}
-	_getIndexScale() {
-		return this.getScaleForId(this.getIndexScaleId());
 	}
 	_getOtherScale(scale) {
 		const meta = this._cachedMeta;
@@ -2072,36 +605,16 @@ class DatasetController {
 		const dataset = me.getDataset();
 		const data = dataset.data || (dataset.data = []);
 		if (isObject(data)) {
-			if (me._objectData === data) {
-				return false;
-			}
 			me._data = convertObjectDataToArray(data);
-			me._objectData = data;
-		} else {
-			if (me._data === data && !me._dataModified && arrayEquals(data, me._dataCopy)) {
-				return false;
-			}
+		} else if (me._data !== data) {
 			if (me._data) {
 				unlistenArrayEvents(me._data, me);
 			}
-			me._dataCopy = data.slice(0);
-			me._dataModified = false;
 			if (data && Object.isExtensible(data)) {
 				listenArrayEvents(data, me);
 			}
 			me._data = data;
 		}
-		return true;
-	}
-	_labelCheck() {
-		const me = this;
-		const iScale = me._cachedMeta.iScale;
-		const labels = iScale ? iScale.getLabels() : me.chart.data.labels;
-		if (me._labels === labels) {
-			return false;
-		}
-		me._labels = labels;
-		return true;
 	}
 	addElements() {
 		const me = this;
@@ -2118,12 +631,10 @@ class DatasetController {
 	}
 	buildOrUpdateElements() {
 		const me = this;
-		const dataChanged = me._dataCheck();
-		const labelsChanged = me._labelCheck();
-		const scaleChanged = me._scaleCheck();
 		const meta = me._cachedMeta;
 		const dataset = me.getDataset();
 		let stackChanged = false;
+		me._dataCheck();
 		meta._stacked = isStacked(meta.vScale, meta);
 		if (meta.stack !== dataset.stack) {
 			stackChanged = true;
@@ -2132,7 +643,7 @@ class DatasetController {
 			});
 			meta.stack = dataset.stack;
 		}
-		me._resyncElements(dataChanged || labelsChanged || scaleChanged || stackChanged);
+		me._resyncElements();
 		if (stackChanged) {
 			updateStacks(me, meta._parsed);
 		}
@@ -2223,14 +734,15 @@ class DatasetController {
 	}
 	parseObjectData(meta, data, start, count) {
 		const {xScale, yScale} = meta;
+		const {xAxisKey = 'x', yAxisKey = 'y'} = this._parsing;
 		const parsed = new Array(count);
 		let i, ilen, index, item;
 		for (i = 0, ilen = count; i < ilen; ++i) {
 			index = i + start;
 			item = data[index];
 			parsed[i] = {
-				x: xScale.parseObject(item, 'x', index),
-				y: yScale.parseObject(item, 'y', index)
+				x: xScale.parse(resolveObjectKey(item, xAxisKey), index),
+				y: yScale.parse(resolveObjectKey(item, yAxisKey), index)
 			};
 		}
 		return parsed;
@@ -2248,27 +760,29 @@ class DatasetController {
 		};
 		return applyStack(stack, value, meta.index);
 	}
+	updateRangeFromParsed(range, scale, parsed, stack) {
+		let value = parsed[scale.axis];
+		const values = stack && parsed._stacks[scale.axis];
+		if (stack && values) {
+			stack.values = values;
+			range.min = Math.min(range.min, value);
+			range.max = Math.max(range.max, value);
+			value = applyStack(stack, value, this._cachedMeta.index, true);
+		}
+		range.min = Math.min(range.min, value);
+		range.max = Math.max(range.max, value);
+	}
 	getMinMax(scale, canStack) {
-		const meta = this._cachedMeta;
+		const me = this;
+		const meta = me._cachedMeta;
 		const _parsed = meta._parsed;
 		const sorted = meta._sorted && scale === meta.iScale;
 		const ilen = _parsed.length;
-		const otherScale = this._getOtherScale(scale);
-		const stack = canStack && meta._stacked && {keys: getSortedDatasetIndices(this.chart, true), values: null};
-		let min = Number.POSITIVE_INFINITY;
-		let max = Number.NEGATIVE_INFINITY;
+		const otherScale = me._getOtherScale(scale);
+		const stack = canStack && meta._stacked && {keys: getSortedDatasetIndices(me.chart, true), values: null};
+		const range = {min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY};
 		const {min: otherMin, max: otherMax} = getUserBounds(otherScale);
 		let i, value, parsed, otherValue;
-		function _compute() {
-			if (stack) {
-				stack.values = parsed._stacks[scale.axis];
-				min = Math.min(min, value);
-				max = Math.max(max, value);
-				value = applyStack(stack, value, meta.index, true);
-			}
-			min = Math.min(min, value);
-			max = Math.max(max, value);
-		}
 		function _skip() {
 			parsed = _parsed[i];
 			value = parsed[scale.axis];
@@ -2279,7 +793,7 @@ class DatasetController {
 			if (_skip()) {
 				continue;
 			}
-			_compute();
+			me.updateRangeFromParsed(range, scale, parsed, stack);
 			if (sorted) {
 				break;
 			}
@@ -2289,11 +803,11 @@ class DatasetController {
 				if (_skip()) {
 					continue;
 				}
-				_compute();
+				me.updateRangeFromParsed(range, scale, parsed, stack);
 				break;
 			}
 		}
-		return {min, max};
+		return range;
 	}
 	getAllParsedValues(scale) {
 		const parsed = this._cachedMeta._parsed;
@@ -2306,29 +820,6 @@ class DatasetController {
 			}
 		}
 		return values;
-	}
-	_cacheScaleStackStatus() {
-		const me = this;
-		const meta = me._cachedMeta;
-		const iScale = meta.iScale;
-		const vScale = meta.vScale;
-		const cache = me._scaleStacked = {};
-		if (iScale && vScale) {
-			cache[iScale.id] = iScale.options.stacked;
-			cache[vScale.id] = vScale.options.stacked;
-		}
-	}
-	_scaleCheck() {
-		const me = this;
-		const meta = me._cachedMeta;
-		const iScale = meta.iScale;
-		const vScale = meta.vScale;
-		const cache = me._scaleStacked;
-		return !cache ||
-			!iScale ||
-			!vScale ||
-			cache[iScale.id] !== iScale.options.stacked ||
-			cache[vScale.id] !== vScale.options.stacked;
 	}
 	getMaxOverflow() {
 		return false;
@@ -2352,7 +843,6 @@ class DatasetController {
 		me._cachedDataOpts = {};
 		me.update(mode);
 		meta._clip = toClip(valueOrDefault(me._config.clip, defaultClip(meta.xScale, meta.yScale, me.getMaxOverflow())));
-		me._cacheScaleStackStatus();
 	}
 	update(mode) {}
 	draw() {
@@ -2404,26 +894,10 @@ class DatasetController {
 		};
 	}
 	resolveDatasetElementOptions(active) {
-		const me = this;
-		const chart = me.chart;
-		const datasetOpts = me._config;
-		const options = chart.options.elements[me.datasetElementType._type] || {};
-		const elementOptions = me.datasetElementOptions;
-		const values = {};
-		const context = me._getContext(undefined, active);
-		let i, ilen, key, readKey, value;
-		for (i = 0, ilen = elementOptions.length; i < ilen; ++i) {
-			key = elementOptions[i];
-			readKey = active ? 'hover' + key.charAt(0).toUpperCase() + key.slice(1) : key;
-			value = resolve([
-				datasetOpts[readKey],
-				options[readKey]
-			], context);
-			if (value !== undefined) {
-				values[key] = value;
-			}
-		}
-		return values;
+		return this._resolveOptions(this.datasetElementOptions, {
+			active,
+			type: this.datasetElementType._type
+		});
 	}
 	resolveDataElementOptions(index, mode) {
 		const me = this;
@@ -2432,44 +906,38 @@ class DatasetController {
 		if (cached[mode]) {
 			return cached[mode];
 		}
-		const chart = me.chart;
-		const datasetOpts = me._config;
-		const options = chart.options.elements[me.dataElementType._type] || {};
-		const elementOptions = me.dataElementOptions;
-		const values = {};
-		const context = me._getContext(index, active);
 		const info = {cacheable: !active};
-		let keys, i, ilen, key, value, readKey;
-		if (isArray(elementOptions)) {
-			for (i = 0, ilen = elementOptions.length; i < ilen; ++i) {
-				key = elementOptions[i];
-				readKey = active ? 'hover' + key.charAt(0).toUpperCase() + key.slice(1) : key;
-				value = resolve([
-					datasetOpts[readKey],
-					options[readKey]
-				], context, index, info);
-				if (value !== undefined) {
-					values[key] = value;
-				}
-			}
-		} else {
-			keys = Object.keys(elementOptions);
-			for (i = 0, ilen = keys.length; i < ilen; ++i) {
-				key = keys[i];
-				readKey = active ? 'hover' + key.charAt(0).toUpperCase() + key.slice(1) : key;
-				value = resolve([
-					datasetOpts[elementOptions[readKey]],
-					datasetOpts[readKey],
-					options[readKey]
-				], context, index, info);
-				if (value !== undefined) {
-					values[key] = value;
-				}
-			}
-		}
+		const values = me._resolveOptions(me.dataElementOptions, {
+			index,
+			active,
+			info,
+			type: me.dataElementType._type
+		});
 		if (info.cacheable) {
 			values.$shared = true;
 			cached[mode] = values;
+		}
+		return values;
+	}
+	_resolveOptions(optionNames, args) {
+		const me = this;
+		const {index, active, type, info} = args;
+		const datasetOpts = me._config;
+		const options = me.chart.options.elements[type] || {};
+		const values = {};
+		const context = me._getContext(index, active);
+		const keys = optionKeys(optionNames);
+		for (let i = 0, ilen = keys.length; i < ilen; ++i) {
+			const key = keys[i];
+			const readKey = optionKey(key, active);
+			const value = resolve([
+				datasetOpts[optionNames[readKey]],
+				datasetOpts[readKey],
+				options[readKey]
+			], context, index, info);
+			if (value !== undefined) {
+				values[key] = value;
+			}
 		}
 		return values;
 	}
@@ -2543,23 +1011,18 @@ class DatasetController {
 			this._setStyle(element, undefined, 'active', true);
 		}
 	}
-	_resyncElements(changed) {
+	_resyncElements() {
 		const me = this;
 		const meta = me._cachedMeta;
 		const numMeta = meta.data.length;
 		const numData = me._data.length;
 		if (numData > numMeta) {
 			me._insertElements(numMeta, numData - numMeta);
-			if (changed && numMeta) {
-				me.parse(0, numMeta);
-			}
 		} else if (numData < numMeta) {
 			meta.data.splice(numData, numMeta - numData);
 			meta._parsed.splice(numData, numMeta - numData);
-			me.parse(0, numData);
-		} else if (changed) {
-			me.parse(0, numData);
 		}
+		me.parse(0, Math.min(numData, numMeta));
 	}
 	_insertElements(start, count) {
 		const me = this;
@@ -2588,24 +1051,19 @@ class DatasetController {
 	_onDataPush() {
 		const count = arguments.length;
 		this._insertElements(this.getDataset().data.length - count, count);
-		this._dataModified = true;
 	}
 	_onDataPop() {
 		this._removeElements(this._cachedMeta.data.length - 1, 1);
-		this._dataModified = true;
 	}
 	_onDataShift() {
 		this._removeElements(0, 1);
-		this._dataModified = true;
 	}
 	_onDataSplice(start, count) {
 		this._removeElements(start, count);
 		this._insertElements(start, arguments.length - 2);
-		this._dataModified = true;
 	}
 	_onDataUnshift() {
 		this._insertElements(0, arguments.length);
-		this._dataModified = true;
 	}
 }
 DatasetController.prototype.datasetElementType = null;
@@ -2655,15 +1113,14 @@ class Element {
 	}
 }
 
-const TAU$1 = Math.PI * 2;
-defaults.set('elements', {
-	arc: {
-		backgroundColor: defaults.color,
-		borderAlign: 'center',
-		borderColor: '#fff',
-		borderWidth: 2
-	}
+const TAU = Math.PI * 2;
+const scope = 'elements.arc';
+defaults.set(scope, {
+	borderAlign: 'center',
+	borderColor: '#fff',
+	borderWidth: 2
 });
+defaults.route(scope, ['backgroundColor'], '', ['color']);
 function clipArc(ctx, model) {
 	const {startAngle, endAngle, pixelMargin, x, y} = model;
 	let angleMargin = pixelMargin / model.outerRadius;
@@ -2686,12 +1143,12 @@ function pathArc(ctx, model) {
 }
 function drawArc(ctx, model, circumference) {
 	if (model.fullCircles) {
-		model.endAngle = model.startAngle + TAU$1;
+		model.endAngle = model.startAngle + TAU;
 		pathArc(ctx, model);
 		for (let i = 0; i < model.fullCircles; ++i) {
 			ctx.fill();
 		}
-		model.endAngle = model.startAngle + circumference % TAU$1;
+		model.endAngle = model.startAngle + circumference % TAU;
 	}
 	pathArc(ctx, model);
 	ctx.fill();
@@ -2700,21 +1157,21 @@ function drawFullCircleBorders(ctx, element, model, inner) {
 	const endAngle = model.endAngle;
 	let i;
 	if (inner) {
-		model.endAngle = model.startAngle + TAU$1;
+		model.endAngle = model.startAngle + TAU;
 		clipArc(ctx, model);
 		model.endAngle = endAngle;
 		if (model.endAngle === model.startAngle && model.fullCircles) {
-			model.endAngle += TAU$1;
+			model.endAngle += TAU;
 			model.fullCircles--;
 		}
 	}
 	ctx.beginPath();
-	ctx.arc(model.x, model.y, model.innerRadius, model.startAngle + TAU$1, model.startAngle, true);
+	ctx.arc(model.x, model.y, model.innerRadius, model.startAngle + TAU, model.startAngle, true);
 	for (i = 0; i < model.fullCircles; ++i) {
 		ctx.stroke();
 	}
 	ctx.beginPath();
-	ctx.arc(model.x, model.y, element.outerRadius, model.startAngle, model.startAngle + TAU$1);
+	ctx.arc(model.x, model.y, element.outerRadius, model.startAngle, model.startAngle + TAU);
 	for (i = 0; i < model.fullCircles; ++i) {
 		ctx.stroke();
 	}
@@ -2764,7 +1221,7 @@ class Arc extends Element {
 			'outerRadius',
 			'circumference'
 		], useFinalPosition);
-		const betweenAngles = circumference >= TAU$1 || _angleBetween(angle, startAngle, endAngle);
+		const betweenAngles = circumference >= TAU || _angleBetween(angle, startAngle, endAngle);
 		const withinRadius = (distance >= innerRadius && distance <= outerRadius);
 		return (betweenAngles && withinRadius);
 	}
@@ -2799,7 +1256,7 @@ class Arc extends Element {
 			pixelMargin,
 			startAngle: me.startAngle,
 			endAngle: me.endAngle,
-			fullCircles: Math.floor(me.circumference / TAU$1)
+			fullCircles: Math.floor(me.circumference / TAU)
 		};
 		if (me.circumference === 0) {
 			return;
@@ -2816,350 +1273,18 @@ class Arc extends Element {
 }
 Arc._type = 'arc';
 
-function _pointInLine(p1, p2, t, mode) {
-	return {
-		x: p1.x + t * (p2.x - p1.x),
-		y: p1.y + t * (p2.y - p1.y)
-	};
-}
-function _steppedInterpolation(p1, p2, t, mode) {
-	return {
-		x: p1.x + t * (p2.x - p1.x),
-		y: mode === 'middle' ? t < 0.5 ? p1.y : p2.y
-		: mode === 'after' ? t < 1 ? p1.y : p2.y
-		: t > 0 ? p2.y : p1.y
-	};
-}
-function _bezierInterpolation(p1, p2, t, mode) {
-	const cp1 = {x: p1.controlPointNextX, y: p1.controlPointNextY};
-	const cp2 = {x: p2.controlPointPreviousX, y: p2.controlPointPreviousY};
-	const a = _pointInLine(p1, cp1, t);
-	const b = _pointInLine(cp1, cp2, t);
-	const c = _pointInLine(cp2, p2, t);
-	const d = _pointInLine(a, b, t);
-	const e = _pointInLine(b, c, t);
-	return _pointInLine(d, e, t);
-}
-
-function propertyFn(property) {
-	if (property === 'angle') {
-		return {
-			between: _angleBetween,
-			compare: _angleDiff,
-			normalize: _normalizeAngle,
-		};
-	}
-	return {
-		between: (n, s, e) => n >= s && n <= e,
-		compare: (a, b) => a - b,
-		normalize: x => x
-	};
-}
-function makeSubSegment(start, end, loop, count) {
-	return {
-		start: start % count,
-		end: end % count,
-		loop: loop && (end - start + 1) % count === 0
-	};
-}
-function getSegment(segment, points, bounds) {
-	const {property, start: startBound, end: endBound} = bounds;
-	const {between, normalize} = propertyFn(property);
-	const count = points.length;
-	let {start, end, loop} = segment;
-	let i, ilen;
-	if (loop) {
-		start += count;
-		end += count;
-		for (i = 0, ilen = count; i < ilen; ++i) {
-			if (!between(normalize(points[start % count][property]), startBound, endBound)) {
-				break;
-			}
-			start--;
-			end--;
-		}
-		start %= count;
-		end %= count;
-	}
-	if (end < start) {
-		end += count;
-	}
-	return {start, end, loop};
-}
-function _boundSegment(segment, points, bounds) {
-	if (!bounds) {
-		return [segment];
-	}
-	const {property, start: startBound, end: endBound} = bounds;
-	const count = points.length;
-	const {compare, between, normalize} = propertyFn(property);
-	const {start, end, loop} = getSegment(segment, points, bounds);
-	const result = [];
-	let inside = false;
-	let subStart = null;
-	let i, value, point, prev;
-	for (i = start; i <= end; ++i) {
-		point = points[i % count];
-		if (point.skip) {
-			continue;
-		}
-		value = normalize(point[property]);
-		inside = between(value, startBound, endBound);
-		if (subStart === null && inside) {
-			subStart = i > start && compare(value, startBound) > 0 ? prev : i;
-		}
-		if (subStart !== null && (!inside || compare(value, endBound) === 0)) {
-			result.push(makeSubSegment(subStart, i, loop, count));
-			subStart = null;
-		}
-		prev = i;
-	}
-	if (subStart !== null) {
-		result.push(makeSubSegment(subStart, end, loop, count));
-	}
-	return result;
-}
-function _boundSegments(line, bounds) {
-	const result = [];
-	const segments = line.segments;
-	for (let i = 0; i < segments.length; i++) {
-		const sub = _boundSegment(segments[i], line.points, bounds);
-		if (sub.length) {
-			result.push(...sub);
-		}
-	}
-	return result;
-}
-function findStartAndEnd(points, count, loop, spanGaps) {
-	let start = 0;
-	let end = count - 1;
-	if (loop && !spanGaps) {
-		while (start < count && !points[start].skip) {
-			start++;
-		}
-	}
-	while (start < count && points[start].skip) {
-		start++;
-	}
-	start %= count;
-	if (loop) {
-		end += start;
-	}
-	while (end > start && points[end % count].skip) {
-		end--;
-	}
-	end %= count;
-	return {start, end};
-}
-function solidSegments(points, start, max, loop) {
-	const count = points.length;
-	const result = [];
-	let last = start;
-	let prev = points[start];
-	let end;
-	for (end = start + 1; end <= max; ++end) {
-		const cur = points[end % count];
-		if (cur.skip || cur.stop) {
-			if (!prev.skip) {
-				loop = false;
-				result.push({start: start % count, end: (end - 1) % count, loop});
-				start = last = cur.stop ? end : null;
-			}
-		} else {
-			last = end;
-			if (prev.skip) {
-				start = end;
-			}
-		}
-		prev = cur;
-	}
-	if (last !== null) {
-		result.push({start: start % count, end: last % count, loop});
-	}
-	return result;
-}
-function _computeSegments(line) {
-	const points = line.points;
-	const spanGaps = line.options.spanGaps;
-	const count = points.length;
-	if (!count) {
-		return [];
-	}
-	const loop = !!line._loop;
-	const {start, end} = findStartAndEnd(points, count, loop, spanGaps);
-	if (spanGaps === true) {
-		return [{start, end, loop}];
-	}
-	const max = end < start ? end + count : end;
-	const completeLoop = !!line._fullLoop && start === 0 && end === count - 1;
-	return solidSegments(points, start, max, completeLoop);
-}
-
-const EPSILON = Number.EPSILON || 1e-14;
-function splineCurve(firstPoint, middlePoint, afterPoint, t) {
-	const previous = firstPoint.skip ? middlePoint : firstPoint;
-	const current = middlePoint;
-	const next = afterPoint.skip ? middlePoint : afterPoint;
-	const d01 = Math.sqrt(Math.pow(current.x - previous.x, 2) + Math.pow(current.y - previous.y, 2));
-	const d12 = Math.sqrt(Math.pow(next.x - current.x, 2) + Math.pow(next.y - current.y, 2));
-	let s01 = d01 / (d01 + d12);
-	let s12 = d12 / (d01 + d12);
-	s01 = isNaN(s01) ? 0 : s01;
-	s12 = isNaN(s12) ? 0 : s12;
-	const fa = t * s01;
-	const fb = t * s12;
-	return {
-		previous: {
-			x: current.x - fa * (next.x - previous.x),
-			y: current.y - fa * (next.y - previous.y)
-		},
-		next: {
-			x: current.x + fb * (next.x - previous.x),
-			y: current.y + fb * (next.y - previous.y)
-		}
-	};
-}
-function splineCurveMonotone(points) {
-	const pointsWithTangents = (points || []).map((point) => ({
-		model: point,
-		deltaK: 0,
-		mK: 0
-	}));
-	const pointsLen = pointsWithTangents.length;
-	let i, pointBefore, pointCurrent, pointAfter;
-	for (i = 0; i < pointsLen; ++i) {
-		pointCurrent = pointsWithTangents[i];
-		if (pointCurrent.model.skip) {
-			continue;
-		}
-		pointBefore = i > 0 ? pointsWithTangents[i - 1] : null;
-		pointAfter = i < pointsLen - 1 ? pointsWithTangents[i + 1] : null;
-		if (pointAfter && !pointAfter.model.skip) {
-			const slopeDeltaX = (pointAfter.model.x - pointCurrent.model.x);
-			pointCurrent.deltaK = slopeDeltaX !== 0 ? (pointAfter.model.y - pointCurrent.model.y) / slopeDeltaX : 0;
-		}
-		if (!pointBefore || pointBefore.model.skip) {
-			pointCurrent.mK = pointCurrent.deltaK;
-		} else if (!pointAfter || pointAfter.model.skip) {
-			pointCurrent.mK = pointBefore.deltaK;
-		} else if (sign(pointBefore.deltaK) !== sign(pointCurrent.deltaK)) {
-			pointCurrent.mK = 0;
-		} else {
-			pointCurrent.mK = (pointBefore.deltaK + pointCurrent.deltaK) / 2;
-		}
-	}
-	let alphaK, betaK, tauK, squaredMagnitude;
-	for (i = 0; i < pointsLen - 1; ++i) {
-		pointCurrent = pointsWithTangents[i];
-		pointAfter = pointsWithTangents[i + 1];
-		if (pointCurrent.model.skip || pointAfter.model.skip) {
-			continue;
-		}
-		if (almostEquals(pointCurrent.deltaK, 0, EPSILON)) {
-			pointCurrent.mK = pointAfter.mK = 0;
-			continue;
-		}
-		alphaK = pointCurrent.mK / pointCurrent.deltaK;
-		betaK = pointAfter.mK / pointCurrent.deltaK;
-		squaredMagnitude = Math.pow(alphaK, 2) + Math.pow(betaK, 2);
-		if (squaredMagnitude <= 9) {
-			continue;
-		}
-		tauK = 3 / Math.sqrt(squaredMagnitude);
-		pointCurrent.mK = alphaK * tauK * pointCurrent.deltaK;
-		pointAfter.mK = betaK * tauK * pointCurrent.deltaK;
-	}
-	let deltaX;
-	for (i = 0; i < pointsLen; ++i) {
-		pointCurrent = pointsWithTangents[i];
-		if (pointCurrent.model.skip) {
-			continue;
-		}
-		pointBefore = i > 0 ? pointsWithTangents[i - 1] : null;
-		pointAfter = i < pointsLen - 1 ? pointsWithTangents[i + 1] : null;
-		if (pointBefore && !pointBefore.model.skip) {
-			deltaX = (pointCurrent.model.x - pointBefore.model.x) / 3;
-			pointCurrent.model.controlPointPreviousX = pointCurrent.model.x - deltaX;
-			pointCurrent.model.controlPointPreviousY = pointCurrent.model.y - deltaX * pointCurrent.mK;
-		}
-		if (pointAfter && !pointAfter.model.skip) {
-			deltaX = (pointAfter.model.x - pointCurrent.model.x) / 3;
-			pointCurrent.model.controlPointNextX = pointCurrent.model.x + deltaX;
-			pointCurrent.model.controlPointNextY = pointCurrent.model.y + deltaX * pointCurrent.mK;
-		}
-	}
-}
-function capControlPoint(pt, min, max) {
-	return Math.max(Math.min(pt, max), min);
-}
-function capBezierPoints(points, area) {
-	let i, ilen, point;
-	for (i = 0, ilen = points.length; i < ilen; ++i) {
-		point = points[i];
-		if (!_isPointInArea(point, area)) {
-			continue;
-		}
-		if (i > 0 && _isPointInArea(points[i - 1], area)) {
-			point.controlPointPreviousX = capControlPoint(point.controlPointPreviousX, area.left, area.right);
-			point.controlPointPreviousY = capControlPoint(point.controlPointPreviousY, area.top, area.bottom);
-		}
-		if (i < points.length - 1 && _isPointInArea(points[i + 1], area)) {
-			point.controlPointNextX = capControlPoint(point.controlPointNextX, area.left, area.right);
-			point.controlPointNextY = capControlPoint(point.controlPointNextY, area.top, area.bottom);
-		}
-	}
-}
-function _updateBezierControlPoints(points, options, area, loop) {
-	let i, ilen, point, controlPoints;
-	if (options.spanGaps) {
-		points = points.filter((pt) => !pt.skip);
-	}
-	if (options.cubicInterpolationMode === 'monotone') {
-		splineCurveMonotone(points);
-	} else {
-		let prev = loop ? points[points.length - 1] : points[0];
-		for (i = 0, ilen = points.length; i < ilen; ++i) {
-			point = points[i];
-			controlPoints = splineCurve(
-				prev,
-				point,
-				points[Math.min(i + 1, ilen - (loop ? 0 : 1)) % ilen],
-				options.tension
-			);
-			point.controlPointPreviousX = controlPoints.previous.x;
-			point.controlPointPreviousY = controlPoints.previous.y;
-			point.controlPointNextX = controlPoints.next.x;
-			point.controlPointNextY = controlPoints.next.y;
-			prev = point;
-		}
-	}
-	if (options.capBezierPoints) {
-		capBezierPoints(points, area);
-	}
-}
-
-var curve = /*#__PURE__*/Object.freeze({
-__proto__: null,
-splineCurve: splineCurve,
-splineCurveMonotone: splineCurveMonotone,
-_updateBezierControlPoints: _updateBezierControlPoints
+const scope$1 = 'elements.line';
+defaults.set(scope$1, {
+	borderCapStyle: 'butt',
+	borderDash: [],
+	borderDashOffset: 0,
+	borderJoinStyle: 'miter',
+	borderWidth: 3,
+	capBezierPoints: true,
+	fill: true,
+	tension: 0
 });
-
-const defaultColor = defaults.color;
-defaults.set('elements', {
-	line: {
-		backgroundColor: defaultColor,
-		borderCapStyle: 'butt',
-		borderColor: defaultColor,
-		borderDash: [],
-		borderDashOffset: 0,
-		borderJoinStyle: 'miter',
-		borderWidth: 3,
-		capBezierPoints: true,
-		fill: true,
-		tension: 0.4
-	}
-});
+defaults.route(scope$1, ['backgroundColor', 'borderColor'], '', 'color');
 function setStyle(ctx, vm) {
 	ctx.lineCap = vm.borderCapStyle;
 	ctx.setLineDash(vm.borderDash);
@@ -3215,12 +1340,20 @@ function fastPathSegment(ctx, line, segment, params) {
 	let avgX = 0;
 	let countX = 0;
 	let i, point, prevX, minY, maxY, lastY;
+	const pointIndex = (index) => (start + (reverse ? ilen - index : index)) % count;
+	const drawX = () => {
+		if (minY !== maxY) {
+			ctx.lineTo(avgX, maxY);
+			ctx.lineTo(avgX, minY);
+			ctx.lineTo(avgX, lastY);
+		}
+	};
 	if (move) {
-		point = points[(start + (reverse ? ilen : 0)) % count];
+		point = points[pointIndex(0)];
 		ctx.moveTo(point.x, point.y);
 	}
 	for (i = 0; i <= ilen; ++i) {
-		point = points[(start + (reverse ? ilen - i : i)) % count];
+		point = points[pointIndex(i)];
 		if (point.skip) {
 			continue;
 		}
@@ -3235,11 +1368,7 @@ function fastPathSegment(ctx, line, segment, params) {
 			}
 			avgX = (countX * avgX + x) / ++countX;
 		} else {
-			if (minY !== maxY) {
-				ctx.lineTo(avgX, maxY);
-				ctx.lineTo(avgX, minY);
-				ctx.lineTo(avgX, lastY);
-			}
+			drawX();
 			ctx.lineTo(x, y);
 			prevX = truncX;
 			countX = 0;
@@ -3247,6 +1376,7 @@ function fastPathSegment(ctx, line, segment, params) {
 		}
 		lastY = y;
 	}
+	drawX();
 }
 function _getSegmentMethod(line) {
 	const opts = line.options;
@@ -3367,19 +1497,16 @@ class Line extends Element {
 }
 Line._type = 'line';
 
-const defaultColor$1 = defaults.color;
-defaults.set('elements', {
-	point: {
-		backgroundColor: defaultColor$1,
-		borderColor: defaultColor$1,
-		borderWidth: 1,
-		hitRadius: 1,
-		hoverBorderWidth: 1,
-		hoverRadius: 4,
-		pointStyle: 'circle',
-		radius: 3
-	}
+const scope$2 = 'elements.point';
+defaults.set(scope$2, {
+	borderWidth: 1,
+	hitRadius: 1,
+	hoverBorderWidth: 1,
+	hoverRadius: 4,
+	pointStyle: 'circle',
+	radius: 3
 });
+defaults.route(scope$2, ['backgroundColor', 'borderColor'], '', 'color');
 class Point extends Element {
 	constructor(cfg) {
 		super();
@@ -3435,15 +1562,12 @@ class Point extends Element {
 }
 Point._type = 'point';
 
-const defaultColor$2 = defaults.color;
-defaults.set('elements', {
-	rectangle: {
-		backgroundColor: defaultColor$2,
-		borderColor: defaultColor$2,
-		borderSkipped: 'bottom',
-		borderWidth: 0
-	}
+const scope$3 = 'elements.rectangle';
+defaults.set(scope$3, {
+	borderSkipped: 'start',
+	borderWidth: 0
 });
+defaults.route(scope$3, ['backgroundColor', 'borderColor'], '', 'color');
 function getBarBounds(bar, useFinalPosition) {
 	const {x, y, base, width, height} = bar.getProps(['x', 'y', 'base', 'width', 'height'], useFinalPosition);
 	let left, right, top, bottom, half;
@@ -3462,24 +1586,32 @@ function getBarBounds(bar, useFinalPosition) {
 	}
 	return {left, top, right, bottom};
 }
-function swap(orig, v1, v2) {
-	return orig === v1 ? v2 : orig === v2 ? v1 : orig;
-}
 function parseBorderSkipped(bar) {
 	let edge = bar.options.borderSkipped;
 	const res = {};
 	if (!edge) {
 		return res;
 	}
-	if (bar.horizontal) {
-		if (bar.base > bar.x) {
-			edge = swap(edge, 'left', 'right');
-		}
-	} else if (bar.base < bar.y) {
-		edge = swap(edge, 'bottom', 'top');
-	}
+	edge = bar.horizontal
+		? parseEdge(edge, 'left', 'right', bar.base > bar.x)
+		: parseEdge(edge, 'bottom', 'top', bar.base < bar.y);
 	res[edge] = true;
 	return res;
+}
+function parseEdge(edge, a, b, reverse) {
+	if (reverse) {
+		edge = swap(edge, a, b);
+		edge = startEnd(edge, b, a);
+	} else {
+		edge = startEnd(edge, a, b);
+	}
+	return edge;
+}
+function swap(orig, v1, v2) {
+	return orig === v1 ? v2 : orig === v2 ? v1 : orig;
+}
+function startEnd(v, start, end) {
+	return v === 'start' ? start : v === 'end' ? end : v;
 }
 function skipOrLimit(skip, value, min, max) {
 	return skip ? 0 : Math.max(Math.min(value, max), min);
@@ -3581,14 +1713,6 @@ class Rectangle extends Element {
 }
 Rectangle._type = 'rectangle';
 
-var elements = /*#__PURE__*/Object.freeze({
-__proto__: null,
-Arc: Arc,
-Line: Line,
-Point: Point,
-Rectangle: Rectangle
-});
-
 defaults.set('bar', {
 	hover: {
 		mode: 'index'
@@ -3604,14 +1728,14 @@ defaults.set('bar', {
 		}
 	},
 	scales: {
-		x: {
+		_index_: {
 			type: 'category',
 			offset: true,
 			gridLines: {
 				offsetGridLines: true
 			}
 		},
-		y: {
+		_value_: {
 			type: 'linear',
 			beginAtZero: true,
 		}
@@ -3667,9 +1791,9 @@ function computeFlexCategoryTraits(index, ruler, options) {
 		start
 	};
 }
-function parseFloatBar(arr, item, vScale, i) {
-	const startValue = vScale.parse(arr[0], i);
-	const endValue = vScale.parse(arr[1], i);
+function parseFloatBar(entry, item, vScale, i) {
+	const startValue = vScale.parse(entry[0], i);
+	const endValue = vScale.parse(entry[1], i);
 	const min = Math.min(startValue, endValue);
 	const max = Math.max(startValue, endValue);
 	let barStart = min;
@@ -3688,6 +1812,14 @@ function parseFloatBar(arr, item, vScale, i) {
 		max
 	};
 }
+function parseValue(entry, item, vScale, i) {
+	if (isArray(entry)) {
+		parseFloatBar(entry, item, vScale, i);
+	} else {
+		item[vScale.axis] = vScale.parse(entry, i);
+	}
+	return item;
+}
 function parseArrayOrPrimitive(meta, data, start, count) {
 	const iScale = meta.iScale;
 	const vScale = meta.vScale;
@@ -3699,12 +1831,7 @@ function parseArrayOrPrimitive(meta, data, start, count) {
 		entry = data[i];
 		item = {};
 		item[iScale.axis] = singleScale || iScale.parse(labels[i], i);
-		if (isArray(entry)) {
-			parseFloatBar(entry, item, vScale, i);
-		} else {
-			item[vScale.axis] = vScale.parse(entry, i);
-		}
-		parsed.push(item);
+		parsed.push(parseValue(entry, item, vScale, i));
 	}
 	return parsed;
 }
@@ -3720,22 +1847,26 @@ class BarController extends DatasetController {
 	}
 	parseObjectData(meta, data, start, count) {
 		const {iScale, vScale} = meta;
-		const vProp = vScale.axis;
+		const {xAxisKey = 'x', yAxisKey = 'y'} = this._parsing;
+		const iAxisKey = iScale.axis === 'x' ? xAxisKey : yAxisKey;
+		const vAxisKey = vScale.axis === 'x' ? xAxisKey : yAxisKey;
 		const parsed = [];
-		let i, ilen, item, obj, value;
+		let i, ilen, item, obj;
 		for (i = start, ilen = start + count; i < ilen; ++i) {
 			obj = data[i];
 			item = {};
-			item[iScale.axis] = iScale.parseObject(obj, iScale.axis, i);
-			value = obj[vProp];
-			if (isArray(value)) {
-				parseFloatBar(value, item, vScale, i);
-			} else {
-				item[vScale.axis] = vScale.parseObject(obj, vProp, i);
-			}
-			parsed.push(item);
+			item[iScale.axis] = iScale.parse(resolveObjectKey(obj, iAxisKey), i);
+			parsed.push(parseValue(resolveObjectKey(obj, vAxisKey), item, vScale, i));
 		}
 		return parsed;
+	}
+	updateRangeFromParsed(range, scale, parsed, stack) {
+		super.updateRangeFromParsed(range, scale, parsed, stack);
+		const custom = parsed._custom;
+		if (custom) {
+			range.min = Math.min(range.min, custom.min);
+			range.max = Math.max(range.max, custom.max);
+		}
 	}
 	getLabelAndValue(index) {
 		const me = this;
@@ -3959,13 +2090,14 @@ defaults.set('bubble', {
 class BubbleController extends DatasetController {
 	parseObjectData(meta, data, start, count) {
 		const {xScale, yScale} = meta;
+		const {xAxisKey = 'x', yAxisKey = 'y'} = this._parsing;
 		const parsed = [];
 		let i, ilen, item;
 		for (i = start, ilen = start + count; i < ilen; ++i) {
 			item = data[i];
 			parsed.push({
-				x: xScale.parseObject(item, 'x', i),
-				y: yScale.parseObject(item, 'y', i),
+				x: xScale.parse(resolveObjectKey(item, xAxisKey), i),
+				y: yScale.parse(resolveObjectKey(item, yAxisKey), i),
 				_custom: item && item.r && +item.r
 			});
 		}
@@ -4064,9 +2196,9 @@ BubbleController.prototype.dataElementOptions = [
 	'rotation'
 ];
 
-const PI$2 = Math.PI;
-const DOUBLE_PI$1 = PI$2 * 2;
-const HALF_PI$1 = PI$2 / 2;
+const PI = Math.PI;
+const DOUBLE_PI = PI * 2;
+const HALF_PI = PI / 2;
 defaults.set('doughnut', {
 	animation: {
 		numbers: {
@@ -4119,8 +2251,8 @@ defaults.set('doughnut', {
 		}
 	},
 	cutoutPercentage: 50,
-	rotation: -HALF_PI$1,
-	circumference: DOUBLE_PI$1,
+	rotation: -HALF_PI,
+	circumference: DOUBLE_PI,
 	tooltips: {
 		callbacks: {
 			title() {
@@ -4145,18 +2277,18 @@ function getRatioAndOffset(rotation, circumference, cutout) {
 	let ratioY = 1;
 	let offsetX = 0;
 	let offsetY = 0;
-	if (circumference < DOUBLE_PI$1) {
-		let startAngle = rotation % DOUBLE_PI$1;
-		startAngle += startAngle >= PI$2 ? -DOUBLE_PI$1 : startAngle < -PI$2 ? DOUBLE_PI$1 : 0;
+	if (circumference < DOUBLE_PI) {
+		let startAngle = rotation % DOUBLE_PI;
+		startAngle += startAngle >= PI ? -DOUBLE_PI : startAngle < -PI ? DOUBLE_PI : 0;
 		const endAngle = startAngle + circumference;
 		const startX = Math.cos(startAngle);
 		const startY = Math.sin(startAngle);
 		const endX = Math.cos(endAngle);
 		const endY = Math.sin(endAngle);
-		const contains0 = (startAngle <= 0 && endAngle >= 0) || endAngle >= DOUBLE_PI$1;
-		const contains90 = (startAngle <= HALF_PI$1 && endAngle >= HALF_PI$1) || endAngle >= DOUBLE_PI$1 + HALF_PI$1;
-		const contains180 = startAngle === -PI$2 || endAngle >= PI$2;
-		const contains270 = (startAngle <= -HALF_PI$1 && endAngle >= -HALF_PI$1) || endAngle >= PI$2 + HALF_PI$1;
+		const contains0 = (startAngle <= 0 && endAngle >= 0) || endAngle >= DOUBLE_PI;
+		const contains90 = (startAngle <= HALF_PI && endAngle >= HALF_PI) || endAngle >= DOUBLE_PI + HALF_PI;
+		const contains180 = startAngle === -PI || endAngle >= PI;
+		const contains270 = (startAngle <= -HALF_PI && endAngle >= -HALF_PI) || endAngle >= PI + HALF_PI;
 		const minX = contains180 ? -1 : Math.min(startX, startX * cutout, endX, endX * cutout);
 		const minY = contains270 ? -1 : Math.min(startY, startY * cutout, endY, endY * cutout);
 		const maxX = contains0 ? 1 : Math.max(startX, startX * cutout, endX, endX * cutout);
@@ -4220,7 +2352,7 @@ class DoughnutController extends DatasetController {
 		const me = this;
 		const opts = me.chart.options;
 		const meta = me._cachedMeta;
-		return reset && opts.animation.animateRotate ? 0 : this.chart.getDataVisibility(i) ? me.calculateCircumference(meta._parsed[i] * opts.circumference / DOUBLE_PI$1) : 0;
+		return reset && opts.animation.animateRotate ? 0 : this.chart.getDataVisibility(i) ? me.calculateCircumference(meta._parsed[i] * opts.circumference / DOUBLE_PI) : 0;
 	}
 	updateElements(arcs, start, mode) {
 		const me = this;
@@ -4279,7 +2411,7 @@ class DoughnutController extends DatasetController {
 	calculateCircumference(value) {
 		const total = this._cachedMeta.total;
 		if (total > 0 && !isNaN(value)) {
-			return DOUBLE_PI$1 * (Math.abs(value) / total);
+			return DOUBLE_PI * (Math.abs(value) / total);
 		}
 		return 0;
 	}
@@ -4339,47 +2471,6 @@ DoughnutController.prototype.dataElementOptions = [
 	'hoverBorderWidth',
 ];
 
-defaults.set('horizontalBar', {
-	hover: {
-		mode: 'index',
-		axis: 'y'
-	},
-	scales: {
-		x: {
-			type: 'linear',
-			beginAtZero: true
-		},
-		y: {
-			type: 'category',
-			offset: true,
-			gridLines: {
-				offsetGridLines: true
-			}
-		}
-	},
-	datasets: {
-		categoryPercentage: 0.8,
-		barPercentage: 0.9
-	},
-	elements: {
-		rectangle: {
-			borderSkipped: 'left'
-		}
-	},
-	tooltips: {
-		mode: 'index',
-		axis: 'y'
-	}
-});
-class HorizontalBarController extends BarController {
-	getValueScaleId() {
-		return this._cachedMeta.xAxisID;
-	}
-	getIndexScaleId() {
-		return this._cachedMeta.yAxisID;
-	}
-}
-
 defaults.set('line', {
 	showLines: true,
 	spanGaps: false,
@@ -4387,10 +2478,10 @@ defaults.set('line', {
 		mode: 'index'
 	},
 	scales: {
-		x: {
+		_index_: {
 			type: 'category',
 		},
-		y: {
+		_value_: {
 			type: 'linear',
 		},
 	}
@@ -4535,6 +2626,9 @@ defaults.set('polarArea', {
 		animateScale: true
 	},
 	aspectRatio: 1,
+	datasets: {
+		indexAxis: 'r'
+	},
 	scales: {
 		r: {
 			type: 'radialLinear',
@@ -4597,12 +2691,6 @@ class PolarAreaController extends DatasetController {
 		this.innerRadius = undefined;
 		this.outerRadius = undefined;
 	}
-	getIndexScaleId() {
-		return this._cachedMeta.rAxisID;
-	}
-	getValueScaleId() {
-		return this._cachedMeta.rAxisID;
-	}
 	update(mode) {
 		const arcs = this._cachedMeta.data;
 		this._updateRadius();
@@ -4627,7 +2715,7 @@ class PolarAreaController extends DatasetController {
 		const dataset = me.getDataset();
 		const opts = chart.options;
 		const animationOpts = opts.animation;
-		const scale = chart.scales.r;
+		const scale = me._cachedMeta.rScale;
 		const centerX = scale.xCenter;
 		const centerY = scale.yCenter;
 		const datasetStartAngle = getStartAngleRadians(opts.startAngle);
@@ -4720,6 +2808,9 @@ defaults.set('radar', {
 			type: 'radialLinear',
 		}
 	},
+	datasets: {
+		indexAxis: 'r'
+	},
 	elements: {
 		line: {
 			fill: 'start',
@@ -4728,12 +2819,6 @@ defaults.set('radar', {
 	}
 });
 class RadarController extends DatasetController {
-	getIndexScaleId() {
-		return this._cachedMeta.rAxisID;
-	}
-	getValueScaleId() {
-		return this._cachedMeta.rAxisID;
-	}
 	getLabelAndValue(index) {
 		const me = this;
 		const vScale = me._cachedMeta.vScale;
@@ -4762,7 +2847,7 @@ class RadarController extends DatasetController {
 	updateElements(points, start, mode) {
 		const me = this;
 		const dataset = me.getDataset();
-		const scale = me.chart.scales.r;
+		const scale = me._cachedMeta.rScale;
 		const reset = mode === 'reset';
 		let i;
 		for (i = 0; i < points.length; i++) {
@@ -4847,7 +2932,6 @@ __proto__: null,
 bar: BarController,
 bubble: BubbleController,
 doughnut: DoughnutController,
-horizontalBar: HorizontalBarController,
 line: LineController,
 polarArea: PolarAreaController,
 pie: DoughnutController,
@@ -4855,199 +2939,50 @@ radar: RadarController,
 scatter: LineController
 });
 
-function _lookup(table, value) {
-	let hi = table.length - 1;
-	let lo = 0;
-	let mid;
-	while (hi - lo > 1) {
-		mid = (lo + hi) >> 1;
-		if (table[mid] < value) {
-			lo = mid;
-		} else {
-			hi = mid;
-		}
-	}
-	return {lo, hi};
+function abstract() {
+	throw new Error('This method is not implemented: either no adapter can be found or an incomplete integration was provided.');
 }
-function _lookupByKey(table, key, value) {
-	let hi = table.length - 1;
-	let lo = 0;
-	let mid;
-	while (hi - lo > 1) {
-		mid = (lo + hi) >> 1;
-		if (table[mid][key] < value) {
-			lo = mid;
-		} else {
-			hi = mid;
-		}
+class DateAdapter {
+	constructor(options) {
+		this.options = options || {};
 	}
-	return {lo, hi};
+	formats() {
+		return abstract();
+	}
+	parse(value, format) {
+		return abstract();
+	}
+	format(timestamp, format) {
+		return abstract();
+	}
+	add(timestamp, amount, unit) {
+		return abstract();
+	}
+	diff(a, b, unit) {
+		return abstract();
+	}
+	startOf(timestamp, unit, weekday) {
+		return abstract();
+	}
+	endOf(timestamp, unit) {
+		return abstract();
+	}
 }
-function _rlookupByKey(table, key, value) {
-	let hi = table.length - 1;
-	let lo = 0;
-	let mid;
-	while (hi - lo > 1) {
-		mid = (lo + hi) >> 1;
-		if (table[mid][key] < value) {
-			hi = mid;
-		} else {
-			lo = mid;
-		}
-	}
-	return {lo, hi};
-}
-function _filterBetween(values, min, max) {
-	let start = 0;
-	let end = values.length;
-	while (start < end && values[start] < min) {
-		start++;
-	}
-	while (end > start && values[end - 1] > max) {
-		end--;
-	}
-	return start > 0 || end < values.length
-		? values.slice(start, end)
-		: values;
-}
+DateAdapter.override = function(members) {
+	Object.assign(DateAdapter.prototype, members);
+};
+var adapters = {
+	_date: DateAdapter
+};
 
-function isConstrainedValue(value) {
-	return value !== undefined && value !== null && value !== 'none';
-}
-function _getParentNode(domNode) {
-	let parent = domNode.parentNode;
-	if (parent && parent.toString() === '[object ShadowRoot]') {
-		parent = parent.host;
-	}
-	return parent;
-}
-function parseMaxStyle(styleValue, node, parentProperty) {
-	let valueInPixels;
-	if (typeof styleValue === 'string') {
-		valueInPixels = parseInt(styleValue, 10);
-		if (styleValue.indexOf('%') !== -1) {
-			valueInPixels = valueInPixels / 100 * node.parentNode[parentProperty];
-		}
-	} else {
-		valueInPixels = styleValue;
-	}
-	return valueInPixels;
-}
-function getConstraintDimension(domNode, maxStyle, percentageProperty) {
-	const view = document.defaultView;
-	const parentNode = _getParentNode(domNode);
-	const constrainedNode = view.getComputedStyle(domNode)[maxStyle];
-	const constrainedContainer = view.getComputedStyle(parentNode)[maxStyle];
-	const hasCNode = isConstrainedValue(constrainedNode);
-	const hasCContainer = isConstrainedValue(constrainedContainer);
-	const infinity = Number.POSITIVE_INFINITY;
-	if (hasCNode || hasCContainer) {
-		return Math.min(
-			hasCNode ? parseMaxStyle(constrainedNode, domNode, percentageProperty) : infinity,
-			hasCContainer ? parseMaxStyle(constrainedContainer, parentNode, percentageProperty) : infinity);
-	}
-}
-function getStyle(el, property) {
-	return el.currentStyle ?
-		el.currentStyle[property] :
-		document.defaultView.getComputedStyle(el, null).getPropertyValue(property);
-}
-function getConstraintWidth(domNode) {
-	return getConstraintDimension(domNode, 'max-width', 'clientWidth');
-}
-function getConstraintHeight(domNode) {
-	return getConstraintDimension(domNode, 'max-height', 'clientHeight');
-}
-function _calculatePadding(container, padding, parentDimension) {
-	padding = getStyle(container, padding);
-	if (padding === '') {
-		return 0;
-	}
-	return padding.indexOf('%') > -1 ? parentDimension * parseInt(padding, 10) / 100 : parseInt(padding, 10);
-}
-function getRelativePosition(evt, chart) {
-	let mouseX, mouseY;
-	const e = evt.originalEvent || evt;
-	const canvasElement = chart.canvas;
-	const boundingRect = canvasElement.getBoundingClientRect();
-	const touches = e.touches;
-	if (touches && touches.length > 0) {
-		mouseX = touches[0].clientX;
-		mouseY = touches[0].clientY;
-	} else {
-		mouseX = e.clientX;
-		mouseY = e.clientY;
-	}
-	const paddingLeft = parseFloat(getStyle(canvasElement, 'padding-left'));
-	const paddingTop = parseFloat(getStyle(canvasElement, 'padding-top'));
-	const paddingRight = parseFloat(getStyle(canvasElement, 'padding-right'));
-	const paddingBottom = parseFloat(getStyle(canvasElement, 'padding-bottom'));
-	const width = boundingRect.right - boundingRect.left - paddingLeft - paddingRight;
-	const height = boundingRect.bottom - boundingRect.top - paddingTop - paddingBottom;
-	mouseX = Math.round((mouseX - boundingRect.left - paddingLeft) / (width) * canvasElement.width / chart.currentDevicePixelRatio);
-	mouseY = Math.round((mouseY - boundingRect.top - paddingTop) / (height) * canvasElement.height / chart.currentDevicePixelRatio);
-	return {
-		x: mouseX,
-		y: mouseY
-	};
-}
-function fallbackIfNotValid(measure, fallback) {
-	return typeof measure === 'number' ? measure : fallback;
-}
-function getMaximumWidth(domNode) {
-	const container = _getParentNode(domNode);
-	if (!container) {
-		return fallbackIfNotValid(domNode.clientWidth, domNode.width);
-	}
-	const clientWidth = container.clientWidth;
-	const paddingLeft = _calculatePadding(container, 'padding-left', clientWidth);
-	const paddingRight = _calculatePadding(container, 'padding-right', clientWidth);
-	const w = clientWidth - paddingLeft - paddingRight;
-	const cw = getConstraintWidth(domNode);
-	return isNaN(cw) ? w : Math.min(w, cw);
-}
-function getMaximumHeight(domNode) {
-	const container = _getParentNode(domNode);
-	if (!container) {
-		return fallbackIfNotValid(domNode.clientHeight, domNode.height);
-	}
-	const clientHeight = container.clientHeight;
-	const paddingTop = _calculatePadding(container, 'padding-top', clientHeight);
-	const paddingBottom = _calculatePadding(container, 'padding-bottom', clientHeight);
-	const h = clientHeight - paddingTop - paddingBottom;
-	const ch = getConstraintHeight(domNode);
-	return isNaN(ch) ? h : Math.min(h, ch);
-}
-function retinaScale(chart, forceRatio) {
-	const pixelRatio = chart.currentDevicePixelRatio = forceRatio || (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
-	const {canvas, width, height} = chart;
-	canvas.height = height * pixelRatio;
-	canvas.width = width * pixelRatio;
-	chart.ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-	if (canvas.style && !canvas.style.height && !canvas.style.width) {
-		canvas.style.height = height + 'px';
-		canvas.style.width = width + 'px';
-	}
-}
-
-var dom = /*#__PURE__*/Object.freeze({
-__proto__: null,
-_getParentNode: _getParentNode,
-getStyle: getStyle,
-getRelativePosition: getRelativePosition,
-getMaximumWidth: getMaximumWidth,
-getMaximumHeight: getMaximumHeight,
-retinaScale: retinaScale
-});
-
-function getRelativePosition$1(e, chart) {
+function getRelativePosition(e, chart) {
 	if ('native' in e) {
 		return {
 			x: e.x,
 			y: e.y
 		};
 	}
-	return getRelativePosition(e, chart);
+	return getRelativePosition$1(e, chart);
 }
 function evaluateAllVisibleItems(chart, handler) {
 	const metasets = chart.getSortedVisibleDatasetMetas();
@@ -5143,7 +3078,7 @@ function getNearestItems(chart, position, axis, intersect, useFinalPosition) {
 var Interaction = {
 	modes: {
 		index(chart, e, options, useFinalPosition) {
-			const position = getRelativePosition$1(e, chart);
+			const position = getRelativePosition(e, chart);
 			const axis = options.axis || 'x';
 			const items = options.intersect
 				? getIntersectItems(chart, position, axis, useFinalPosition)
@@ -5162,7 +3097,7 @@ var Interaction = {
 			return elements;
 		},
 		dataset(chart, e, options, useFinalPosition) {
-			const position = getRelativePosition$1(e, chart);
+			const position = getRelativePosition(e, chart);
 			const axis = options.axis || 'xy';
 			let items = options.intersect
 				? getIntersectItems(chart, position, axis, useFinalPosition) :
@@ -5178,17 +3113,17 @@ var Interaction = {
 			return items;
 		},
 		point(chart, e, options, useFinalPosition) {
-			const position = getRelativePosition$1(e, chart);
+			const position = getRelativePosition(e, chart);
 			const axis = options.axis || 'xy';
 			return getIntersectItems(chart, position, axis, useFinalPosition);
 		},
 		nearest(chart, e, options, useFinalPosition) {
-			const position = getRelativePosition$1(e, chart);
+			const position = getRelativePosition(e, chart);
 			const axis = options.axis || 'xy';
 			return getNearestItems(chart, position, axis, options.intersect, useFinalPosition);
 		},
 		x(chart, e, options, useFinalPosition) {
-			const position = getRelativePosition$1(e, chart);
+			const position = getRelativePosition(e, chart);
 			const items = [];
 			let intersectsItem = false;
 			evaluateAllVisibleItems(chart, (element, datasetIndex, index) => {
@@ -5205,7 +3140,7 @@ var Interaction = {
 			return items;
 		},
 		y(chart, e, options, useFinalPosition) {
-			const position = getRelativePosition$1(e, chart);
+			const position = getRelativePosition(e, chart);
 			const items = [];
 			let intersectsItem = false;
 			evaluateAllVisibleItems(chart, (element, datasetIndex, index) => {
@@ -5584,7 +3519,7 @@ function createEvent(type, chart, x, y, nativeEvent) {
 }
 function fromNativeEvent(event, chart) {
 	const type = EVENT_TYPES[event.type] || event.type;
-	const pos = getRelativePosition(event, chart);
+	const pos = getRelativePosition$1(event, chart);
 	return createEvent(type, chart, pos.x, pos.y, event);
 }
 function throttled(fn, thisArg) {
@@ -5745,13 +3680,6 @@ class DomPlatform extends BasePlatform {
 	}
 }
 
-var platforms = /*#__PURE__*/Object.freeze({
-__proto__: null,
-BasePlatform: BasePlatform,
-BasicPlatform: BasicPlatform,
-DomPlatform: DomPlatform
-});
-
 defaults.set('plugins', {});
 class PluginService {
 	constructor() {
@@ -5841,7 +3769,7 @@ class PluginService {
 		delete chart.$plugins;
 	}
 }
-var pluginsCore = new PluginService();
+var plugins = new PluginService();
 
 var scaleService = {
 	constructors: {},
@@ -5876,31 +3804,53 @@ var scaleService = {
 
 var version = "3.0.0-alpha";
 
+function getIndexAxis(type, options) {
+	const typeDefaults = defaults[type] || {};
+	const datasetDefaults = typeDefaults.datasets || {};
+	const typeOptions = options[type] || {};
+	const datasetOptions = typeOptions.datasets || {};
+	return datasetOptions.indexAxis || options.indexAxis || datasetDefaults.indexAxis || 'x';
+}
+function getAxisFromDefaultScaleID(id, indexAxis) {
+	let axis = id;
+	if (id === '_index_') {
+		axis = indexAxis;
+	} else if (id === '_value_') {
+		axis = indexAxis === 'x' ? 'y' : 'x';
+	}
+	return axis;
+}
+function getDefaultScaleIDFromAxis(axis, indexAxis) {
+	return axis === indexAxis ? '_index_' : '_value_';
+}
 function mergeScaleConfig(config, options) {
 	options = options || {};
 	const chartDefaults = defaults[config.type] || {scales: {}};
 	const configScales = options.scales || {};
+	const chartIndexAxis = getIndexAxis(config.type, options);
 	const firstIDs = {};
 	const scales = {};
 	Object.keys(configScales).forEach(id => {
-		const axis = id[0];
+		const scaleConf = configScales[id];
+		const axis = determineAxis(id, scaleConf);
+		const defaultId = getDefaultScaleIDFromAxis(axis, chartIndexAxis);
 		firstIDs[axis] = firstIDs[axis] || id;
-		scales[id] = mergeIf({}, [configScales[id], chartDefaults.scales[axis]]);
+		scales[id] = mergeIf({axis}, [scaleConf, chartDefaults.scales[axis], chartDefaults.scales[defaultId]]);
 	});
 	if (options.scale) {
-		scales[options.scale.id || 'r'] = mergeIf({}, [options.scale, chartDefaults.scales.r]);
+		scales[options.scale.id || 'r'] = mergeIf({axis: 'r'}, [options.scale, chartDefaults.scales.r]);
 		firstIDs.r = firstIDs.r || options.scale.id || 'r';
 	}
 	config.data.datasets.forEach(dataset => {
-		const datasetDefaults = defaults[dataset.type || config.type] || {scales: {}};
+		const type = dataset.type || config.type;
+		const indexAxis = dataset.indexAxis || getIndexAxis(type, options);
+		const datasetDefaults = defaults[type] || {};
 		const defaultScaleOptions = datasetDefaults.scales || {};
 		Object.keys(defaultScaleOptions).forEach(defaultID => {
-			const id = dataset[defaultID + 'AxisID'] || firstIDs[defaultID] || defaultID;
+			const axis = getAxisFromDefaultScaleID(defaultID, indexAxis);
+			const id = dataset[axis + 'AxisID'] || firstIDs[axis] || axis;
 			scales[id] = scales[id] || {};
-			mergeIf(scales[id], [
-				configScales[id],
-				defaultScaleOptions[defaultID]
-			]);
+			mergeIf(scales[id], [{axis}, configScales[id], defaultScaleOptions[defaultID]]);
 		});
 	});
 	Object.keys(scales).forEach(key => {
@@ -5948,9 +3898,23 @@ function updateConfig(chart) {
 	chart.options.scales = scaleConfig;
 	chart._animationsDisabled = isAnimationDisabled(newOptions);
 }
-const KNOWN_POSITIONS = new Set(['top', 'bottom', 'left', 'right', 'chartArea']);
+const KNOWN_POSITIONS = ['top', 'bottom', 'left', 'right', 'chartArea'];
 function positionIsHorizontal(position, axis) {
-	return position === 'top' || position === 'bottom' || (!KNOWN_POSITIONS.has(position) && axis === 'x');
+	return position === 'top' || position === 'bottom' || (KNOWN_POSITIONS.indexOf(position) === -1 && axis === 'x');
+}
+function axisFromPosition(position) {
+	if (position === 'top' || position === 'bottom') {
+		return 'x';
+	}
+	if (position === 'left' || position === 'right') {
+		return 'y';
+	}
+}
+function determineAxis(id, scaleOptions) {
+	if (id === 'x' || id === 'y' || id === 'r') {
+		return id;
+	}
+	return scaleOptions.axis || axisFromPosition(scaleOptions.position) || id.charAt(0).toLowerCase();
 }
 function compare2Level(l1, l2) {
 	return function(a, b) {
@@ -5962,7 +3926,7 @@ function compare2Level(l1, l2) {
 function onAnimationsComplete(ctx) {
 	const chart = ctx.chart;
 	const animationOptions = chart.options.animation;
-	pluginsCore.notify(chart, 'afterRender');
+	plugins.notify(chart, 'afterRender');
 	callback(animationOptions && animationOptions.onComplete, [ctx], chart);
 }
 function onAnimationProgress(ctx) {
@@ -6020,8 +3984,7 @@ class Chart {
 		this.currentDevicePixelRatio = undefined;
 		this.chartArea = undefined;
 		this.data = undefined;
-		this.active = undefined;
-		this.lastActive = [];
+		this._active = [];
 		this._lastEvent = undefined;
 		this._listeners = {};
 		this._sortedMetasets = [];
@@ -6031,7 +3994,7 @@ class Chart {
 		this.$plugins = undefined;
 		this.$proxies = {};
 		this._hiddenIndices = {};
-		this.attached = true;
+		this.attached = false;
 		Chart.instances[me.id] = me;
 		Object.defineProperty(me, 'data', {
 			get() {
@@ -6054,14 +4017,14 @@ class Chart {
 	}
 	_initialize() {
 		const me = this;
-		pluginsCore.notify(me, 'beforeInit');
+		plugins.notify(me, 'beforeInit');
 		if (me.options.responsive) {
 			me.resize(true);
 		} else {
 			retinaScale(me, me.options.devicePixelRatio);
 		}
 		me.bindEvents();
-		pluginsCore.notify(me, 'afterInit');
+		plugins.notify(me, 'afterInit');
 		return me;
 	}
 	_initializePlatform(canvas, config) {
@@ -6099,11 +4062,11 @@ class Chart {
 		}
 		retinaScale(me, newRatio);
 		if (!silent) {
-			pluginsCore.notify(me, 'resize', [newSize]);
-			if (options.onResize) {
-				options.onResize(me, newSize);
+			plugins.notify(me, 'resize', [newSize]);
+			callback(options.onResize, [newSize], me);
+			if (me.attached) {
+				me.update('resize');
 			}
-			me.update(me.attached && 'resize');
 		}
 	}
 	ensureScalesHaveIDs() {
@@ -6129,12 +4092,13 @@ class Chart {
 		let items = [];
 		if (scaleOpts) {
 			items = items.concat(
-				Object.keys(scaleOpts).map((axisID) => {
-					const axisOptions = scaleOpts[axisID];
-					const isRadial = axisID.charAt(0).toLowerCase() === 'r';
-					const isHorizontal = axisID.charAt(0).toLowerCase() === 'x';
+				Object.keys(scaleOpts).map((id) => {
+					const scaleOptions = scaleOpts[id];
+					const axis = determineAxis(id, scaleOptions);
+					const isRadial = axis === 'r';
+					const isHorizontal = axis === 'x';
 					return {
-						options: axisOptions,
+						options: scaleOptions,
 						dposition: isRadial ? 'chartArea' : isHorizontal ? 'bottom' : 'left',
 						dtype: isRadial ? 'radialLinear' : isHorizontal ? 'category' : 'linear'
 					};
@@ -6144,8 +4108,9 @@ class Chart {
 		each(items, (item) => {
 			const scaleOptions = item.options;
 			const id = scaleOptions.id;
+			const axis = determineAxis(id, scaleOptions);
 			const scaleType = valueOrDefault(scaleOptions.type, item.dtype);
-			if (scaleOptions.position === undefined || positionIsHorizontal(scaleOptions.position, scaleOptions.axis || id[0]) !== positionIsHorizontal(item.dposition)) {
+			if (scaleOptions.position === undefined || positionIsHorizontal(scaleOptions.position, axis) !== positionIsHorizontal(item.dposition)) {
 				scaleOptions.position = item.dposition;
 			}
 			updated[id] = true;
@@ -6214,6 +4179,7 @@ class Chart {
 				meta = me.getDatasetMeta(i);
 			}
 			meta.type = type;
+			meta.indexAxis = dataset.indexAxis || getIndexAxis(type, me.options);
 			meta.order = dataset.order || 0;
 			me._updateMetasetIndex(meta, i);
 			meta.label = '' + dataset.label;
@@ -6241,7 +4207,7 @@ class Chart {
 	}
 	reset() {
 		this._resetElements();
-		pluginsCore.notify(this, 'reset');
+		plugins.notify(this, 'reset');
 	}
 	update(mode) {
 		const me = this;
@@ -6250,8 +4216,8 @@ class Chart {
 		updateConfig(me);
 		me.ensureScalesHaveIDs();
 		me.buildOrUpdateScales();
-		pluginsCore.invalidate(me);
-		if (pluginsCore.notify(me, 'beforeUpdate') === false) {
+		plugins.invalidate(me);
+		if (plugins.notify(me, 'beforeUpdate') === false) {
 			return;
 		}
 		const newControllers = me.buildOrUpdateControllers();
@@ -6265,7 +4231,7 @@ class Chart {
 			});
 		}
 		me._updateDatasets(mode);
-		pluginsCore.notify(me, 'afterUpdate');
+		plugins.notify(me, 'afterUpdate');
 		me._layers.sort(compare2Level('z', '_idx'));
 		if (me._lastEvent) {
 			me._eventHandler(me._lastEvent, true);
@@ -6275,7 +4241,7 @@ class Chart {
 	}
 	_updateLayout() {
 		const me = this;
-		if (pluginsCore.notify(me, 'beforeLayout') === false) {
+		if (plugins.notify(me, 'beforeLayout') === false) {
 			return;
 		}
 		layouts.update(me, me.width, me.height);
@@ -6289,37 +4255,37 @@ class Chart {
 		me._layers.forEach((item, index) => {
 			item._idx = index;
 		});
-		pluginsCore.notify(me, 'afterLayout');
+		plugins.notify(me, 'afterLayout');
 	}
 	_updateDatasets(mode) {
 		const me = this;
 		const isFunction = typeof mode === 'function';
-		if (pluginsCore.notify(me, 'beforeDatasetsUpdate') === false) {
+		if (plugins.notify(me, 'beforeDatasetsUpdate') === false) {
 			return;
 		}
 		for (let i = 0, ilen = me.data.datasets.length; i < ilen; ++i) {
 			me._updateDataset(i, isFunction ? mode({datasetIndex: i}) : mode);
 		}
-		pluginsCore.notify(me, 'afterDatasetsUpdate');
+		plugins.notify(me, 'afterDatasetsUpdate');
 	}
 	_updateDataset(index, mode) {
 		const me = this;
 		const meta = me.getDatasetMeta(index);
 		const args = {meta, index, mode};
-		if (pluginsCore.notify(me, 'beforeDatasetUpdate', [args]) === false) {
+		if (plugins.notify(me, 'beforeDatasetUpdate', [args]) === false) {
 			return;
 		}
 		meta.controller._update(mode);
-		pluginsCore.notify(me, 'afterDatasetUpdate', [args]);
+		plugins.notify(me, 'afterDatasetUpdate', [args]);
 	}
 	render() {
 		const me = this;
 		const animationOptions = me.options.animation;
-		if (pluginsCore.notify(me, 'beforeRender') === false) {
+		if (plugins.notify(me, 'beforeRender') === false) {
 			return;
 		}
 		const onComplete = function() {
-			pluginsCore.notify(me, 'afterRender');
+			plugins.notify(me, 'afterRender');
 			callback(animationOptions && animationOptions.onComplete, [], me);
 		};
 		if (animator.has(me)) {
@@ -6338,7 +4304,7 @@ class Chart {
 		if (me.width <= 0 || me.height <= 0) {
 			return;
 		}
-		if (pluginsCore.notify(me, 'beforeDraw') === false) {
+		if (plugins.notify(me, 'beforeDraw') === false) {
 			return;
 		}
 		const layers = me._layers;
@@ -6349,7 +4315,7 @@ class Chart {
 		for (; i < layers.length; ++i) {
 			layers[i].draw(me.chartArea);
 		}
-		pluginsCore.notify(me, 'afterDraw');
+		plugins.notify(me, 'afterDraw');
 	}
 	_getSortedDatasetMetas(filterVisible) {
 		const me = this;
@@ -6369,14 +4335,14 @@ class Chart {
 	}
 	_drawDatasets() {
 		const me = this;
-		if (pluginsCore.notify(me, 'beforeDatasetsDraw') === false) {
+		if (plugins.notify(me, 'beforeDatasetsDraw') === false) {
 			return;
 		}
 		const metasets = me.getSortedVisibleDatasetMetas();
 		for (let i = metasets.length - 1; i >= 0; --i) {
 			me._drawDataset(metasets[i]);
 		}
-		pluginsCore.notify(me, 'afterDatasetsDraw');
+		plugins.notify(me, 'afterDatasetsDraw');
 	}
 	_drawDataset(meta) {
 		const me = this;
@@ -6387,7 +4353,7 @@ class Chart {
 			meta,
 			index: meta.index,
 		};
-		if (pluginsCore.notify(me, 'beforeDatasetDraw', [args]) === false) {
+		if (plugins.notify(me, 'beforeDatasetDraw', [args]) === false) {
 			return;
 		}
 		clipArea(ctx, {
@@ -6398,7 +4364,7 @@ class Chart {
 		});
 		meta.controller.draw();
 		unclipArea(ctx);
-		pluginsCore.notify(me, 'afterDatasetDraw', [args]);
+		plugins.notify(me, 'afterDatasetDraw', [args]);
 	}
 	getElementAtEvent(e) {
 		return Interaction.modes.nearest(this, e, {intersect: true});
@@ -6498,7 +4464,7 @@ class Chart {
 			me.canvas = null;
 			me.ctx = null;
 		}
-		pluginsCore.notify(me, 'destroy');
+		plugins.notify(me, 'destroy');
 		delete Chart.instances[me.id];
 	}
 	toBase64Image(...args) {
@@ -6575,176 +4541,57 @@ class Chart {
 			}
 		}
 	}
-	_updateHoverStyles() {
+	_updateHoverStyles(active, lastActive) {
 		const me = this;
 		const options = me.options || {};
 		const hoverOptions = options.hover;
-		if (me.lastActive.length) {
-			me.updateHoverStyle(me.lastActive, hoverOptions.mode, false);
+		if (lastActive.length) {
+			me.updateHoverStyle(lastActive, hoverOptions.mode, false);
 		}
-		if (me.active.length && hoverOptions.mode) {
-			me.updateHoverStyle(me.active, hoverOptions.mode, true);
+		if (active.length && hoverOptions.mode) {
+			me.updateHoverStyle(active, hoverOptions.mode, true);
 		}
 	}
 	_eventHandler(e, replay) {
 		const me = this;
-		if (pluginsCore.notify(me, 'beforeEvent', [e, replay]) === false) {
+		if (plugins.notify(me, 'beforeEvent', [e, replay]) === false) {
 			return;
 		}
 		me._handleEvent(e, replay);
-		pluginsCore.notify(me, 'afterEvent', [e, replay]);
+		plugins.notify(me, 'afterEvent', [e, replay]);
 		me.render();
 		return me;
 	}
 	_handleEvent(e, replay) {
 		const me = this;
+		const lastActive = me._active || [];
 		const options = me.options;
 		const hoverOptions = options.hover;
 		const useFinalPosition = replay;
+		let active = [];
 		let changed = false;
 		if (e.type === 'mouseout') {
-			me.active = [];
 			me._lastEvent = null;
 		} else {
-			me.active = me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions, useFinalPosition);
+			active = me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions, useFinalPosition);
 			me._lastEvent = e.type === 'click' ? me._lastEvent : e;
 		}
-		callback(options.onHover || options.hover.onHover, [e.native, me.active, me], me);
+		callback(options.onHover || options.hover.onHover, [e, active, me], me);
 		if (e.type === 'mouseup' || e.type === 'click') {
 			if (_isPointInArea(e, me.chartArea)) {
-				callback(options.onClick, [e, me.active, me], me);
+				callback(options.onClick, [e, active, me], me);
 			}
 		}
-		changed = !_elementsEqual(me.active, me.lastActive);
+		changed = !_elementsEqual(active, lastActive);
 		if (changed || replay) {
-			me._updateHoverStyles();
+			me._active = active;
+			me._updateHoverStyles(active, lastActive);
 		}
-		me.lastActive = me.active;
 		return changed;
 	}
 }
 Chart.version = version;
 Chart.instances = {};
-
-const getRightToLeftAdapter = function(rectX, width) {
-	return {
-		x(x) {
-			return rectX + rectX + width - x;
-		},
-		setWidth(w) {
-			width = w;
-		},
-		textAlign(align) {
-			if (align === 'center') {
-				return align;
-			}
-			return align === 'right' ? 'left' : 'right';
-		},
-		xPlus(x, value) {
-			return x - value;
-		},
-		leftForLtr(x, itemWidth) {
-			return x - itemWidth;
-		},
-	};
-};
-const getLeftToRightAdapter = function() {
-	return {
-		x(x) {
-			return x;
-		},
-		setWidth(w) {
-		},
-		textAlign(align) {
-			return align;
-		},
-		xPlus(x, value) {
-			return x + value;
-		},
-		leftForLtr(x, _itemWidth) {
-			return x;
-		},
-	};
-};
-function getRtlAdapter(rtl, rectX, width) {
-	return rtl ? getRightToLeftAdapter(rectX, width) : getLeftToRightAdapter();
-}
-function overrideTextDirection(ctx, direction) {
-	let style, original;
-	if (direction === 'ltr' || direction === 'rtl') {
-		style = ctx.canvas.style;
-		original = [
-			style.getPropertyValue('direction'),
-			style.getPropertyPriority('direction'),
-		];
-		style.setProperty('direction', direction, 'important');
-		ctx.prevTextDirection = original;
-	}
-}
-function restoreTextDirection(ctx, original) {
-	if (original !== undefined) {
-		delete ctx.prevTextDirection;
-		ctx.canvas.style.setProperty('direction', original[0], original[1]);
-	}
-}
-
-var rtl = /*#__PURE__*/Object.freeze({
-__proto__: null,
-getRtlAdapter: getRtlAdapter,
-overrideTextDirection: overrideTextDirection,
-restoreTextDirection: restoreTextDirection
-});
-
-var helpers = {
-	...coreHelpers,
-	canvas,
-	curve,
-	dom,
-	easing: {effects},
-	options,
-	math,
-	rtl,
-	requestAnimFrame,
-	fontString,
-	color,
-	getHoverColor
-};
-
-function abstract() {
-	throw new Error('This method is not implemented: either no adapter can be found or an incomplete integration was provided.');
-}
-class DateAdapter {
-	constructor(options) {
-		this.options = options || {};
-	}
-	formats() {
-		return abstract();
-	}
-	parse(value, format) {
-		return abstract();
-	}
-	format(timestamp, format) {
-		return abstract();
-	}
-	add(timestamp, amount, unit) {
-		return abstract();
-	}
-	diff(a, b, unit) {
-		return abstract();
-	}
-	startOf(timestamp, unit, weekday) {
-		return abstract();
-	}
-	endOf(timestamp, unit) {
-		return abstract();
-	}
-}
-DateAdapter.override = function(members) {
-	Object.assign(DateAdapter.prototype, members);
-};
-var _adapters = {
-	_date: DateAdapter
-};
 
 const formatters = {
 	values(value) {
@@ -6754,23 +4601,21 @@ const formatters = {
 		if (tickValue === 0) {
 			return '0';
 		}
+		const locale = this.chart.options.locale;
+		const maxTick = Math.max(Math.abs(ticks[0].value), Math.abs(ticks[ticks.length - 1].value));
+		let notation;
+		if (maxTick < 1e-4 || maxTick > 1e+15) {
+			notation = 'scientific';
+		}
 		let delta = ticks.length > 3 ? ticks[2].value - ticks[1].value : ticks[1].value - ticks[0].value;
 		if (Math.abs(delta) > 1 && tickValue !== Math.floor(tickValue)) {
 			delta = tickValue - Math.floor(tickValue);
 		}
 		const logDelta = log10(Math.abs(delta));
-		const maxTick = Math.max(Math.abs(ticks[0].value), Math.abs(ticks[ticks.length - 1].value));
-		const minTick = Math.min(Math.abs(ticks[0].value), Math.abs(ticks[ticks.length - 1].value));
-		const locale = this.chart.options.locale;
-		if (maxTick < 1e-4 || minTick > 1e+7) {
-			const logTick = log10(Math.abs(tickValue));
-			let numExponential = Math.floor(logTick) - Math.floor(logDelta);
-			numExponential = Math.max(Math.min(numExponential, 20), 0);
-			return tickValue.toExponential(numExponential);
-		}
-		let numDecimal = -1 * Math.floor(logDelta);
-		numDecimal = Math.max(Math.min(numDecimal, 20), 0);
-		return new Intl.NumberFormat(locale, {minimumFractionDigits: numDecimal, maximumFractionDigits: numDecimal}).format(tickValue);
+		const numDecimal = Math.max(Math.min(-1 * Math.floor(logDelta), 20), 0);
+		const options = {notation, minimumFractionDigits: numDecimal, maximumFractionDigits: numDecimal};
+		Object.assign(options, this.options.ticks.format);
+		return new Intl.NumberFormat(locale, options).format(tickValue);
 	}
 };
 formatters.logarithmic = function(tickValue, index, ticks) {
@@ -7011,12 +4856,6 @@ class Scale extends Element {
 	parse(raw, index) {
 		return raw;
 	}
-	parseObject(obj, axis, index) {
-		if (obj[axis] !== undefined) {
-			return this.parse(obj[axis], index);
-		}
-		return null;
-	}
 	getUserBounds() {
 		let min = this._userMin;
 		let max = this._userMax;
@@ -7031,18 +4870,18 @@ class Scale extends Element {
 	getMinMax(canStack) {
 		const me = this;
 		let {min, max, minDefined, maxDefined} = me.getUserBounds();
-		let minmax;
+		let range;
 		if (minDefined && maxDefined) {
 			return {min, max};
 		}
 		const metas = me.getMatchingVisibleMetas();
 		for (let i = 0, ilen = metas.length; i < ilen; ++i) {
-			minmax = metas[i].controller.getMinMax(me, canStack);
+			range = metas[i].controller.getMinMax(me, canStack);
 			if (!minDefined) {
-				min = Math.min(min, minmax.min);
+				min = Math.min(min, range.min);
 			}
 			if (!maxDefined) {
-				max = Math.max(max, minmax.max);
+				max = Math.max(max, range.max);
 			}
 		}
 		return {min, max};
@@ -7477,8 +5316,10 @@ class Scale extends Element {
 		const tl = getTickMarkLength(gridLines);
 		const items = [];
 		let context = {
+			chart,
 			scale: me,
 			tick: ticks[0],
+			index: 0,
 		};
 		const axisWidth = gridLines.drawBorder ? resolve([gridLines.borderWidth, gridLines.lineWidth, 0], context, 0) : 0;
 		const axisHalfWidth = axisWidth / 2;
@@ -7539,8 +5380,10 @@ class Scale extends Element {
 		for (i = 0; i < ticksLength; ++i) {
 			const tick = ticks[i] || {};
 			context = {
+				chart,
 				scale: me,
 				tick,
+				index: i,
 			};
 			const lineWidth = resolve([gridLines.lineWidth], context, i);
 			const lineColor = resolve([gridLines.color], context, i);
@@ -7657,8 +5500,10 @@ class Scale extends Element {
 		const ctx = me.ctx;
 		const chart = me.chart;
 		let context = {
+			chart,
 			scale: me,
 			tick: me.ticks[0],
+			index: 0,
 		};
 		const axisWidth = gridLines.drawBorder ? resolve([gridLines.borderWidth, gridLines.lineWidth, 0], context, 0) : 0;
 		const items = me._gridLineItems || (me._gridLineItems = me._computeGridLineItems(chartArea));
@@ -7693,8 +5538,10 @@ class Scale extends Element {
 		if (axisWidth) {
 			const firstLineWidth = axisWidth;
 			context = {
+				chart,
 				scale: me,
 				tick: me.ticks[me._ticksLength - 1],
+				index: me._ticksLength - 1,
 			};
 			const lastLineWidth = resolve([gridLines.lineWidth, 1], context, me._ticksLength - 1);
 			const borderValue = me._borderValue;
@@ -7886,1316 +5733,6 @@ class Scale extends Element {
 	}
 }
 Scale.prototype._draw = Scale.prototype.draw;
-
-const defaultConfig = {
-};
-class CategoryScale extends Scale {
-	constructor(cfg) {
-		super(cfg);
-		this._numLabels = 0;
-		this._startValue = undefined;
-		this._valueRange = 0;
-	}
-	parse(raw, index) {
-		const labels = this.getLabels();
-		if (labels[index] === raw) {
-			return index;
-		}
-		const first = labels.indexOf(raw);
-		const last = labels.lastIndexOf(raw);
-		return first === -1 || first !== last ? index : first;
-	}
-	determineDataLimits() {
-		const me = this;
-		const max = me.getLabels().length - 1;
-		me.min = Math.max(me._userMin || 0, 0);
-		me.max = Math.min(me._userMax || max, max);
-	}
-	buildTicks() {
-		const me = this;
-		const min = me.min;
-		const max = me.max;
-		const offset = me.options.offset;
-		let labels = me.getLabels();
-		labels = (min === 0 && max === labels.length - 1) ? labels : labels.slice(min, max + 1);
-		me._numLabels = labels.length;
-		me._valueRange = Math.max(labels.length - (offset ? 0 : 1), 1);
-		me._startValue = me.min - (offset ? 0.5 : 0);
-		return labels.map((l) => ({value: l}));
-	}
-	getLabelForValue(value) {
-		const me = this;
-		const labels = me.getLabels();
-		if (value >= 0 && value < labels.length) {
-			return labels[value];
-		}
-		return value;
-	}
-	configure() {
-		const me = this;
-		super.configure();
-		if (!me.isHorizontal()) {
-			me._reversePixels = !me._reversePixels;
-		}
-	}
-	getPixelForValue(value) {
-		const me = this;
-		if (typeof value !== 'number') {
-			value = me.parse(value);
-		}
-		return me.getPixelForDecimal((value - me._startValue) / me._valueRange);
-	}
-	getPixelForTick(index) {
-		const me = this;
-		const ticks = me.ticks;
-		if (index < 0 || index > ticks.length - 1) {
-			return null;
-		}
-		return me.getPixelForValue(index * me._numLabels / ticks.length + me.min);
-	}
-	getValueForPixel(pixel) {
-		const me = this;
-		const value = Math.round(me._startValue + me.getDecimalForPixel(pixel) * me._valueRange);
-		return Math.min(Math.max(value, 0), me.ticks.length - 1);
-	}
-	getBasePixel() {
-		return this.bottom;
-	}
-}
-CategoryScale.id = 'category';
-CategoryScale.defaults = defaultConfig;
-
-function niceNum(range, round) {
-	const exponent = Math.floor(log10(range));
-	const fraction = range / Math.pow(10, exponent);
-	let niceFraction;
-	if (round) {
-		if (fraction < 1.5) {
-			niceFraction = 1;
-		} else if (fraction < 3) {
-			niceFraction = 2;
-		} else if (fraction < 7) {
-			niceFraction = 5;
-		} else {
-			niceFraction = 10;
-		}
-	} else if (fraction <= 1.0) {
-		niceFraction = 1;
-	} else if (fraction <= 2) {
-		niceFraction = 2;
-	} else if (fraction <= 5) {
-		niceFraction = 5;
-	} else {
-		niceFraction = 10;
-	}
-	return niceFraction * Math.pow(10, exponent);
-}
-function generateTicks(generationOptions, dataRange) {
-	const ticks = [];
-	const MIN_SPACING = 1e-14;
-	const {stepSize, min, max, precision} = generationOptions;
-	const unit = stepSize || 1;
-	const maxNumSpaces = generationOptions.maxTicks - 1;
-	const {min: rmin, max: rmax} = dataRange;
-	let spacing = niceNum((rmax - rmin) / maxNumSpaces / unit) * unit;
-	let factor, niceMin, niceMax, numSpaces;
-	if (spacing < MIN_SPACING && isNullOrUndef(min) && isNullOrUndef(max)) {
-		return [{value: rmin}, {value: rmax}];
-	}
-	numSpaces = Math.ceil(rmax / spacing) - Math.floor(rmin / spacing);
-	if (numSpaces > maxNumSpaces) {
-		spacing = niceNum(numSpaces * spacing / maxNumSpaces / unit) * unit;
-	}
-	if (stepSize || isNullOrUndef(precision)) {
-		factor = Math.pow(10, _decimalPlaces(spacing));
-	} else {
-		factor = Math.pow(10, precision);
-		spacing = Math.ceil(spacing * factor) / factor;
-	}
-	niceMin = Math.floor(rmin / spacing) * spacing;
-	niceMax = Math.ceil(rmax / spacing) * spacing;
-	if (stepSize && !isNullOrUndef(min) && !isNullOrUndef(max)) {
-		if (almostWhole((max - min) / stepSize, spacing / 1000)) {
-			niceMin = min;
-			niceMax = max;
-		}
-	}
-	numSpaces = (niceMax - niceMin) / spacing;
-	if (almostEquals(numSpaces, Math.round(numSpaces), spacing / 1000)) {
-		numSpaces = Math.round(numSpaces);
-	} else {
-		numSpaces = Math.ceil(numSpaces);
-	}
-	niceMin = Math.round(niceMin * factor) / factor;
-	niceMax = Math.round(niceMax * factor) / factor;
-	ticks.push({value: isNullOrUndef(min) ? niceMin : min});
-	for (let j = 1; j < numSpaces; ++j) {
-		ticks.push({value: Math.round((niceMin + j * spacing) * factor) / factor});
-	}
-	ticks.push({value: isNullOrUndef(max) ? niceMax : max});
-	return ticks;
-}
-class LinearScaleBase extends Scale {
-	constructor(cfg) {
-		super(cfg);
-		this.start = undefined;
-		this.end = undefined;
-		this._startValue = undefined;
-		this._endValue = undefined;
-		this._valueRange = 0;
-	}
-	parse(raw, index) {
-		if (isNullOrUndef(raw)) {
-			return NaN;
-		}
-		if ((typeof raw === 'number' || raw instanceof Number) && !isFinite(+raw)) {
-			return NaN;
-		}
-		return +raw;
-	}
-	handleTickRangeOptions() {
-		const me = this;
-		const opts = me.options;
-		if (opts.beginAtZero) {
-			const minSign = sign(me.min);
-			const maxSign = sign(me.max);
-			if (minSign < 0 && maxSign < 0) {
-				me.max = 0;
-			} else if (minSign > 0 && maxSign > 0) {
-				me.min = 0;
-			}
-		}
-		const setMin = opts.min !== undefined || opts.suggestedMin !== undefined;
-		const setMax = opts.max !== undefined || opts.suggestedMax !== undefined;
-		if (opts.min !== undefined) {
-			me.min = opts.min;
-		} else if (opts.suggestedMin !== undefined) {
-			if (me.min === null) {
-				me.min = opts.suggestedMin;
-			} else {
-				me.min = Math.min(me.min, opts.suggestedMin);
-			}
-		}
-		if (opts.max !== undefined) {
-			me.max = opts.max;
-		} else if (opts.suggestedMax !== undefined) {
-			if (me.max === null) {
-				me.max = opts.suggestedMax;
-			} else {
-				me.max = Math.max(me.max, opts.suggestedMax);
-			}
-		}
-		if (setMin !== setMax) {
-			if (me.min >= me.max) {
-				if (setMin) {
-					me.max = me.min + 1;
-				} else {
-					me.min = me.max - 1;
-				}
-			}
-		}
-		if (me.min === me.max) {
-			me.max++;
-			if (!opts.beginAtZero) {
-				me.min--;
-			}
-		}
-	}
-	getTickLimit() {
-		const me = this;
-		const tickOpts = me.options.ticks;
-		let {maxTicksLimit, stepSize} = tickOpts;
-		let maxTicks;
-		if (stepSize) {
-			maxTicks = Math.ceil(me.max / stepSize) - Math.floor(me.min / stepSize) + 1;
-		} else {
-			maxTicks = me.computeTickLimit();
-			maxTicksLimit = maxTicksLimit || 11;
-		}
-		if (maxTicksLimit) {
-			maxTicks = Math.min(maxTicksLimit, maxTicks);
-		}
-		return maxTicks;
-	}
-	computeTickLimit() {
-		return Number.POSITIVE_INFINITY;
-	}
-	handleDirectionalChanges(ticks) {
-		return ticks;
-	}
-	buildTicks() {
-		const me = this;
-		const opts = me.options;
-		const tickOpts = opts.ticks;
-		let maxTicks = me.getTickLimit();
-		maxTicks = Math.max(2, maxTicks);
-		const numericGeneratorOptions = {
-			maxTicks,
-			min: opts.min,
-			max: opts.max,
-			precision: tickOpts.precision,
-			stepSize: valueOrDefault(tickOpts.fixedStepSize, tickOpts.stepSize)
-		};
-		let ticks = generateTicks(numericGeneratorOptions, me);
-		ticks = me.handleDirectionalChanges(ticks);
-		_setMinAndMaxByKey(ticks, me, 'value');
-		if (opts.reverse) {
-			ticks.reverse();
-			me.start = me.max;
-			me.end = me.min;
-		} else {
-			me.start = me.min;
-			me.end = me.max;
-		}
-		return ticks;
-	}
-	configure() {
-		const me = this;
-		const ticks = me.ticks;
-		let start = me.min;
-		let end = me.max;
-		super.configure();
-		if (me.options.offset && ticks.length) {
-			const offset = (end - start) / Math.max(ticks.length - 1, 1) / 2;
-			start -= offset;
-			end += offset;
-		}
-		me._startValue = start;
-		me._endValue = end;
-		me._valueRange = end - start;
-	}
-	getLabelForValue(value) {
-		return new Intl.NumberFormat(this.options.locale).format(value);
-	}
-}
-
-const defaultConfig$1 = {
-	ticks: {
-		callback: Ticks.formatters.numeric
-	}
-};
-class LinearScale extends LinearScaleBase {
-	determineDataLimits() {
-		const me = this;
-		const options = me.options;
-		const minmax = me.getMinMax(true);
-		const min = minmax.min;
-		const max = minmax.max;
-		me.min = isNumberFinite(min) ? min : valueOrDefault(options.suggestedMin, 0);
-		me.max = isNumberFinite(max) ? max : valueOrDefault(options.suggestedMax, 1);
-		if (options.stacked && min > 0) {
-			me.min = 0;
-		}
-		me.handleTickRangeOptions();
-	}
-	computeTickLimit() {
-		const me = this;
-		if (me.isHorizontal()) {
-			return Math.ceil(me.width / 40);
-		}
-		const tickFont = me._resolveTickFontOptions(0);
-		return Math.ceil(me.height / tickFont.lineHeight);
-	}
-	handleDirectionalChanges(ticks) {
-		return this.isHorizontal() ? ticks : ticks.reverse();
-	}
-	getPixelForValue(value) {
-		const me = this;
-		return me.getPixelForDecimal((value - me._startValue) / me._valueRange);
-	}
-	getValueForPixel(pixel) {
-		return this._startValue + this.getDecimalForPixel(pixel) * this._valueRange;
-	}
-}
-LinearScale.id = 'linear';
-LinearScale.defaults = defaultConfig$1;
-
-function isMajor(tickVal) {
-	const remain = tickVal / (Math.pow(10, Math.floor(log10(tickVal))));
-	return remain === 1;
-}
-function finiteOrDefault(value, def) {
-	return isNumberFinite(value) ? value : def;
-}
-function generateTicks$1(generationOptions, dataRange) {
-	const endExp = Math.floor(log10(dataRange.max));
-	const endSignificand = Math.ceil(dataRange.max / Math.pow(10, endExp));
-	const ticks = [];
-	let tickVal = finiteOrDefault(generationOptions.min, Math.pow(10, Math.floor(log10(dataRange.min))));
-	let exp = Math.floor(log10(tickVal));
-	let significand = Math.floor(tickVal / Math.pow(10, exp));
-	let precision = exp < 0 ? Math.pow(10, Math.abs(exp)) : 1;
-	do {
-		ticks.push({value: tickVal, major: isMajor(tickVal)});
-		++significand;
-		if (significand === 10) {
-			significand = 1;
-			++exp;
-			precision = exp >= 0 ? 1 : precision;
-		}
-		tickVal = Math.round(significand * Math.pow(10, exp) * precision) / precision;
-	} while (exp < endExp || (exp === endExp && significand < endSignificand));
-	const lastTick = finiteOrDefault(generationOptions.max, tickVal);
-	ticks.push({value: lastTick, major: isMajor(tickVal)});
-	return ticks;
-}
-const defaultConfig$2 = {
-	ticks: {
-		callback: Ticks.formatters.logarithmic,
-		major: {
-			enabled: true
-		}
-	}
-};
-class LogarithmicScale extends Scale {
-	constructor(cfg) {
-		super(cfg);
-		this.start = undefined;
-		this.end = undefined;
-		this._startValue = undefined;
-		this._valueRange = 0;
-	}
-	parse(raw, index) {
-		const value = LinearScaleBase.prototype.parse.apply(this, [raw, index]);
-		if (value === 0) {
-			return undefined;
-		}
-		return isNumberFinite(value) && value > 0 ? value : NaN;
-	}
-	determineDataLimits() {
-		const me = this;
-		const minmax = me.getMinMax(true);
-		const min = minmax.min;
-		const max = minmax.max;
-		me.min = isNumberFinite(min) ? Math.max(0, min) : null;
-		me.max = isNumberFinite(max) ? Math.max(0, max) : null;
-		me.handleTickRangeOptions();
-	}
-	handleTickRangeOptions() {
-		const me = this;
-		const DEFAULT_MIN = 1;
-		const DEFAULT_MAX = 10;
-		let min = me.min;
-		let max = me.max;
-		if (min === max) {
-			if (min <= 0) {
-				min = DEFAULT_MIN;
-				max = DEFAULT_MAX;
-			} else {
-				min = Math.pow(10, Math.floor(log10(min)) - 1);
-				max = Math.pow(10, Math.floor(log10(max)) + 1);
-			}
-		}
-		if (min <= 0) {
-			min = Math.pow(10, Math.floor(log10(max)) - 1);
-		}
-		if (max <= 0) {
-			max = Math.pow(10, Math.floor(log10(min)) + 1);
-		}
-		me.min = min;
-		me.max = max;
-	}
-	buildTicks() {
-		const me = this;
-		const opts = me.options;
-		const generationOptions = {
-			min: me._userMin,
-			max: me._userMax
-		};
-		const ticks = generateTicks$1(generationOptions, me);
-		let reverse = !me.isHorizontal();
-		_setMinAndMaxByKey(ticks, me, 'value');
-		if (opts.reverse) {
-			reverse = !reverse;
-			me.start = me.max;
-			me.end = me.min;
-		} else {
-			me.start = me.min;
-			me.end = me.max;
-		}
-		if (reverse) {
-			ticks.reverse();
-		}
-		return ticks;
-	}
-	getLabelForValue(value) {
-		return value === undefined ? '0' : new Intl.NumberFormat(this.options.locale).format(value);
-	}
-	configure() {
-		const me = this;
-		const start = me.min;
-		super.configure();
-		me._startValue = log10(start);
-		me._valueRange = log10(me.max) - log10(start);
-	}
-	getPixelForValue(value) {
-		const me = this;
-		if (value === undefined || value === 0) {
-			value = me.min;
-		}
-		return me.getPixelForDecimal(value === me.min
-			? 0
-			: (log10(value) - me._startValue) / me._valueRange);
-	}
-	getValueForPixel(pixel) {
-		const me = this;
-		const decimal = me.getDecimalForPixel(pixel);
-		return Math.pow(10, me._startValue + decimal * me._valueRange);
-	}
-}
-LogarithmicScale.id = 'logarithmic';
-LogarithmicScale.defaults = defaultConfig$2;
-
-const defaultConfig$3 = {
-	display: true,
-	animate: true,
-	position: 'chartArea',
-	angleLines: {
-		display: true,
-		color: 'rgba(0,0,0,0.1)',
-		lineWidth: 1,
-		borderDash: [],
-		borderDashOffset: 0.0
-	},
-	gridLines: {
-		circular: false
-	},
-	ticks: {
-		showLabelBackdrop: true,
-		backdropColor: 'rgba(255,255,255,0.75)',
-		backdropPaddingY: 2,
-		backdropPaddingX: 2,
-		callback: Ticks.formatters.numeric
-	},
-	pointLabels: {
-		display: true,
-		font: {
-			size: 10
-		},
-		callback(label) {
-			return label;
-		}
-	}
-};
-function getTickBackdropHeight(opts) {
-	const tickOpts = opts.ticks;
-	if (tickOpts.display && opts.display) {
-		return valueOrDefault(tickOpts.font && tickOpts.font.size, defaults.font.size) + tickOpts.backdropPaddingY * 2;
-	}
-	return 0;
-}
-function measureLabelSize(ctx, lineHeight, label) {
-	if (isArray(label)) {
-		return {
-			w: _longestText(ctx, ctx.font, label),
-			h: label.length * lineHeight
-		};
-	}
-	return {
-		w: ctx.measureText(label).width,
-		h: lineHeight
-	};
-}
-function determineLimits(angle, pos, size, min, max) {
-	if (angle === min || angle === max) {
-		return {
-			start: pos - (size / 2),
-			end: pos + (size / 2)
-		};
-	} else if (angle < min || angle > max) {
-		return {
-			start: pos - size,
-			end: pos
-		};
-	}
-	return {
-		start: pos,
-		end: pos + size
-	};
-}
-function fitWithPointLabels(scale) {
-	const plFont = toFont(scale.options.pointLabels.font);
-	const furthestLimits = {
-		l: 0,
-		r: scale.width,
-		t: 0,
-		b: scale.height - scale.paddingTop
-	};
-	const furthestAngles = {};
-	let i, textSize, pointPosition;
-	scale.ctx.font = plFont.string;
-	scale._pointLabelSizes = [];
-	const valueCount = scale.chart.data.labels.length;
-	for (i = 0; i < valueCount; i++) {
-		pointPosition = scale.getPointPosition(i, scale.drawingArea + 5);
-		textSize = measureLabelSize(scale.ctx, plFont.lineHeight, scale.pointLabels[i]);
-		scale._pointLabelSizes[i] = textSize;
-		const angleRadians = scale.getIndexAngle(i);
-		const angle = toDegrees(angleRadians);
-		const hLimits = determineLimits(angle, pointPosition.x, textSize.w, 0, 180);
-		const vLimits = determineLimits(angle, pointPosition.y, textSize.h, 90, 270);
-		if (hLimits.start < furthestLimits.l) {
-			furthestLimits.l = hLimits.start;
-			furthestAngles.l = angleRadians;
-		}
-		if (hLimits.end > furthestLimits.r) {
-			furthestLimits.r = hLimits.end;
-			furthestAngles.r = angleRadians;
-		}
-		if (vLimits.start < furthestLimits.t) {
-			furthestLimits.t = vLimits.start;
-			furthestAngles.t = angleRadians;
-		}
-		if (vLimits.end > furthestLimits.b) {
-			furthestLimits.b = vLimits.end;
-			furthestAngles.b = angleRadians;
-		}
-	}
-	scale._setReductions(scale.drawingArea, furthestLimits, furthestAngles);
-}
-function getTextAlignForAngle(angle) {
-	if (angle === 0 || angle === 180) {
-		return 'center';
-	} else if (angle < 180) {
-		return 'left';
-	}
-	return 'right';
-}
-function fillText(ctx, text, position, lineHeight) {
-	let y = position.y + lineHeight / 2;
-	let i, ilen;
-	if (isArray(text)) {
-		for (i = 0, ilen = text.length; i < ilen; ++i) {
-			ctx.fillText(text[i], position.x, y);
-			y += lineHeight;
-		}
-	} else {
-		ctx.fillText(text, position.x, y);
-	}
-}
-function adjustPointPositionForLabelHeight(angle, textSize, position) {
-	if (angle === 90 || angle === 270) {
-		position.y -= (textSize.h / 2);
-	} else if (angle > 270 || angle < 90) {
-		position.y -= textSize.h;
-	}
-}
-function drawPointLabels(scale) {
-	const ctx = scale.ctx;
-	const opts = scale.options;
-	const pointLabelOpts = opts.pointLabels;
-	const tickBackdropHeight = getTickBackdropHeight(opts);
-	const outerDistance = scale.getDistanceFromCenterForValue(opts.ticks.reverse ? scale.min : scale.max);
-	const plFont = toFont(pointLabelOpts.font);
-	ctx.save();
-	ctx.textBaseline = 'middle';
-	for (let i = scale.chart.data.labels.length - 1; i >= 0; i--) {
-		const extra = (i === 0 ? tickBackdropHeight / 2 : 0);
-		const pointLabelPosition = scale.getPointPosition(i, outerDistance + extra + 5);
-		ctx.font = plFont.string;
-		ctx.fillStyle = plFont.color;
-		const angleRadians = scale.getIndexAngle(i);
-		const angle = toDegrees(angleRadians);
-		ctx.textAlign = getTextAlignForAngle(angle);
-		adjustPointPositionForLabelHeight(angle, scale._pointLabelSizes[i], pointLabelPosition);
-		fillText(ctx, scale.pointLabels[i], pointLabelPosition, plFont.lineHeight);
-	}
-	ctx.restore();
-}
-function drawRadiusLine(scale, gridLineOpts, radius, index) {
-	const ctx = scale.ctx;
-	const circular = gridLineOpts.circular;
-	const valueCount = scale.chart.data.labels.length;
-	const lineColor = valueAtIndexOrDefault(gridLineOpts.color, index - 1, undefined);
-	const lineWidth = valueAtIndexOrDefault(gridLineOpts.lineWidth, index - 1, undefined);
-	let pointPosition;
-	if ((!circular && !valueCount) || !lineColor || !lineWidth) {
-		return;
-	}
-	ctx.save();
-	ctx.strokeStyle = lineColor;
-	ctx.lineWidth = lineWidth;
-	if (ctx.setLineDash) {
-		ctx.setLineDash(gridLineOpts.borderDash || []);
-		ctx.lineDashOffset = gridLineOpts.borderDashOffset || 0.0;
-	}
-	ctx.beginPath();
-	if (circular) {
-		ctx.arc(scale.xCenter, scale.yCenter, radius, 0, Math.PI * 2);
-	} else {
-		pointPosition = scale.getPointPosition(0, radius);
-		ctx.moveTo(pointPosition.x, pointPosition.y);
-		for (let i = 1; i < valueCount; i++) {
-			pointPosition = scale.getPointPosition(i, radius);
-			ctx.lineTo(pointPosition.x, pointPosition.y);
-		}
-	}
-	ctx.closePath();
-	ctx.stroke();
-	ctx.restore();
-}
-function numberOrZero(param) {
-	return isNumber(param) ? param : 0;
-}
-class RadialLinearScale extends LinearScaleBase {
-	constructor(cfg) {
-		super(cfg);
-		this.xCenter = undefined;
-		this.yCenter = undefined;
-		this.drawingArea = undefined;
-		this.pointLabels = [];
-	}
-	init(options) {
-		super.init(options);
-		this.axis = 'r';
-	}
-	setDimensions() {
-		const me = this;
-		me.width = me.maxWidth;
-		me.height = me.maxHeight;
-		me.paddingTop = getTickBackdropHeight(me.options) / 2;
-		me.xCenter = Math.floor(me.width / 2);
-		me.yCenter = Math.floor((me.height - me.paddingTop) / 2);
-		me.drawingArea = Math.min(me.height - me.paddingTop, me.width) / 2;
-	}
-	determineDataLimits() {
-		const me = this;
-		const minmax = me.getMinMax(false);
-		const min = minmax.min;
-		const max = minmax.max;
-		me.min = isNumberFinite(min) && !isNaN(min) ? min : 0;
-		me.max = isNumberFinite(max) && !isNaN(max) ? max : 0;
-		me.handleTickRangeOptions();
-	}
-	computeTickLimit() {
-		return Math.ceil(this.drawingArea / getTickBackdropHeight(this.options));
-	}
-	generateTickLabels(ticks) {
-		const me = this;
-		LinearScaleBase.prototype.generateTickLabels.call(me, ticks);
-		me.pointLabels = me.chart.data.labels.map((value, index) => {
-			const label = callback(me.options.pointLabels.callback, [value, index], me);
-			return label || label === 0 ? label : '';
-		});
-	}
-	fit() {
-		const me = this;
-		const opts = me.options;
-		if (opts.display && opts.pointLabels.display) {
-			fitWithPointLabels(me);
-		} else {
-			me.setCenterPoint(0, 0, 0, 0);
-		}
-	}
-	_setReductions(largestPossibleRadius, furthestLimits, furthestAngles) {
-		const me = this;
-		let radiusReductionLeft = furthestLimits.l / Math.sin(furthestAngles.l);
-		let radiusReductionRight = Math.max(furthestLimits.r - me.width, 0) / Math.sin(furthestAngles.r);
-		let radiusReductionTop = -furthestLimits.t / Math.cos(furthestAngles.t);
-		let radiusReductionBottom = -Math.max(furthestLimits.b - (me.height - me.paddingTop), 0) / Math.cos(furthestAngles.b);
-		radiusReductionLeft = numberOrZero(radiusReductionLeft);
-		radiusReductionRight = numberOrZero(radiusReductionRight);
-		radiusReductionTop = numberOrZero(radiusReductionTop);
-		radiusReductionBottom = numberOrZero(radiusReductionBottom);
-		me.drawingArea = Math.min(
-			Math.floor(largestPossibleRadius - (radiusReductionLeft + radiusReductionRight) / 2),
-			Math.floor(largestPossibleRadius - (radiusReductionTop + radiusReductionBottom) / 2));
-		me.setCenterPoint(radiusReductionLeft, radiusReductionRight, radiusReductionTop, radiusReductionBottom);
-	}
-	setCenterPoint(leftMovement, rightMovement, topMovement, bottomMovement) {
-		const me = this;
-		const maxRight = me.width - rightMovement - me.drawingArea;
-		const maxLeft = leftMovement + me.drawingArea;
-		const maxTop = topMovement + me.drawingArea;
-		const maxBottom = (me.height - me.paddingTop) - bottomMovement - me.drawingArea;
-		me.xCenter = Math.floor(((maxLeft + maxRight) / 2) + me.left);
-		me.yCenter = Math.floor(((maxTop + maxBottom) / 2) + me.top + me.paddingTop);
-	}
-	getIndexAngle(index) {
-		const chart = this.chart;
-		const angleMultiplier = Math.PI * 2 / chart.data.labels.length;
-		const options = chart.options || {};
-		const startAngle = options.startAngle || 0;
-		return _normalizeAngle(index * angleMultiplier + toRadians(startAngle));
-	}
-	getDistanceFromCenterForValue(value) {
-		const me = this;
-		if (isNullOrUndef(value)) {
-			return NaN;
-		}
-		const scalingFactor = me.drawingArea / (me.max - me.min);
-		if (me.options.reverse) {
-			return (me.max - value) * scalingFactor;
-		}
-		return (value - me.min) * scalingFactor;
-	}
-	getValueForDistanceFromCenter(distance) {
-		if (isNullOrUndef(distance)) {
-			return NaN;
-		}
-		const me = this;
-		const scaledDistance = distance / (me.drawingArea / (me.max - me.min));
-		return me.options.reverse ? me.max - scaledDistance : me.min + scaledDistance;
-	}
-	getPointPosition(index, distanceFromCenter) {
-		const me = this;
-		const angle = me.getIndexAngle(index) - (Math.PI / 2);
-		return {
-			x: Math.cos(angle) * distanceFromCenter + me.xCenter,
-			y: Math.sin(angle) * distanceFromCenter + me.yCenter,
-			angle
-		};
-	}
-	getPointPositionForValue(index, value) {
-		return this.getPointPosition(index, this.getDistanceFromCenterForValue(value));
-	}
-	getBasePosition(index) {
-		return this.getPointPositionForValue(index || 0, this.getBaseValue());
-	}
-	drawGrid() {
-		const me = this;
-		const ctx = me.ctx;
-		const opts = me.options;
-		const gridLineOpts = opts.gridLines;
-		const angleLineOpts = opts.angleLines;
-		const lineWidth = valueOrDefault(angleLineOpts.lineWidth, gridLineOpts.lineWidth);
-		const lineColor = valueOrDefault(angleLineOpts.color, gridLineOpts.color);
-		let i, offset, position;
-		if (opts.pointLabels.display) {
-			drawPointLabels(me);
-		}
-		if (gridLineOpts.display) {
-			me.ticks.forEach((tick, index) => {
-				if (index !== 0) {
-					offset = me.getDistanceFromCenterForValue(me.ticks[index].value);
-					drawRadiusLine(me, gridLineOpts, offset, index);
-				}
-			});
-		}
-		if (angleLineOpts.display && lineWidth && lineColor) {
-			ctx.save();
-			ctx.lineWidth = lineWidth;
-			ctx.strokeStyle = lineColor;
-			if (ctx.setLineDash) {
-				ctx.setLineDash(resolve([angleLineOpts.borderDash, gridLineOpts.borderDash, []]));
-				ctx.lineDashOffset = resolve([angleLineOpts.borderDashOffset, gridLineOpts.borderDashOffset, 0.0]);
-			}
-			for (i = me.chart.data.labels.length - 1; i >= 0; i--) {
-				offset = me.getDistanceFromCenterForValue(opts.ticks.reverse ? me.min : me.max);
-				position = me.getPointPosition(i, offset);
-				ctx.beginPath();
-				ctx.moveTo(me.xCenter, me.yCenter);
-				ctx.lineTo(position.x, position.y);
-				ctx.stroke();
-			}
-			ctx.restore();
-		}
-	}
-	drawLabels() {
-		const me = this;
-		const ctx = me.ctx;
-		const opts = me.options;
-		const tickOpts = opts.ticks;
-		if (!tickOpts.display) {
-			return;
-		}
-		const startAngle = me.getIndexAngle(0);
-		const tickFont = toFont(tickOpts.font);
-		let offset, width;
-		ctx.save();
-		ctx.font = tickFont.string;
-		ctx.translate(me.xCenter, me.yCenter);
-		ctx.rotate(startAngle);
-		ctx.textAlign = 'center';
-		ctx.textBaseline = 'middle';
-		me.ticks.forEach((tick, index) => {
-			if (index === 0 && !opts.reverse) {
-				return;
-			}
-			offset = me.getDistanceFromCenterForValue(me.ticks[index].value);
-			if (tickOpts.showLabelBackdrop) {
-				width = ctx.measureText(tick.label).width;
-				ctx.fillStyle = tickOpts.backdropColor;
-				ctx.fillRect(
-					-width / 2 - tickOpts.backdropPaddingX,
-					-offset - tickFont.size / 2 - tickOpts.backdropPaddingY,
-					width + tickOpts.backdropPaddingX * 2,
-					tickFont.size + tickOpts.backdropPaddingY * 2
-				);
-			}
-			ctx.fillStyle = tickFont.color;
-			ctx.fillText(tick.label, 0, -offset);
-		});
-		ctx.restore();
-	}
-	drawTitle() {}
-}
-RadialLinearScale.id = 'radialLinear';
-RadialLinearScale.defaults = defaultConfig$3;
-
-const MAX_INTEGER = Number.MAX_SAFE_INTEGER || 9007199254740991;
-const INTERVALS = {
-	millisecond: {common: true, size: 1, steps: 1000},
-	second: {common: true, size: 1000, steps: 60},
-	minute: {common: true, size: 60000, steps: 60},
-	hour: {common: true, size: 3600000, steps: 24},
-	day: {common: true, size: 86400000, steps: 30},
-	week: {common: false, size: 604800000, steps: 4},
-	month: {common: true, size: 2.628e9, steps: 12},
-	quarter: {common: false, size: 7.884e9, steps: 4},
-	year: {common: true, size: 3.154e10}
-};
-const UNITS = (Object.keys(INTERVALS));
-function sorter(a, b) {
-	return a - b;
-}
-function arrayUnique(items) {
-	const set = new Set();
-	let i, ilen;
-	for (i = 0, ilen = items.length; i < ilen; ++i) {
-		set.add(items[i]);
-	}
-	if (set.size === ilen) {
-		return items;
-	}
-	return [...set];
-}
-function parse(scale, input) {
-	if (isNullOrUndef(input)) {
-		return null;
-	}
-	const adapter = scale._adapter;
-	const options = scale.options.time;
-	const {parser, round, isoWeekday} = options;
-	let value = input;
-	if (typeof parser === 'function') {
-		value = parser(value);
-	}
-	if (!isNumberFinite(value)) {
-		value = typeof parser === 'string'
-			? adapter.parse(value, parser)
-			: adapter.parse(value);
-	}
-	if (value === null) {
-		return value;
-	}
-	if (round) {
-		value = round === 'week' && isoWeekday
-			? scale._adapter.startOf(value, 'isoWeek', isoWeekday)
-			: scale._adapter.startOf(value, round);
-	}
-	return +value;
-}
-function getDataTimestamps(scale) {
-	const isSeries = scale.options.distribution === 'series';
-	let timestamps = scale._cache.data || [];
-	let i, ilen;
-	if (timestamps.length) {
-		return timestamps;
-	}
-	const metas = scale.getMatchingVisibleMetas();
-	if (isSeries && metas.length) {
-		return metas[0].controller.getAllParsedValues(scale);
-	}
-	for (i = 0, ilen = metas.length; i < ilen; ++i) {
-		timestamps = timestamps.concat(metas[i].controller.getAllParsedValues(scale));
-	}
-	return (scale._cache.data = arrayUnique(timestamps.sort(sorter)));
-}
-function getLabelTimestamps(scale) {
-	const isSeries = scale.options.distribution === 'series';
-	const timestamps = scale._cache.labels || [];
-	let i, ilen;
-	if (timestamps.length) {
-		return timestamps;
-	}
-	const labels = scale.getLabels();
-	for (i = 0, ilen = labels.length; i < ilen; ++i) {
-		timestamps.push(parse(scale, labels[i]));
-	}
-	return (scale._cache.labels = isSeries ? timestamps : arrayUnique(timestamps.sort(sorter)));
-}
-function getAllTimestamps(scale) {
-	let timestamps = scale._cache.all || [];
-	if (timestamps.length) {
-		return timestamps;
-	}
-	const data = getDataTimestamps(scale);
-	const label = getLabelTimestamps(scale);
-	if (data.length && label.length) {
-		timestamps = arrayUnique(data.concat(label).sort(sorter));
-	} else {
-		timestamps = data.length ? data : label;
-	}
-	timestamps = scale._cache.all = timestamps;
-	return timestamps;
-}
-function buildLookupTable(timestamps, min, max, distribution) {
-	if (distribution === 'linear' || !timestamps.length) {
-		return [
-			{time: min, pos: 0},
-			{time: max, pos: 1}
-		];
-	}
-	const table = [];
-	const items = [min];
-	let i, ilen, prev, curr, next;
-	for (i = 0, ilen = timestamps.length; i < ilen; ++i) {
-		curr = timestamps[i];
-		if (curr > min && curr < max) {
-			items.push(curr);
-		}
-	}
-	items.push(max);
-	for (i = 0, ilen = items.length; i < ilen; ++i) {
-		next = items[i + 1];
-		prev = items[i - 1];
-		curr = items[i];
-		if (prev === undefined || next === undefined || Math.round((next + prev) / 2) !== curr) {
-			table.push({time: curr, pos: i / (ilen - 1)});
-		}
-	}
-	return table;
-}
-function interpolate(table, skey, sval, tkey) {
-	const {lo, hi} = _lookupByKey(table, skey, sval);
-	const prev = table[lo];
-	const next = table[hi];
-	const span = next[skey] - prev[skey];
-	const ratio = span ? (sval - prev[skey]) / span : 0;
-	const offset = (next[tkey] - prev[tkey]) * ratio;
-	return prev[tkey] + offset;
-}
-function determineUnitForAutoTicks(minUnit, min, max, capacity) {
-	const ilen = UNITS.length;
-	for (let i = UNITS.indexOf(minUnit); i < ilen - 1; ++i) {
-		const interval = INTERVALS[UNITS[i]];
-		const factor = interval.steps ? interval.steps : MAX_INTEGER;
-		if (interval.common && Math.ceil((max - min) / (factor * interval.size)) <= capacity) {
-			return UNITS[i];
-		}
-	}
-	return UNITS[ilen - 1];
-}
-function determineUnitForFormatting(scale, numTicks, minUnit, min, max) {
-	for (let i = UNITS.length - 1; i >= UNITS.indexOf(minUnit); i--) {
-		const unit = UNITS[i];
-		if (INTERVALS[unit].common && scale._adapter.diff(max, min, unit) >= numTicks - 1) {
-			return unit;
-		}
-	}
-	return UNITS[minUnit ? UNITS.indexOf(minUnit) : 0];
-}
-function determineMajorUnit(unit) {
-	for (let i = UNITS.indexOf(unit) + 1, ilen = UNITS.length; i < ilen; ++i) {
-		if (INTERVALS[UNITS[i]].common) {
-			return UNITS[i];
-		}
-	}
-}
-function addTick(timestamps, ticks, time) {
-	if (!timestamps.length) {
-		return;
-	}
-	const {lo, hi} = _lookup(timestamps, time);
-	const timestamp = timestamps[lo] >= time ? timestamps[lo] : timestamps[hi];
-	ticks.add(timestamp);
-}
-function generate(scale) {
-	const adapter = scale._adapter;
-	const min = scale.min;
-	const max = scale.max;
-	const options = scale.options;
-	const timeOpts = options.time;
-	const minor = timeOpts.unit || determineUnitForAutoTicks(timeOpts.minUnit, min, max, scale._getLabelCapacity(min));
-	const stepSize = valueOrDefault(timeOpts.stepSize, 1);
-	const weekday = minor === 'week' ? timeOpts.isoWeekday : false;
-	const ticks = new Set();
-	let first = min;
-	let time;
-	if (weekday) {
-		first = +adapter.startOf(first, 'isoWeek', weekday);
-	}
-	first = +adapter.startOf(first, weekday ? 'day' : minor);
-	if (adapter.diff(max, min, minor) > 100000 * stepSize) {
-		throw new Error(min + ' and ' + max + ' are too far apart with stepSize of ' + stepSize + ' ' + minor);
-	}
-	if (scale.options.ticks.source === 'data') {
-		const timestamps = getDataTimestamps(scale);
-		for (time = first; time < max; time = +adapter.add(time, stepSize, minor)) {
-			addTick(timestamps, ticks, time);
-		}
-		if (time === max || options.bounds === 'ticks') {
-			addTick(timestamps, ticks, time);
-		}
-	} else {
-		for (time = first; time < max; time = +adapter.add(time, stepSize, minor)) {
-			ticks.add(time);
-		}
-		if (time === max || options.bounds === 'ticks') {
-			ticks.add(time);
-		}
-	}
-	return [...ticks];
-}
-function computeOffsets(table, timestamps, min, max, options) {
-	let start = 0;
-	let end = 0;
-	let first, last;
-	if (options.offset && timestamps.length) {
-		first = interpolate(table, 'time', timestamps[0], 'pos');
-		if (timestamps.length === 1) {
-			start = 1 - first;
-		} else {
-			start = (interpolate(table, 'time', timestamps[1], 'pos') - first) / 2;
-		}
-		last = interpolate(table, 'time', timestamps[timestamps.length - 1], 'pos');
-		if (timestamps.length === 1) {
-			end = last;
-		} else {
-			end = (last - interpolate(table, 'time', timestamps[timestamps.length - 2], 'pos')) / 2;
-		}
-	}
-	return {start, end, factor: 1 / (start + 1 + end)};
-}
-function setMajorTicks(scale, ticks, map, majorUnit) {
-	const adapter = scale._adapter;
-	const first = +adapter.startOf(ticks[0].value, majorUnit);
-	const last = ticks[ticks.length - 1].value;
-	let major, index;
-	for (major = first; major <= last; major = +adapter.add(major, 1, majorUnit)) {
-		index = map[major];
-		if (index >= 0) {
-			ticks[index].major = true;
-		}
-	}
-	return ticks;
-}
-function ticksFromTimestamps(scale, values, majorUnit) {
-	const ticks = [];
-	const map = {};
-	const ilen = values.length;
-	let i, value;
-	for (i = 0; i < ilen; ++i) {
-		value = values[i];
-		map[value] = i;
-		ticks.push({
-			value,
-			major: false
-		});
-	}
-	return (ilen === 0 || !majorUnit) ? ticks : setMajorTicks(scale, ticks, map, majorUnit);
-}
-function getTimestampsForTicks(scale) {
-	if (scale.options.ticks.source === 'labels') {
-		return getLabelTimestamps(scale);
-	}
-	return generate(scale);
-}
-function getTimestampsForTable(scale) {
-	return scale.options.distribution === 'series'
-		? getAllTimestamps(scale)
-		: [scale.min, scale.max];
-}
-function getLabelBounds(scale) {
-	const arr = getLabelTimestamps(scale);
-	let min = Number.POSITIVE_INFINITY;
-	let max = Number.NEGATIVE_INFINITY;
-	if (arr.length) {
-		min = arr[0];
-		max = arr[arr.length - 1];
-	}
-	return {min, max};
-}
-const defaultConfig$4 = {
-	distribution: 'linear',
-	bounds: 'data',
-	adapters: {},
-	time: {
-		parser: false,
-		unit: false,
-		round: false,
-		isoWeekday: false,
-		minUnit: 'millisecond',
-		displayFormats: {}
-	},
-	ticks: {
-		autoSkip: false,
-		source: 'auto',
-		major: {
-			enabled: false
-		}
-	}
-};
-class TimeScale extends Scale {
-	constructor(props) {
-		super(props);
-		this._cache = {
-			data: [],
-			labels: [],
-			all: []
-		};
-		this._unit = 'day';
-		this._majorUnit = undefined;
-		this._offsets = {};
-		this._table = [];
-	}
-	init(options) {
-		const time = options.time || (options.time = {});
-		const adapter = this._adapter = new _adapters._date(options.adapters.date);
-		mergeIf(time.displayFormats, adapter.formats());
-		super.init(options);
-	}
-	parse(raw, index) {
-		if (raw === undefined) {
-			return NaN;
-		}
-		return parse(this, raw);
-	}
-	parseObject(obj, axis, index) {
-		if (obj && obj.t) {
-			return this.parse(obj.t, index);
-		}
-		if (obj[axis] !== undefined) {
-			return this.parse(obj[axis], index);
-		}
-		return null;
-	}
-	invalidateCaches() {
-		this._cache = {
-			data: [],
-			labels: [],
-			all: []
-		};
-	}
-	determineDataLimits() {
-		const me = this;
-		const options = me.options;
-		const adapter = me._adapter;
-		const unit = options.time.unit || 'day';
-		let {min, max, minDefined, maxDefined} = me.getUserBounds();
-		function _applyBounds(bounds) {
-			if (!minDefined && !isNaN(bounds.min)) {
-				min = Math.min(min, bounds.min);
-			}
-			if (!maxDefined && !isNaN(bounds.max)) {
-				max = Math.max(max, bounds.max);
-			}
-		}
-		if (!minDefined || !maxDefined) {
-			_applyBounds(getLabelBounds(me));
-			if (options.bounds !== 'ticks' || options.ticks.source !== 'labels') {
-				_applyBounds(me.getMinMax(false));
-			}
-		}
-		min = isNumberFinite(min) && !isNaN(min) ? min : +adapter.startOf(Date.now(), unit);
-		max = isNumberFinite(max) && !isNaN(max) ? max : +adapter.endOf(Date.now(), unit) + 1;
-		me.min = Math.min(min, max);
-		me.max = Math.max(min + 1, max);
-	}
-	buildTicks() {
-		const me = this;
-		const options = me.options;
-		const timeOpts = options.time;
-		const tickOpts = options.ticks;
-		const distribution = options.distribution;
-		const timestamps = getTimestampsForTicks(me);
-		if (options.bounds === 'ticks' && timestamps.length) {
-			me.min = me._userMin || timestamps[0];
-			me.max = me._userMax || timestamps[timestamps.length - 1];
-		}
-		const min = me.min;
-		const max = me.max;
-		const ticks = _filterBetween(timestamps, min, max);
-		me._unit = timeOpts.unit || (tickOpts.autoSkip
-			? determineUnitForAutoTicks(timeOpts.minUnit, me.min, me.max, me._getLabelCapacity(min))
-			: determineUnitForFormatting(me, ticks.length, timeOpts.minUnit, me.min, me.max));
-		me._majorUnit = !tickOpts.major.enabled || me._unit === 'year' ? undefined
-			: determineMajorUnit(me._unit);
-		me._table = buildLookupTable(getTimestampsForTable(me), min, max, distribution);
-		me._offsets = computeOffsets(me._table, timestamps, min, max, options);
-		if (options.reverse) {
-			ticks.reverse();
-		}
-		return ticksFromTimestamps(me, ticks, me._majorUnit);
-	}
-	getLabelForValue(value) {
-		const me = this;
-		const adapter = me._adapter;
-		const timeOpts = me.options.time;
-		if (timeOpts.tooltipFormat) {
-			return adapter.format(value, timeOpts.tooltipFormat);
-		}
-		return adapter.format(value, timeOpts.displayFormats.datetime);
-	}
-	_tickFormatFunction(time, index, ticks, format) {
-		const me = this;
-		const options = me.options;
-		const formats = options.time.displayFormats;
-		const unit = me._unit;
-		const majorUnit = me._majorUnit;
-		const minorFormat = unit && formats[unit];
-		const majorFormat = majorUnit && formats[majorUnit];
-		const tick = ticks[index];
-		const major = majorUnit && majorFormat && tick && tick.major;
-		const label = me._adapter.format(time, format || (major ? majorFormat : minorFormat));
-		const formatter = options.ticks.callback;
-		return formatter ? formatter(label, index, ticks) : label;
-	}
-	generateTickLabels(ticks) {
-		let i, ilen, tick;
-		for (i = 0, ilen = ticks.length; i < ilen; ++i) {
-			tick = ticks[i];
-			tick.label = this._tickFormatFunction(tick.value, i, ticks);
-		}
-	}
-	getPixelForValue(value) {
-		const me = this;
-		const offsets = me._offsets;
-		const pos = interpolate(me._table, 'time', value, 'pos');
-		return me.getPixelForDecimal((offsets.start + pos) * offsets.factor);
-	}
-	getValueForPixel(pixel) {
-		const me = this;
-		const offsets = me._offsets;
-		const pos = me.getDecimalForPixel(pixel) / offsets.factor - offsets.end;
-		return interpolate(me._table, 'pos', pos, 'time');
-	}
-	_getLabelSize(label) {
-		const me = this;
-		const ticksOpts = me.options.ticks;
-		const tickLabelWidth = me.ctx.measureText(label).width;
-		const angle = toRadians(me.isHorizontal() ? ticksOpts.maxRotation : ticksOpts.minRotation);
-		const cosRotation = Math.cos(angle);
-		const sinRotation = Math.sin(angle);
-		const tickFontSize = me._resolveTickFontOptions(0).size;
-		return {
-			w: (tickLabelWidth * cosRotation) + (tickFontSize * sinRotation),
-			h: (tickLabelWidth * sinRotation) + (tickFontSize * cosRotation)
-		};
-	}
-	_getLabelCapacity(exampleTime) {
-		const me = this;
-		const timeOpts = me.options.time;
-		const displayFormats = timeOpts.displayFormats;
-		const format = displayFormats[timeOpts.unit] || displayFormats.millisecond;
-		const exampleLabel = me._tickFormatFunction(exampleTime, 0, ticksFromTimestamps(me, [exampleTime], me._majorUnit), format);
-		const size = me._getLabelSize(exampleLabel);
-		const capacity = Math.floor(me.isHorizontal() ? me.width / size.w : me.height / size.h) - 1;
-		return capacity > 0 ? capacity : 1;
-	}
-}
-TimeScale.id = 'time';
-TimeScale.defaults = defaultConfig$4;
-
-var scales = /*#__PURE__*/Object.freeze({
-__proto__: null,
-CategoryScale: CategoryScale,
-LinearScale: LinearScale,
-LogarithmicScale: LogarithmicScale,
-RadialLinearScale: RadialLinearScale,
-TimeScale: TimeScale
-});
 
 defaults.set('plugins', {
 	filler: {
@@ -10104,7 +6641,7 @@ var plugin_legend = {
 			createNewLegendAndAttach(chart, legendOpts);
 		}
 	},
-	afterUpdate(chart) {
+	beforeUpdate(chart) {
 		const legendOpts = chart.options.legend;
 		const legend = chart.legend;
 		if (legendOpts) {
@@ -10112,13 +6649,17 @@ var plugin_legend = {
 			if (legend) {
 				layouts.configure(chart, legend, legendOpts);
 				legend.options = legendOpts;
-				legend.buildLabels();
 			} else {
 				createNewLegendAndAttach(chart, legendOpts);
 			}
 		} else if (legend) {
 			layouts.removeBox(chart, legend);
 			delete chart.legend;
+		}
+	},
+	afterUpdate(chart) {
+		if (chart.legend) {
+			chart.legend.buildLabels();
 		}
 	},
 	afterEvent(chart, e) {
@@ -10227,7 +6768,7 @@ class Title extends Element {
 		if (!opts.display) {
 			return;
 		}
-		const fontOpts = toFont(opts);
+		const fontOpts = toFont(opts.font);
 		const lineHeight = fontOpts.lineHeight;
 		const offset = lineHeight / 2 + me._padding.top;
 		let rotation = 0;
@@ -10817,7 +7358,7 @@ class Tooltip extends Element {
 			me._resolveAnimations().update(me, properties);
 		}
 		if (changed && options.custom) {
-			options.custom.call(me);
+			options.custom.call(me, [me]);
 		}
 	}
 	drawCaret(tooltipPoint, ctx, size) {
@@ -11145,13 +7686,13 @@ var plugin_tooltip = {
 		const args = {
 			tooltip
 		};
-		if (pluginsCore.notify(chart, 'beforeTooltipDraw', [args]) === false) {
+		if (plugins.notify(chart, 'beforeTooltipDraw', [args]) === false) {
 			return;
 		}
 		if (tooltip) {
 			tooltip.draw(chart.ctx);
 		}
-		pluginsCore.notify(chart, 'afterTooltipDraw', [args]);
+		plugins.notify(chart, 'afterTooltipDraw', [args]);
 	},
 	afterEvent(chart, e, replay) {
 		if (chart.tooltip) {
@@ -11161,39 +7702,1342 @@ var plugin_tooltip = {
 	}
 };
 
-var plugins = /*#__PURE__*/Object.freeze({
-__proto__: null,
-filler: plugin_filler,
-legend: plugin_legend,
-title: plugin_title,
-tooltip: plugin_tooltip
-});
-
-Chart.helpers = helpers;
-Chart._adapters = _adapters;
-Chart.Animation = Animation;
-Chart.animator = animator;
-Chart.animationService = Animations;
-Chart.controllers = controllers;
-Chart.DatasetController = DatasetController;
-Chart.defaults = defaults;
-Chart.Element = Element;
-Chart.elements = elements;
-Chart.Interaction = Interaction;
-Chart.layouts = layouts;
-Chart.platforms = platforms;
-Chart.plugins = pluginsCore;
-Chart.Scale = Scale;
-Chart.scaleService = scaleService;
-Chart.Ticks = Ticks;
-Object.keys(scales).forEach(key => Chart.scaleService.registerScale(scales[key]));
-for (const k in plugins) {
-	if (Object.prototype.hasOwnProperty.call(plugins, k)) {
-		Chart.plugins.register(plugins[k]);
+const defaultConfig = {
+};
+class CategoryScale extends Scale {
+	constructor(cfg) {
+		super(cfg);
+		this._numLabels = 0;
+		this._startValue = undefined;
+		this._valueRange = 0;
+	}
+	parse(raw, index) {
+		const labels = this.getLabels();
+		if (labels[index] === raw) {
+			return index;
+		}
+		const first = labels.indexOf(raw);
+		const last = labels.lastIndexOf(raw);
+		return first === -1 || first !== last ? index : first;
+	}
+	determineDataLimits() {
+		const me = this;
+		const max = me.getLabels().length - 1;
+		me.min = Math.max(me._userMin || 0, 0);
+		me.max = Math.min(me._userMax || max, max);
+	}
+	buildTicks() {
+		const me = this;
+		const min = me.min;
+		const max = me.max;
+		const offset = me.options.offset;
+		let labels = me.getLabels();
+		labels = (min === 0 && max === labels.length - 1) ? labels : labels.slice(min, max + 1);
+		me._numLabels = labels.length;
+		me._valueRange = Math.max(labels.length - (offset ? 0 : 1), 1);
+		me._startValue = me.min - (offset ? 0.5 : 0);
+		return labels.map((l) => ({value: l}));
+	}
+	getLabelForValue(value) {
+		const me = this;
+		const labels = me.getLabels();
+		if (value >= 0 && value < labels.length) {
+			return labels[value];
+		}
+		return value;
+	}
+	configure() {
+		const me = this;
+		super.configure();
+		if (!me.isHorizontal()) {
+			me._reversePixels = !me._reversePixels;
+		}
+	}
+	getPixelForValue(value) {
+		const me = this;
+		if (typeof value !== 'number') {
+			value = me.parse(value);
+		}
+		return me.getPixelForDecimal((value - me._startValue) / me._valueRange);
+	}
+	getPixelForTick(index) {
+		const me = this;
+		const ticks = me.ticks;
+		if (index < 0 || index > ticks.length - 1) {
+			return null;
+		}
+		return me.getPixelForValue(index * me._numLabels / ticks.length + me.min);
+	}
+	getValueForPixel(pixel) {
+		const me = this;
+		const value = Math.round(me._startValue + me.getDecimalForPixel(pixel) * me._valueRange);
+		return Math.min(Math.max(value, 0), me.ticks.length - 1);
+	}
+	getBasePixel() {
+		return this.bottom;
 	}
 }
-if (typeof window !== 'undefined') {
-	window.Chart = Chart;
+CategoryScale.id = 'category';
+CategoryScale.defaults = defaultConfig;
+
+function niceNum(range) {
+	const exponent = Math.floor(log10(range));
+	const fraction = range / Math.pow(10, exponent);
+	let niceFraction;
+	if (fraction <= 1.0) {
+		niceFraction = 1;
+	} else if (fraction <= 2) {
+		niceFraction = 2;
+	} else if (fraction <= 5) {
+		niceFraction = 5;
+	} else {
+		niceFraction = 10;
+	}
+	return niceFraction * Math.pow(10, exponent);
+}
+function generateTicks(generationOptions, dataRange) {
+	const ticks = [];
+	const MIN_SPACING = 1e-14;
+	const {stepSize, min, max, precision} = generationOptions;
+	const unit = stepSize || 1;
+	const maxNumSpaces = generationOptions.maxTicks - 1;
+	const {min: rmin, max: rmax} = dataRange;
+	let spacing = niceNum((rmax - rmin) / maxNumSpaces / unit) * unit;
+	let factor, niceMin, niceMax, numSpaces;
+	if (spacing < MIN_SPACING && isNullOrUndef(min) && isNullOrUndef(max)) {
+		return [{value: rmin}, {value: rmax}];
+	}
+	numSpaces = Math.ceil(rmax / spacing) - Math.floor(rmin / spacing);
+	if (numSpaces > maxNumSpaces) {
+		spacing = niceNum(numSpaces * spacing / maxNumSpaces / unit) * unit;
+	}
+	if (stepSize || isNullOrUndef(precision)) {
+		factor = Math.pow(10, _decimalPlaces(spacing));
+	} else {
+		factor = Math.pow(10, precision);
+		spacing = Math.ceil(spacing * factor) / factor;
+	}
+	niceMin = Math.floor(rmin / spacing) * spacing;
+	niceMax = Math.ceil(rmax / spacing) * spacing;
+	if (stepSize && !isNullOrUndef(min) && !isNullOrUndef(max)) {
+		if (almostWhole((max - min) / stepSize, spacing / 1000)) {
+			niceMin = min;
+			niceMax = max;
+		}
+	}
+	numSpaces = (niceMax - niceMin) / spacing;
+	if (almostEquals(numSpaces, Math.round(numSpaces), spacing / 1000)) {
+		numSpaces = Math.round(numSpaces);
+	} else {
+		numSpaces = Math.ceil(numSpaces);
+	}
+	niceMin = Math.round(niceMin * factor) / factor;
+	niceMax = Math.round(niceMax * factor) / factor;
+	ticks.push({value: isNullOrUndef(min) ? niceMin : min});
+	for (let j = 1; j < numSpaces; ++j) {
+		ticks.push({value: Math.round((niceMin + j * spacing) * factor) / factor});
+	}
+	ticks.push({value: isNullOrUndef(max) ? niceMax : max});
+	return ticks;
+}
+class LinearScaleBase extends Scale {
+	constructor(cfg) {
+		super(cfg);
+		this.start = undefined;
+		this.end = undefined;
+		this._startValue = undefined;
+		this._endValue = undefined;
+		this._valueRange = 0;
+	}
+	parse(raw, index) {
+		if (isNullOrUndef(raw)) {
+			return NaN;
+		}
+		if ((typeof raw === 'number' || raw instanceof Number) && !isFinite(+raw)) {
+			return NaN;
+		}
+		return +raw;
+	}
+	handleTickRangeOptions() {
+		const me = this;
+		const opts = me.options;
+		if (opts.beginAtZero) {
+			const minSign = sign(me.min);
+			const maxSign = sign(me.max);
+			if (minSign < 0 && maxSign < 0) {
+				me.max = 0;
+			} else if (minSign > 0 && maxSign > 0) {
+				me.min = 0;
+			}
+		}
+		const setMin = opts.min !== undefined || opts.suggestedMin !== undefined;
+		const setMax = opts.max !== undefined || opts.suggestedMax !== undefined;
+		if (opts.min !== undefined) {
+			me.min = opts.min;
+		} else if (opts.suggestedMin !== undefined) {
+			if (me.min === null) {
+				me.min = opts.suggestedMin;
+			} else {
+				me.min = Math.min(me.min, opts.suggestedMin);
+			}
+		}
+		if (opts.max !== undefined) {
+			me.max = opts.max;
+		} else if (opts.suggestedMax !== undefined) {
+			if (me.max === null) {
+				me.max = opts.suggestedMax;
+			} else {
+				me.max = Math.max(me.max, opts.suggestedMax);
+			}
+		}
+		if (setMin !== setMax) {
+			if (me.min >= me.max) {
+				if (setMin) {
+					me.max = me.min + 1;
+				} else {
+					me.min = me.max - 1;
+				}
+			}
+		}
+		if (me.min === me.max) {
+			me.max++;
+			if (!opts.beginAtZero) {
+				me.min--;
+			}
+		}
+	}
+	getTickLimit() {
+		const me = this;
+		const tickOpts = me.options.ticks;
+		let {maxTicksLimit, stepSize} = tickOpts;
+		let maxTicks;
+		if (stepSize) {
+			maxTicks = Math.ceil(me.max / stepSize) - Math.floor(me.min / stepSize) + 1;
+		} else {
+			maxTicks = me.computeTickLimit();
+			maxTicksLimit = maxTicksLimit || 11;
+		}
+		if (maxTicksLimit) {
+			maxTicks = Math.min(maxTicksLimit, maxTicks);
+		}
+		return maxTicks;
+	}
+	computeTickLimit() {
+		return Number.POSITIVE_INFINITY;
+	}
+	handleDirectionalChanges(ticks) {
+		return ticks;
+	}
+	buildTicks() {
+		const me = this;
+		const opts = me.options;
+		const tickOpts = opts.ticks;
+		let maxTicks = me.getTickLimit();
+		maxTicks = Math.max(2, maxTicks);
+		const numericGeneratorOptions = {
+			maxTicks,
+			min: opts.min,
+			max: opts.max,
+			precision: tickOpts.precision,
+			stepSize: valueOrDefault(tickOpts.fixedStepSize, tickOpts.stepSize)
+		};
+		let ticks = generateTicks(numericGeneratorOptions, me);
+		ticks = me.handleDirectionalChanges(ticks);
+		_setMinAndMaxByKey(ticks, me, 'value');
+		if (opts.reverse) {
+			ticks.reverse();
+			me.start = me.max;
+			me.end = me.min;
+		} else {
+			me.start = me.min;
+			me.end = me.max;
+		}
+		return ticks;
+	}
+	configure() {
+		const me = this;
+		const ticks = me.ticks;
+		let start = me.min;
+		let end = me.max;
+		super.configure();
+		if (me.options.offset && ticks.length) {
+			const offset = (end - start) / Math.max(ticks.length - 1, 1) / 2;
+			start -= offset;
+			end += offset;
+		}
+		me._startValue = start;
+		me._endValue = end;
+		me._valueRange = end - start;
+	}
+	getLabelForValue(value) {
+		return new Intl.NumberFormat(this.options.locale).format(value);
+	}
 }
 
-export default Chart;
+const defaultConfig$1 = {
+	ticks: {
+		callback: Ticks.formatters.numeric
+	}
+};
+class LinearScale extends LinearScaleBase {
+	determineDataLimits() {
+		const me = this;
+		const options = me.options;
+		const {min, max} = me.getMinMax(true);
+		me.min = isNumberFinite(min) ? min : valueOrDefault(options.suggestedMin, 0);
+		me.max = isNumberFinite(max) ? max : valueOrDefault(options.suggestedMax, 1);
+		if (options.stacked && min > 0) {
+			me.min = 0;
+		}
+		me.handleTickRangeOptions();
+	}
+	computeTickLimit() {
+		const me = this;
+		if (me.isHorizontal()) {
+			return Math.ceil(me.width / 40);
+		}
+		const tickFont = me._resolveTickFontOptions(0);
+		return Math.ceil(me.height / tickFont.lineHeight);
+	}
+	handleDirectionalChanges(ticks) {
+		return this.isHorizontal() ? ticks : ticks.reverse();
+	}
+	getPixelForValue(value) {
+		const me = this;
+		return me.getPixelForDecimal((value - me._startValue) / me._valueRange);
+	}
+	getValueForPixel(pixel) {
+		return this._startValue + this.getDecimalForPixel(pixel) * this._valueRange;
+	}
+}
+LinearScale.id = 'linear';
+LinearScale.defaults = defaultConfig$1;
+
+function isMajor(tickVal) {
+	const remain = tickVal / (Math.pow(10, Math.floor(log10(tickVal))));
+	return remain === 1;
+}
+function finiteOrDefault(value, def) {
+	return isNumberFinite(value) ? value : def;
+}
+function generateTicks$1(generationOptions, dataRange) {
+	const endExp = Math.floor(log10(dataRange.max));
+	const endSignificand = Math.ceil(dataRange.max / Math.pow(10, endExp));
+	const ticks = [];
+	let tickVal = finiteOrDefault(generationOptions.min, Math.pow(10, Math.floor(log10(dataRange.min))));
+	let exp = Math.floor(log10(tickVal));
+	let significand = Math.floor(tickVal / Math.pow(10, exp));
+	let precision = exp < 0 ? Math.pow(10, Math.abs(exp)) : 1;
+	do {
+		ticks.push({value: tickVal, major: isMajor(tickVal)});
+		++significand;
+		if (significand === 10) {
+			significand = 1;
+			++exp;
+			precision = exp >= 0 ? 1 : precision;
+		}
+		tickVal = Math.round(significand * Math.pow(10, exp) * precision) / precision;
+	} while (exp < endExp || (exp === endExp && significand < endSignificand));
+	const lastTick = finiteOrDefault(generationOptions.max, tickVal);
+	ticks.push({value: lastTick, major: isMajor(tickVal)});
+	return ticks;
+}
+const defaultConfig$2 = {
+	ticks: {
+		callback: Ticks.formatters.logarithmic,
+		major: {
+			enabled: true
+		}
+	}
+};
+class LogarithmicScale extends Scale {
+	constructor(cfg) {
+		super(cfg);
+		this.start = undefined;
+		this.end = undefined;
+		this._startValue = undefined;
+		this._valueRange = 0;
+	}
+	parse(raw, index) {
+		const value = LinearScaleBase.prototype.parse.apply(this, [raw, index]);
+		if (value === 0) {
+			return undefined;
+		}
+		return isNumberFinite(value) && value > 0 ? value : NaN;
+	}
+	determineDataLimits() {
+		const me = this;
+		const {min, max} = me.getMinMax(true);
+		me.min = isNumberFinite(min) ? Math.max(0, min) : null;
+		me.max = isNumberFinite(max) ? Math.max(0, max) : null;
+		me.handleTickRangeOptions();
+	}
+	handleTickRangeOptions() {
+		const me = this;
+		const DEFAULT_MIN = 1;
+		const DEFAULT_MAX = 10;
+		let min = me.min;
+		let max = me.max;
+		if (min === max) {
+			if (min <= 0) {
+				min = DEFAULT_MIN;
+				max = DEFAULT_MAX;
+			} else {
+				min = Math.pow(10, Math.floor(log10(min)) - 1);
+				max = Math.pow(10, Math.floor(log10(max)) + 1);
+			}
+		}
+		if (min <= 0) {
+			min = Math.pow(10, Math.floor(log10(max)) - 1);
+		}
+		if (max <= 0) {
+			max = Math.pow(10, Math.floor(log10(min)) + 1);
+		}
+		me.min = min;
+		me.max = max;
+	}
+	buildTicks() {
+		const me = this;
+		const opts = me.options;
+		const generationOptions = {
+			min: me._userMin,
+			max: me._userMax
+		};
+		const ticks = generateTicks$1(generationOptions, me);
+		let reverse = !me.isHorizontal();
+		_setMinAndMaxByKey(ticks, me, 'value');
+		if (opts.reverse) {
+			reverse = !reverse;
+			me.start = me.max;
+			me.end = me.min;
+		} else {
+			me.start = me.min;
+			me.end = me.max;
+		}
+		if (reverse) {
+			ticks.reverse();
+		}
+		return ticks;
+	}
+	getLabelForValue(value) {
+		return value === undefined ? '0' : new Intl.NumberFormat(this.options.locale).format(value);
+	}
+	configure() {
+		const me = this;
+		const start = me.min;
+		super.configure();
+		me._startValue = log10(start);
+		me._valueRange = log10(me.max) - log10(start);
+	}
+	getPixelForValue(value) {
+		const me = this;
+		if (value === undefined || value === 0) {
+			value = me.min;
+		}
+		return me.getPixelForDecimal(value === me.min
+			? 0
+			: (log10(value) - me._startValue) / me._valueRange);
+	}
+	getValueForPixel(pixel) {
+		const me = this;
+		const decimal = me.getDecimalForPixel(pixel);
+		return Math.pow(10, me._startValue + decimal * me._valueRange);
+	}
+}
+LogarithmicScale.id = 'logarithmic';
+LogarithmicScale.defaults = defaultConfig$2;
+
+const defaultConfig$3 = {
+	display: true,
+	animate: true,
+	position: 'chartArea',
+	angleLines: {
+		display: true,
+		color: 'rgba(0,0,0,0.1)',
+		lineWidth: 1,
+		borderDash: [],
+		borderDashOffset: 0.0
+	},
+	gridLines: {
+		circular: false
+	},
+	ticks: {
+		showLabelBackdrop: true,
+		backdropColor: 'rgba(255,255,255,0.75)',
+		backdropPaddingY: 2,
+		backdropPaddingX: 2,
+		callback: Ticks.formatters.numeric
+	},
+	pointLabels: {
+		display: true,
+		font: {
+			size: 10
+		},
+		callback(label) {
+			return label;
+		}
+	}
+};
+function getTickBackdropHeight(opts) {
+	const tickOpts = opts.ticks;
+	if (tickOpts.display && opts.display) {
+		return valueOrDefault(tickOpts.font && tickOpts.font.size, defaults.font.size) + tickOpts.backdropPaddingY * 2;
+	}
+	return 0;
+}
+function measureLabelSize(ctx, lineHeight, label) {
+	if (isArray(label)) {
+		return {
+			w: _longestText(ctx, ctx.font, label),
+			h: label.length * lineHeight
+		};
+	}
+	return {
+		w: ctx.measureText(label).width,
+		h: lineHeight
+	};
+}
+function determineLimits(angle, pos, size, min, max) {
+	if (angle === min || angle === max) {
+		return {
+			start: pos - (size / 2),
+			end: pos + (size / 2)
+		};
+	} else if (angle < min || angle > max) {
+		return {
+			start: pos - size,
+			end: pos
+		};
+	}
+	return {
+		start: pos,
+		end: pos + size
+	};
+}
+function fitWithPointLabels(scale) {
+	const furthestLimits = {
+		l: 0,
+		r: scale.width,
+		t: 0,
+		b: scale.height - scale.paddingTop
+	};
+	const furthestAngles = {};
+	let i, textSize, pointPosition;
+	scale._pointLabelSizes = [];
+	const valueCount = scale.chart.data.labels.length;
+	for (i = 0; i < valueCount; i++) {
+		pointPosition = scale.getPointPosition(i, scale.drawingArea + 5);
+		const context = {
+			chart: scale.chart,
+			scale,
+			index: i,
+			label: scale.pointLabels[i]
+		};
+		const plFont = toFont(resolve([scale.options.pointLabels.font], context, i));
+		scale.ctx.font = plFont.string;
+		textSize = measureLabelSize(scale.ctx, plFont.lineHeight, scale.pointLabels[i]);
+		scale._pointLabelSizes[i] = textSize;
+		const angleRadians = scale.getIndexAngle(i);
+		const angle = toDegrees(angleRadians);
+		const hLimits = determineLimits(angle, pointPosition.x, textSize.w, 0, 180);
+		const vLimits = determineLimits(angle, pointPosition.y, textSize.h, 90, 270);
+		if (hLimits.start < furthestLimits.l) {
+			furthestLimits.l = hLimits.start;
+			furthestAngles.l = angleRadians;
+		}
+		if (hLimits.end > furthestLimits.r) {
+			furthestLimits.r = hLimits.end;
+			furthestAngles.r = angleRadians;
+		}
+		if (vLimits.start < furthestLimits.t) {
+			furthestLimits.t = vLimits.start;
+			furthestAngles.t = angleRadians;
+		}
+		if (vLimits.end > furthestLimits.b) {
+			furthestLimits.b = vLimits.end;
+			furthestAngles.b = angleRadians;
+		}
+	}
+	scale._setReductions(scale.drawingArea, furthestLimits, furthestAngles);
+}
+function getTextAlignForAngle(angle) {
+	if (angle === 0 || angle === 180) {
+		return 'center';
+	} else if (angle < 180) {
+		return 'left';
+	}
+	return 'right';
+}
+function fillText(ctx, text, position, lineHeight) {
+	let y = position.y + lineHeight / 2;
+	let i, ilen;
+	if (isArray(text)) {
+		for (i = 0, ilen = text.length; i < ilen; ++i) {
+			ctx.fillText(text[i], position.x, y);
+			y += lineHeight;
+		}
+	} else {
+		ctx.fillText(text, position.x, y);
+	}
+}
+function adjustPointPositionForLabelHeight(angle, textSize, position) {
+	if (angle === 90 || angle === 270) {
+		position.y -= (textSize.h / 2);
+	} else if (angle > 270 || angle < 90) {
+		position.y -= textSize.h;
+	}
+}
+function drawPointLabels(scale) {
+	const ctx = scale.ctx;
+	const opts = scale.options;
+	const pointLabelOpts = opts.pointLabels;
+	const tickBackdropHeight = getTickBackdropHeight(opts);
+	const outerDistance = scale.getDistanceFromCenterForValue(opts.ticks.reverse ? scale.min : scale.max);
+	ctx.save();
+	ctx.textBaseline = 'middle';
+	for (let i = scale.chart.data.labels.length - 1; i >= 0; i--) {
+		const extra = (i === 0 ? tickBackdropHeight / 2 : 0);
+		const pointLabelPosition = scale.getPointPosition(i, outerDistance + extra + 5);
+		const context = {
+			chart: scale.chart,
+			scale,
+			index: i,
+			label: scale.pointLabels[i],
+		};
+		const plFont = toFont(resolve([pointLabelOpts.font], context, i));
+		ctx.font = plFont.string;
+		ctx.fillStyle = plFont.color;
+		const angle = toDegrees(scale.getIndexAngle(i));
+		ctx.textAlign = getTextAlignForAngle(angle);
+		adjustPointPositionForLabelHeight(angle, scale._pointLabelSizes[i], pointLabelPosition);
+		fillText(ctx, scale.pointLabels[i], pointLabelPosition, plFont.lineHeight);
+	}
+	ctx.restore();
+}
+function drawRadiusLine(scale, gridLineOpts, radius, index) {
+	const ctx = scale.ctx;
+	const circular = gridLineOpts.circular;
+	const valueCount = scale.chart.data.labels.length;
+	const context = {
+		chart: scale.chart,
+		scale,
+		index,
+		tick: scale.ticks[index],
+	};
+	const lineColor = resolve([gridLineOpts.color], context, index - 1);
+	const lineWidth = resolve([gridLineOpts.lineWidth], context, index - 1);
+	let pointPosition;
+	if ((!circular && !valueCount) || !lineColor || !lineWidth) {
+		return;
+	}
+	ctx.save();
+	ctx.strokeStyle = lineColor;
+	ctx.lineWidth = lineWidth;
+	if (ctx.setLineDash) {
+		ctx.setLineDash(resolve([gridLineOpts.borderDash, []], context));
+		ctx.lineDashOffset = resolve([gridLineOpts.borderDashOffset], context, index - 1);
+	}
+	ctx.beginPath();
+	if (circular) {
+		ctx.arc(scale.xCenter, scale.yCenter, radius, 0, Math.PI * 2);
+	} else {
+		pointPosition = scale.getPointPosition(0, radius);
+		ctx.moveTo(pointPosition.x, pointPosition.y);
+		for (let i = 1; i < valueCount; i++) {
+			pointPosition = scale.getPointPosition(i, radius);
+			ctx.lineTo(pointPosition.x, pointPosition.y);
+		}
+	}
+	ctx.closePath();
+	ctx.stroke();
+	ctx.restore();
+}
+function numberOrZero(param) {
+	return isNumber(param) ? param : 0;
+}
+class RadialLinearScale extends LinearScaleBase {
+	constructor(cfg) {
+		super(cfg);
+		this.xCenter = undefined;
+		this.yCenter = undefined;
+		this.drawingArea = undefined;
+		this.pointLabels = [];
+	}
+	init(options) {
+		super.init(options);
+		this.axis = 'r';
+	}
+	setDimensions() {
+		const me = this;
+		me.width = me.maxWidth;
+		me.height = me.maxHeight;
+		me.paddingTop = getTickBackdropHeight(me.options) / 2;
+		me.xCenter = Math.floor(me.width / 2);
+		me.yCenter = Math.floor((me.height - me.paddingTop) / 2);
+		me.drawingArea = Math.min(me.height - me.paddingTop, me.width) / 2;
+	}
+	determineDataLimits() {
+		const me = this;
+		const {min, max} = me.getMinMax(false);
+		me.min = isNumberFinite(min) && !isNaN(min) ? min : 0;
+		me.max = isNumberFinite(max) && !isNaN(max) ? max : 0;
+		me.handleTickRangeOptions();
+	}
+	computeTickLimit() {
+		return Math.ceil(this.drawingArea / getTickBackdropHeight(this.options));
+	}
+	generateTickLabels(ticks) {
+		const me = this;
+		LinearScaleBase.prototype.generateTickLabels.call(me, ticks);
+		me.pointLabels = me.chart.data.labels.map((value, index) => {
+			const label = callback(me.options.pointLabels.callback, [value, index], me);
+			return label || label === 0 ? label : '';
+		});
+	}
+	fit() {
+		const me = this;
+		const opts = me.options;
+		if (opts.display && opts.pointLabels.display) {
+			fitWithPointLabels(me);
+		} else {
+			me.setCenterPoint(0, 0, 0, 0);
+		}
+	}
+	_setReductions(largestPossibleRadius, furthestLimits, furthestAngles) {
+		const me = this;
+		let radiusReductionLeft = furthestLimits.l / Math.sin(furthestAngles.l);
+		let radiusReductionRight = Math.max(furthestLimits.r - me.width, 0) / Math.sin(furthestAngles.r);
+		let radiusReductionTop = -furthestLimits.t / Math.cos(furthestAngles.t);
+		let radiusReductionBottom = -Math.max(furthestLimits.b - (me.height - me.paddingTop), 0) / Math.cos(furthestAngles.b);
+		radiusReductionLeft = numberOrZero(radiusReductionLeft);
+		radiusReductionRight = numberOrZero(radiusReductionRight);
+		radiusReductionTop = numberOrZero(radiusReductionTop);
+		radiusReductionBottom = numberOrZero(radiusReductionBottom);
+		me.drawingArea = Math.min(
+			Math.floor(largestPossibleRadius - (radiusReductionLeft + radiusReductionRight) / 2),
+			Math.floor(largestPossibleRadius - (radiusReductionTop + radiusReductionBottom) / 2));
+		me.setCenterPoint(radiusReductionLeft, radiusReductionRight, radiusReductionTop, radiusReductionBottom);
+	}
+	setCenterPoint(leftMovement, rightMovement, topMovement, bottomMovement) {
+		const me = this;
+		const maxRight = me.width - rightMovement - me.drawingArea;
+		const maxLeft = leftMovement + me.drawingArea;
+		const maxTop = topMovement + me.drawingArea;
+		const maxBottom = (me.height - me.paddingTop) - bottomMovement - me.drawingArea;
+		me.xCenter = Math.floor(((maxLeft + maxRight) / 2) + me.left);
+		me.yCenter = Math.floor(((maxTop + maxBottom) / 2) + me.top + me.paddingTop);
+	}
+	getIndexAngle(index) {
+		const chart = this.chart;
+		const angleMultiplier = Math.PI * 2 / chart.data.labels.length;
+		const options = chart.options || {};
+		const startAngle = options.startAngle || 0;
+		return _normalizeAngle(index * angleMultiplier + toRadians(startAngle));
+	}
+	getDistanceFromCenterForValue(value) {
+		const me = this;
+		if (isNullOrUndef(value)) {
+			return NaN;
+		}
+		const scalingFactor = me.drawingArea / (me.max - me.min);
+		if (me.options.reverse) {
+			return (me.max - value) * scalingFactor;
+		}
+		return (value - me.min) * scalingFactor;
+	}
+	getValueForDistanceFromCenter(distance) {
+		if (isNullOrUndef(distance)) {
+			return NaN;
+		}
+		const me = this;
+		const scaledDistance = distance / (me.drawingArea / (me.max - me.min));
+		return me.options.reverse ? me.max - scaledDistance : me.min + scaledDistance;
+	}
+	getPointPosition(index, distanceFromCenter) {
+		const me = this;
+		const angle = me.getIndexAngle(index) - (Math.PI / 2);
+		return {
+			x: Math.cos(angle) * distanceFromCenter + me.xCenter,
+			y: Math.sin(angle) * distanceFromCenter + me.yCenter,
+			angle
+		};
+	}
+	getPointPositionForValue(index, value) {
+		return this.getPointPosition(index, this.getDistanceFromCenterForValue(value));
+	}
+	getBasePosition(index) {
+		return this.getPointPositionForValue(index || 0, this.getBaseValue());
+	}
+	drawGrid() {
+		const me = this;
+		const ctx = me.ctx;
+		const opts = me.options;
+		const gridLineOpts = opts.gridLines;
+		const angleLineOpts = opts.angleLines;
+		let i, offset, position;
+		if (opts.pointLabels.display) {
+			drawPointLabels(me);
+		}
+		if (gridLineOpts.display) {
+			me.ticks.forEach((tick, index) => {
+				if (index !== 0) {
+					offset = me.getDistanceFromCenterForValue(me.ticks[index].value);
+					drawRadiusLine(me, gridLineOpts, offset, index);
+				}
+			});
+		}
+		if (angleLineOpts.display) {
+			ctx.save();
+			for (i = me.chart.data.labels.length - 1; i >= 0; i--) {
+				const context = {
+					chart: me.chart,
+					scale: me,
+					index: i,
+					label: me.pointLabels[i],
+				};
+				const lineWidth = resolve([angleLineOpts.lineWidth, gridLineOpts.lineWidth], context, i);
+				const color = resolve([angleLineOpts.color, gridLineOpts.color], context, i);
+				if (!lineWidth || !color) {
+					continue;
+				}
+				ctx.lineWidth = lineWidth;
+				ctx.strokeStyle = color;
+				if (ctx.setLineDash) {
+					ctx.setLineDash(resolve([angleLineOpts.borderDash, gridLineOpts.borderDash, []], context));
+					ctx.lineDashOffset = resolve([angleLineOpts.borderDashOffset, gridLineOpts.borderDashOffset, 0.0], context, i);
+				}
+				offset = me.getDistanceFromCenterForValue(opts.ticks.reverse ? me.min : me.max);
+				position = me.getPointPosition(i, offset);
+				ctx.beginPath();
+				ctx.moveTo(me.xCenter, me.yCenter);
+				ctx.lineTo(position.x, position.y);
+				ctx.stroke();
+			}
+			ctx.restore();
+		}
+	}
+	drawLabels() {
+		const me = this;
+		const ctx = me.ctx;
+		const opts = me.options;
+		const tickOpts = opts.ticks;
+		if (!tickOpts.display) {
+			return;
+		}
+		const startAngle = me.getIndexAngle(0);
+		let offset, width;
+		ctx.save();
+		ctx.translate(me.xCenter, me.yCenter);
+		ctx.rotate(startAngle);
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		me.ticks.forEach((tick, index) => {
+			const context = {
+				chart: me.chart,
+				scale: me,
+				index,
+				tick,
+			};
+			if (index === 0 && !opts.reverse) {
+				return;
+			}
+			const tickFont = me._resolveTickFontOptions(index);
+			ctx.font = tickFont.string;
+			offset = me.getDistanceFromCenterForValue(me.ticks[index].value);
+			const showLabelBackdrop = resolve([tickOpts.showLabelBackdrop], context, index);
+			if (showLabelBackdrop) {
+				width = ctx.measureText(tick.label).width;
+				ctx.fillStyle = resolve([tickOpts.backdropColor], context, index);
+				ctx.fillRect(
+					-width / 2 - tickOpts.backdropPaddingX,
+					-offset - tickFont.size / 2 - tickOpts.backdropPaddingY,
+					width + tickOpts.backdropPaddingX * 2,
+					tickFont.size + tickOpts.backdropPaddingY * 2
+				);
+			}
+			ctx.fillStyle = tickFont.color;
+			ctx.fillText(tick.label, 0, -offset);
+		});
+		ctx.restore();
+	}
+	drawTitle() {}
+}
+RadialLinearScale.id = 'radialLinear';
+RadialLinearScale.defaults = defaultConfig$3;
+
+const MAX_INTEGER = Number.MAX_SAFE_INTEGER || 9007199254740991;
+const INTERVALS = {
+	millisecond: {common: true, size: 1, steps: 1000},
+	second: {common: true, size: 1000, steps: 60},
+	minute: {common: true, size: 60000, steps: 60},
+	hour: {common: true, size: 3600000, steps: 24},
+	day: {common: true, size: 86400000, steps: 30},
+	week: {common: false, size: 604800000, steps: 4},
+	month: {common: true, size: 2.628e9, steps: 12},
+	quarter: {common: false, size: 7.884e9, steps: 4},
+	year: {common: true, size: 3.154e10}
+};
+const UNITS = (Object.keys(INTERVALS));
+function sorter(a, b) {
+	return a - b;
+}
+function parse(scale, input) {
+	if (isNullOrUndef(input)) {
+		return null;
+	}
+	const adapter = scale._adapter;
+	const options = scale.options.time;
+	const {parser, round, isoWeekday} = options;
+	let value = input;
+	if (typeof parser === 'function') {
+		value = parser(value);
+	}
+	if (!isNumberFinite(value)) {
+		value = typeof parser === 'string'
+			? adapter.parse(value, parser)
+			: adapter.parse(value);
+	}
+	if (value === null) {
+		return value;
+	}
+	if (round) {
+		value = round === 'week' && isoWeekday
+			? scale._adapter.startOf(value, 'isoWeek', isoWeekday)
+			: scale._adapter.startOf(value, round);
+	}
+	return +value;
+}
+function determineUnitForAutoTicks(minUnit, min, max, capacity) {
+	const ilen = UNITS.length;
+	for (let i = UNITS.indexOf(minUnit); i < ilen - 1; ++i) {
+		const interval = INTERVALS[UNITS[i]];
+		const factor = interval.steps ? interval.steps : MAX_INTEGER;
+		if (interval.common && Math.ceil((max - min) / (factor * interval.size)) <= capacity) {
+			return UNITS[i];
+		}
+	}
+	return UNITS[ilen - 1];
+}
+function determineUnitForFormatting(scale, numTicks, minUnit, min, max) {
+	for (let i = UNITS.length - 1; i >= UNITS.indexOf(minUnit); i--) {
+		const unit = UNITS[i];
+		if (INTERVALS[unit].common && scale._adapter.diff(max, min, unit) >= numTicks - 1) {
+			return unit;
+		}
+	}
+	return UNITS[minUnit ? UNITS.indexOf(minUnit) : 0];
+}
+function determineMajorUnit(unit) {
+	for (let i = UNITS.indexOf(unit) + 1, ilen = UNITS.length; i < ilen; ++i) {
+		if (INTERVALS[UNITS[i]].common) {
+			return UNITS[i];
+		}
+	}
+}
+function addTick(timestamps, ticks, time) {
+	if (!timestamps.length) {
+		return;
+	}
+	const {lo, hi} = _lookup(timestamps, time);
+	const timestamp = timestamps[lo] >= time ? timestamps[lo] : timestamps[hi];
+	ticks[timestamp] = true;
+}
+function setMajorTicks(scale, ticks, map, majorUnit) {
+	const adapter = scale._adapter;
+	const first = +adapter.startOf(ticks[0].value, majorUnit);
+	const last = ticks[ticks.length - 1].value;
+	let major, index;
+	for (major = first; major <= last; major = +adapter.add(major, 1, majorUnit)) {
+		index = map[major];
+		if (index >= 0) {
+			ticks[index].major = true;
+		}
+	}
+	return ticks;
+}
+function ticksFromTimestamps(scale, values, majorUnit) {
+	const ticks = [];
+	const map = {};
+	const ilen = values.length;
+	let i, value;
+	for (i = 0; i < ilen; ++i) {
+		value = values[i];
+		map[value] = i;
+		ticks.push({
+			value,
+			major: false
+		});
+	}
+	return (ilen === 0 || !majorUnit) ? ticks : setMajorTicks(scale, ticks, map, majorUnit);
+}
+const defaultConfig$4 = {
+	bounds: 'data',
+	adapters: {},
+	time: {
+		parser: false,
+		unit: false,
+		round: false,
+		isoWeekday: false,
+		minUnit: 'millisecond',
+		displayFormats: {}
+	},
+	ticks: {
+		autoSkip: false,
+		source: 'auto',
+		major: {
+			enabled: false
+		}
+	}
+};
+class TimeScale extends Scale {
+	constructor(props) {
+		super(props);
+		this._cache = {
+			data: [],
+			labels: [],
+			all: []
+		};
+		this._unit = 'day';
+		this._majorUnit = undefined;
+		this._offsets = {};
+	}
+	init(options) {
+		const time = options.time || (options.time = {});
+		const adapter = this._adapter = new adapters._date(options.adapters.date);
+		mergeIf(time.displayFormats, adapter.formats());
+		super.init(options);
+	}
+	parse(raw, index) {
+		if (raw === undefined) {
+			return NaN;
+		}
+		return parse(this, raw);
+	}
+	invalidateCaches() {
+		this._cache = {
+			data: [],
+			labels: [],
+			all: []
+		};
+	}
+	determineDataLimits() {
+		const me = this;
+		const options = me.options;
+		const adapter = me._adapter;
+		const unit = options.time.unit || 'day';
+		let {min, max, minDefined, maxDefined} = me.getUserBounds();
+		function _applyBounds(bounds) {
+			if (!minDefined && !isNaN(bounds.min)) {
+				min = Math.min(min, bounds.min);
+			}
+			if (!maxDefined && !isNaN(bounds.max)) {
+				max = Math.max(max, bounds.max);
+			}
+		}
+		if (!minDefined || !maxDefined) {
+			_applyBounds(me._getLabelBounds());
+			if (options.bounds !== 'ticks' || options.ticks.source !== 'labels') {
+				_applyBounds(me.getMinMax(false));
+			}
+		}
+		min = isNumberFinite(min) && !isNaN(min) ? min : +adapter.startOf(Date.now(), unit);
+		max = isNumberFinite(max) && !isNaN(max) ? max : +adapter.endOf(Date.now(), unit) + 1;
+		me.min = Math.min(min, max);
+		me.max = Math.max(min + 1, max);
+	}
+	_getLabelBounds() {
+		const arr = this.getLabelTimestamps();
+		let min = Number.POSITIVE_INFINITY;
+		let max = Number.NEGATIVE_INFINITY;
+		if (arr.length) {
+			min = arr[0];
+			max = arr[arr.length - 1];
+		}
+		return {min, max};
+	}
+	buildTicks() {
+		const me = this;
+		const options = me.options;
+		const timeOpts = options.time;
+		const tickOpts = options.ticks;
+		const timestamps = tickOpts.source === 'labels' ? me.getLabelTimestamps() : me._generate();
+		if (options.bounds === 'ticks' && timestamps.length) {
+			me.min = me._userMin || timestamps[0];
+			me.max = me._userMax || timestamps[timestamps.length - 1];
+		}
+		const min = me.min;
+		const max = me.max;
+		const ticks = _filterBetween(timestamps, min, max);
+		me._unit = timeOpts.unit || (tickOpts.autoSkip
+			? determineUnitForAutoTicks(timeOpts.minUnit, me.min, me.max, me._getLabelCapacity(min))
+			: determineUnitForFormatting(me, ticks.length, timeOpts.minUnit, me.min, me.max));
+		me._majorUnit = !tickOpts.major.enabled || me._unit === 'year' ? undefined
+			: determineMajorUnit(me._unit);
+		me.initOffsets(timestamps);
+		if (options.reverse) {
+			ticks.reverse();
+		}
+		return ticksFromTimestamps(me, ticks, me._majorUnit);
+	}
+	initOffsets(timestamps) {
+		const me = this;
+		let start = 0;
+		let end = 0;
+		let first, last;
+		if (me.options.offset && timestamps.length) {
+			first = me.getDecimalForValue(timestamps[0]);
+			if (timestamps.length === 1) {
+				start = 1 - first;
+			} else {
+				start = (me.getDecimalForValue(timestamps[1]) - first) / 2;
+			}
+			last = me.getDecimalForValue(timestamps[timestamps.length - 1]);
+			if (timestamps.length === 1) {
+				end = last;
+			} else {
+				end = (last - me.getDecimalForValue(timestamps[timestamps.length - 2])) / 2;
+			}
+		}
+		me._offsets = {start, end, factor: 1 / (start + 1 + end)};
+	}
+	_generate() {
+		const me = this;
+		const adapter = me._adapter;
+		const min = me.min;
+		const max = me.max;
+		const options = me.options;
+		const timeOpts = options.time;
+		const minor = timeOpts.unit || determineUnitForAutoTicks(timeOpts.minUnit, min, max, me._getLabelCapacity(min));
+		const stepSize = valueOrDefault(timeOpts.stepSize, 1);
+		const weekday = minor === 'week' ? timeOpts.isoWeekday : false;
+		const ticks = {};
+		let first = min;
+		let time;
+		if (weekday) {
+			first = +adapter.startOf(first, 'isoWeek', weekday);
+		}
+		first = +adapter.startOf(first, weekday ? 'day' : minor);
+		if (adapter.diff(max, min, minor) > 100000 * stepSize) {
+			throw new Error(min + ' and ' + max + ' are too far apart with stepSize of ' + stepSize + ' ' + minor);
+		}
+		if (me.options.ticks.source === 'data') {
+			const timestamps = me.getDataTimestamps();
+			for (time = first; time < max; time = +adapter.add(time, stepSize, minor)) {
+				addTick(timestamps, ticks, time);
+			}
+			if (time === max || options.bounds === 'ticks') {
+				addTick(timestamps, ticks, time);
+			}
+		} else {
+			for (time = first; time < max; time = +adapter.add(time, stepSize, minor)) {
+				ticks[time] = true;
+			}
+			if (time === max || options.bounds === 'ticks') {
+				ticks[time] = true;
+			}
+		}
+		return Object.keys(ticks).map(x => +x);
+	}
+	getLabelForValue(value) {
+		const me = this;
+		const adapter = me._adapter;
+		const timeOpts = me.options.time;
+		if (timeOpts.tooltipFormat) {
+			return adapter.format(value, timeOpts.tooltipFormat);
+		}
+		return adapter.format(value, timeOpts.displayFormats.datetime);
+	}
+	_tickFormatFunction(time, index, ticks, format) {
+		const me = this;
+		const options = me.options;
+		const formats = options.time.displayFormats;
+		const unit = me._unit;
+		const majorUnit = me._majorUnit;
+		const minorFormat = unit && formats[unit];
+		const majorFormat = majorUnit && formats[majorUnit];
+		const tick = ticks[index];
+		const major = majorUnit && majorFormat && tick && tick.major;
+		const label = me._adapter.format(time, format || (major ? majorFormat : minorFormat));
+		const formatter = options.ticks.callback;
+		return formatter ? formatter(label, index, ticks) : label;
+	}
+	generateTickLabels(ticks) {
+		let i, ilen, tick;
+		for (i = 0, ilen = ticks.length; i < ilen; ++i) {
+			tick = ticks[i];
+			tick.label = this._tickFormatFunction(tick.value, i, ticks);
+		}
+	}
+	getDecimalForValue(value) {
+		const me = this;
+		return (value - me.min) / (me.max - me.min);
+	}
+	getPixelForValue(value) {
+		const me = this;
+		const offsets = me._offsets;
+		const pos = me.getDecimalForValue(value);
+		return me.getPixelForDecimal((offsets.start + pos) * offsets.factor);
+	}
+	getValueForPixel(pixel) {
+		const me = this;
+		const offsets = me._offsets;
+		const pos = me.getDecimalForPixel(pixel) / offsets.factor - offsets.end;
+		return me.min + pos * (me.max - me.min);
+	}
+	_getLabelSize(label) {
+		const me = this;
+		const ticksOpts = me.options.ticks;
+		const tickLabelWidth = me.ctx.measureText(label).width;
+		const angle = toRadians(me.isHorizontal() ? ticksOpts.maxRotation : ticksOpts.minRotation);
+		const cosRotation = Math.cos(angle);
+		const sinRotation = Math.sin(angle);
+		const tickFontSize = me._resolveTickFontOptions(0).size;
+		return {
+			w: (tickLabelWidth * cosRotation) + (tickFontSize * sinRotation),
+			h: (tickLabelWidth * sinRotation) + (tickFontSize * cosRotation)
+		};
+	}
+	_getLabelCapacity(exampleTime) {
+		const me = this;
+		const timeOpts = me.options.time;
+		const displayFormats = timeOpts.displayFormats;
+		const format = displayFormats[timeOpts.unit] || displayFormats.millisecond;
+		const exampleLabel = me._tickFormatFunction(exampleTime, 0, ticksFromTimestamps(me, [exampleTime], me._majorUnit), format);
+		const size = me._getLabelSize(exampleLabel);
+		const capacity = Math.floor(me.isHorizontal() ? me.width / size.w : me.height / size.h) - 1;
+		return capacity > 0 ? capacity : 1;
+	}
+	getDataTimestamps() {
+		const me = this;
+		let timestamps = me._cache.data || [];
+		let i, ilen;
+		if (timestamps.length) {
+			return timestamps;
+		}
+		const metas = me.getMatchingVisibleMetas();
+		for (i = 0, ilen = metas.length; i < ilen; ++i) {
+			timestamps = timestamps.concat(metas[i].controller.getAllParsedValues(me));
+		}
+		return (me._cache.data = _arrayUnique(timestamps.sort(sorter)));
+	}
+	getLabelTimestamps() {
+		const me = this;
+		const timestamps = me._cache.labels || [];
+		let i, ilen;
+		if (timestamps.length) {
+			return timestamps;
+		}
+		const labels = me.getLabels();
+		for (i = 0, ilen = labels.length; i < ilen; ++i) {
+			timestamps.push(parse(me, labels[i]));
+		}
+		return (me._cache.labels = _arrayUnique(timestamps.sort(sorter)));
+	}
+}
+TimeScale.id = 'time';
+TimeScale.defaults = defaultConfig$4;
+
+function interpolate(table, skey, sval, tkey) {
+	const {lo, hi} = _lookupByKey(table, skey, sval);
+	const prev = table[lo];
+	const next = table[hi];
+	const span = next[skey] - prev[skey];
+	const ratio = span ? (sval - prev[skey]) / span : 0;
+	const offset = (next[tkey] - prev[tkey]) * ratio;
+	return prev[tkey] + offset;
+}
+function sorter$1(a, b) {
+	return a - b;
+}
+class TimeSeriesScale extends TimeScale {
+	constructor(props) {
+		super(props);
+		this._table = [];
+	}
+	initOffsets(timestamps) {
+		const me = this;
+		me._table = me.buildLookupTable();
+		super.initOffsets(timestamps);
+	}
+	buildLookupTable() {
+		const me = this;
+		const {min, max} = me;
+		const timestamps = me._getTimestampsForTable();
+		if (!timestamps.length) {
+			return [
+				{time: min, pos: 0},
+				{time: max, pos: 1}
+			];
+		}
+		const table = [];
+		const items = [min];
+		let i, ilen, prev, curr, next;
+		for (i = 0, ilen = timestamps.length; i < ilen; ++i) {
+			curr = timestamps[i];
+			if (curr > min && curr < max) {
+				items.push(curr);
+			}
+		}
+		items.push(max);
+		for (i = 0, ilen = items.length; i < ilen; ++i) {
+			next = items[i + 1];
+			prev = items[i - 1];
+			curr = items[i];
+			if (prev === undefined || next === undefined || Math.round((next + prev) / 2) !== curr) {
+				table.push({time: curr, pos: i / (ilen - 1)});
+			}
+		}
+		return table;
+	}
+	_getTimestampsForTable() {
+		const me = this;
+		let timestamps = me._cache.all || [];
+		if (timestamps.length) {
+			return timestamps;
+		}
+		const data = me.getDataTimestamps();
+		const label = me.getLabelTimestamps();
+		if (data.length && label.length) {
+			timestamps = _arrayUnique(data.concat(label).sort(sorter$1));
+		} else {
+			timestamps = data.length ? data : label;
+		}
+		timestamps = me._cache.all = timestamps;
+		return timestamps;
+	}
+	getDecimalForValue(value) {
+		return interpolate(this._table, 'time', value, 'pos');
+	}
+	getDataTimestamps() {
+		const me = this;
+		const timestamps = me._cache.data || [];
+		if (timestamps.length) {
+			return timestamps;
+		}
+		const metas = me.getMatchingVisibleMetas();
+		return (me._cache.data = metas.length ? metas[0].controller.getAllParsedValues(me) : []);
+	}
+	getLabelTimestamps() {
+		const me = this;
+		const timestamps = me._cache.labels || [];
+		let i, ilen;
+		if (timestamps.length) {
+			return timestamps;
+		}
+		const labels = me.getLabels();
+		for (i = 0, ilen = labels.length; i < ilen; ++i) {
+			timestamps.push(me.parse(labels[i]));
+		}
+		return (me._cache.labels = timestamps);
+	}
+	getValueForPixel(pixel) {
+		const me = this;
+		const offsets = me._offsets;
+		const pos = me.getDecimalForPixel(pixel) / offsets.factor - offsets.end;
+		return interpolate(me._table, 'pos', pos, 'time');
+	}
+}
+TimeSeriesScale.id = 'timeseries';
+TimeSeriesScale.defaults = TimeScale.defaults;
+
+export { Animation, Animations, Arc, BasePlatform, BasicPlatform, CategoryScale, Chart, DatasetController, DomPlatform, Element, Interaction, Line, LinearScale, LogarithmicScale, Point, RadialLinearScale, Rectangle, Scale, scaleService as ScaleService, Ticks, TimeScale, TimeSeriesScale, adapters as _adapters, animator, BarController as bar, BubbleController as bubble, DoughnutController as doughnut, plugin_filler as filler, layouts, plugin_legend as legend, LineController as line, DoughnutController as pie, plugins, PolarAreaController as polarArea, RadarController as radar, LineController as scatter, plugin_title as title, plugin_tooltip as tooltip };
