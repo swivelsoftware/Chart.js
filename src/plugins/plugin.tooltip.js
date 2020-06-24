@@ -670,7 +670,7 @@ export class Tooltip extends Element {
 		}
 
 		if (changed && options.custom) {
-			options.custom.call(me);
+			options.custom.call(me, [me]);
 		}
 	}
 

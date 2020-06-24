@@ -370,21 +370,6 @@ export default class Scale extends Element {
 	}
 
 	/**
-	 * Parse an object for axis to internal representation.
-	 * @param {object} obj
-	 * @param {string} axis
-	 * @param {number} index
-	 * @since 3.0
-	 * @protected
-	 */
-	parseObject(obj, axis, index) {
-		if (obj[axis] !== undefined) {
-			return this.parse(obj[axis], index);
-		}
-		return null;
-	}
-
-	/**
 	 * @return {{min: number, max: number, minDefined: boolean, maxDefined: boolean}}
 	 * @protected
 	 * @since 3.0
@@ -411,7 +396,7 @@ export default class Scale extends Element {
 		const me = this;
 		// eslint-disable-next-line prefer-const
 		let {min, max, minDefined, maxDefined} = me.getUserBounds();
-		let minmax;
+		let range;
 
 		if (minDefined && maxDefined) {
 			return {min, max};
@@ -419,12 +404,12 @@ export default class Scale extends Element {
 
 		const metas = me.getMatchingVisibleMetas();
 		for (let i = 0, ilen = metas.length; i < ilen; ++i) {
-			minmax = metas[i].controller.getMinMax(me, canStack);
+			range = metas[i].controller.getMinMax(me, canStack);
 			if (!minDefined) {
-				min = Math.min(min, minmax.min);
+				min = Math.min(min, range.min);
 			}
 			if (!maxDefined) {
-				max = Math.max(max, minmax.max);
+				max = Math.max(max, range.max);
 			}
 		}
 
@@ -1119,8 +1104,10 @@ export default class Scale extends Element {
 		const items = [];
 
 		let context = {
+			chart,
 			scale: me,
 			tick: ticks[0],
+			index: 0,
 		};
 		const axisWidth = gridLines.drawBorder ? resolve([gridLines.borderWidth, gridLines.lineWidth, 0], context, 0) : 0;
 		const axisHalfWidth = axisWidth / 2;
@@ -1187,8 +1174,10 @@ export default class Scale extends Element {
 			const tick = ticks[i] || {};
 
 			context = {
+				chart,
 				scale: me,
 				tick,
+				index: i,
 			};
 
 			const lineWidth = resolve([gridLines.lineWidth], context, i);
@@ -1328,8 +1317,10 @@ export default class Scale extends Element {
 		const ctx = me.ctx;
 		const chart = me.chart;
 		let context = {
+			chart,
 			scale: me,
 			tick: me.ticks[0],
+			index: 0,
 		};
 		const axisWidth = gridLines.drawBorder ? resolve([gridLines.borderWidth, gridLines.lineWidth, 0], context, 0) : 0;
 		const items = me._gridLineItems || (me._gridLineItems = me._computeGridLineItems(chartArea));
@@ -1372,8 +1363,10 @@ export default class Scale extends Element {
 			// Draw the line at the edge of the axis
 			const firstLineWidth = axisWidth;
 			context = {
+				chart,
 				scale: me,
 				tick: me.ticks[me._ticksLength - 1],
+				index: me._ticksLength - 1,
 			};
 			const lastLineWidth = resolve([gridLines.lineWidth, 1], context, me._ticksLength - 1);
 			const borderValue = me._borderValue;

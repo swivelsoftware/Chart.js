@@ -3,21 +3,21 @@ module.exports = {
 	config: {
 		type: 'line',
 		data: {
-			labels: ['2017', '2018', '2019', '2020', '2025'],
+			labels: ['2017', '2019', '2020', '2025', '2042'],
 			datasets: [{data: [0, 1, 2, 3, 4], fill: false}]
 		},
 		options: {
 			scales: {
 				x: {
-					type: 'time',
+					type: 'timeseries',
+					min: '2012',
 					time: {
-						parser: 'YYYY',
-						unit: 'year'
+						parser: 'YYYY'
 					},
+					reverse: true,
 					ticks: {
-						source: 'auto'
-					},
-					distribution: 'series'
+						source: 'labels'
+					}
 				},
 				y: {
 					display: false

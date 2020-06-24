@@ -1,5 +1,6 @@
 import Animations from './core.animations';
-import {isObject, merge, _merger, isArray, valueOrDefault, mergeIf, arrayEquals} from '../helpers/helpers.core';
+import {isObject, merge, _merger, isArray, valueOrDefault, mergeIf, resolveObjectKey} from '../helpers/helpers.core';
+import {listenArrayEvents, unlistenArrayEvents} from '../helpers/helpers.collection';
 import {resolve} from '../helpers/helpers.options';
 import {getHoverColor} from '../helpers/helpers.color';
 import {sign} from '../helpers/helpers.math';
@@ -8,49 +9,6 @@ import {sign} from '../helpers/helpers.math';
  * @typedef { import("./core.controller").default } Chart
  * @typedef { import("./core.scale").default } Scale
  */
-
-const arrayEvents = ['push', 'pop', 'shift', 'splice', 'unshift'];
-
-/**
- * Hooks the array methods that add or remove values ('push', pop', 'shift', 'splice',
- * 'unshift') and notify the listener AFTER the array has been altered. Listeners are
- * called on the '_onData*' callbacks (e.g. _onDataPush, etc.) with same arguments.
- */
-function listenArrayEvents(array, listener) {
-	if (array._chartjs) {
-		array._chartjs.listeners.push(listener);
-		return;
-	}
-
-	Object.defineProperty(array, '_chartjs', {
-		configurable: true,
-		enumerable: false,
-		value: {
-			listeners: [listener]
-		}
-	});
-
-	arrayEvents.forEach((key) => {
-		const method = '_onData' + key.charAt(0).toUpperCase() + key.slice(1);
-		const base = array[key];
-
-		Object.defineProperty(array, key, {
-			configurable: true,
-			enumerable: false,
-			value(...args) {
-				const res = base.apply(this, args);
-
-				array._chartjs.listeners.forEach((object) => {
-					if (typeof object[method] === 'function') {
-						object[method](...args);
-					}
-				});
-
-				return res;
-			}
-		});
-	});
-}
 
 function scaleClip(scale, allowedOverflow) {
 	const opts = scale && scale.options || {};
@@ -96,33 +54,6 @@ function toClip(value) {
 		bottom: b,
 		left: l
 	};
-}
-
-/**
- * Removes the given array event listener and cleanup extra attached properties (such as
- * the _chartjs stub and overridden methods) if array doesn't have any more listeners.
- */
-function unlistenArrayEvents(array, listener) {
-	const stub = array._chartjs;
-	if (!stub) {
-		return;
-	}
-
-	const listeners = stub.listeners;
-	const index = listeners.indexOf(listener);
-	if (index !== -1) {
-		listeners.splice(index, 1);
-	}
-
-	if (listeners.length > 0) {
-		return;
-	}
-
-	arrayEvents.forEach((key) => {
-		delete array[key];
-	});
-
-	delete array._chartjs;
 }
 
 function getSortedDatasetIndices(chart, filterVisible) {
@@ -216,6 +147,14 @@ function getFirstScaleId(chart, axis) {
 	return Object.keys(scales).filter(key => scales[key].axis === axis).shift();
 }
 
+function optionKeys(optionNames) {
+	return isArray(optionNames) ? optionNames : Object.keys(optionNames);
+}
+
+function optionKey(key, active) {
+	return active ? 'hover' + key.charAt(0).toUpperCase() + key.slice(1) : key;
+}
+
 export default class DatasetController {
 
 	/**
@@ -231,13 +170,10 @@ export default class DatasetController {
 		this._cachedMeta = this.getMeta();
 		this._type = this._cachedMeta.type;
 		this._config = undefined;
+		/** @type {boolean | object} */
 		this._parsing = false;
 		this._data = undefined;
-		this._dataCopy = undefined;
-		this._dataModified = false;
 		this._objectData = undefined;
-		this._labels = undefined;
-		this._scaleStacked = {};
 
 		this.initialize();
 	}
@@ -261,14 +197,19 @@ export default class DatasetController {
 		const meta = me._cachedMeta;
 		const dataset = me.getDataset();
 
-		const xid = meta.xAxisID = dataset.xAxisID || getFirstScaleId(chart, 'x');
-		const yid = meta.yAxisID = dataset.yAxisID || getFirstScaleId(chart, 'y');
-		const rid = meta.rAxisID = dataset.rAxisID || getFirstScaleId(chart, 'r');
+		const chooseId = (axis, x, y, r) => axis === 'x' ? x : axis === 'r' ? r : y;
+
+		const xid = meta.xAxisID = valueOrDefault(dataset.xAxisID, getFirstScaleId(chart, 'x'));
+		const yid = meta.yAxisID = valueOrDefault(dataset.yAxisID, getFirstScaleId(chart, 'y'));
+		const rid = meta.rAxisID = valueOrDefault(dataset.rAxisID, getFirstScaleId(chart, 'r'));
+		const indexAxis = meta.indexAxis;
+		const iid = meta.iAxisID = chooseId(indexAxis, xid, yid, rid);
+		const vid = meta.vAxisID = chooseId(indexAxis, yid, xid, rid);
 		meta.xScale = me.getScaleForId(xid);
 		meta.yScale = me.getScaleForId(yid);
 		meta.rScale = me.getScaleForId(rid);
-		meta.iScale = me._getIndexScale();
-		meta.vScale = me._getValueScale();
+		meta.iScale = me.getScaleForId(iid);
+		meta.vScale = me.getScaleForId(vid);
 	}
 
 	getDataset() {
@@ -285,34 +226,6 @@ export default class DatasetController {
 	 */
 	getScaleForId(scaleID) {
 		return this.chart.scales[scaleID];
-	}
-
-	/**
-	 * @protected
-	 */
-	getValueScaleId() {
-		return this._cachedMeta.yAxisID;
-	}
-
-	/**
-	 * @protected
-	 */
-	getIndexScaleId() {
-		return this._cachedMeta.xAxisID;
-	}
-
-	/**
-	 * @private
-	 */
-	_getValueScale() {
-		return this.getScaleForId(this.getValueScaleId());
-	}
-
-	/**
-	 * @private
-	 */
-	_getIndexScale() {
-		return this.getScaleForId(this.getIndexScaleId());
 	}
 
 	/**
@@ -339,7 +252,6 @@ export default class DatasetController {
 	}
 
 	/**
-	 * @return {boolean} whether the data was modified
 	 * @private
 	 */
 	_dataCheck() {
@@ -352,50 +264,17 @@ export default class DatasetController {
 		// the internal meta data accordingly.
 
 		if (isObject(data)) {
-			// Object data is currently monitored for replacement only
-			if (me._objectData === data) {
-				return false;
-			}
 			me._data = convertObjectDataToArray(data);
-			me._objectData = data;
-		} else {
-			if (me._data === data && !me._dataModified && arrayEquals(data, me._dataCopy)) {
-				return false;
-			}
-
+		} else if (me._data !== data) {
 			if (me._data) {
 				// This case happens when the user replaced the data array instance.
 				unlistenArrayEvents(me._data, me);
 			}
-
-			// Store a copy to detect direct modifications.
-			// Note: This is suboptimal, but better than always parsing the data
-			me._dataCopy = data.slice(0);
-
-			me._dataModified = false;
-
 			if (data && Object.isExtensible(data)) {
 				listenArrayEvents(data, me);
 			}
 			me._data = data;
 		}
-		return true;
-	}
-
-	/**
-	 * @private
-	 */
-	_labelCheck() {
-		const me = this;
-		const iScale = me._cachedMeta.iScale;
-		const labels = iScale ? iScale.getLabels() : me.chart.data.labels;
-
-		if (me._labels === labels) {
-			return false;
-		}
-
-		me._labels = labels;
-		return true;
 	}
 
 	addElements() {
@@ -418,12 +297,11 @@ export default class DatasetController {
 
 	buildOrUpdateElements() {
 		const me = this;
-		const dataChanged = me._dataCheck();
-		const labelsChanged = me._labelCheck();
-		const scaleChanged = me._scaleCheck();
 		const meta = me._cachedMeta;
 		const dataset = me.getDataset();
 		let stackChanged = false;
+
+		me._dataCheck();
 
 		// make sure cached _stacked status is current
 		meta._stacked = isStacked(meta.vScale, meta);
@@ -440,7 +318,7 @@ export default class DatasetController {
 
 		// Re-sync meta data in case the user replaced the data array or if we missed
 		// any updates and so make sure that we handle number of datapoints changing.
-		me._resyncElements(dataChanged || labelsChanged || scaleChanged || stackChanged);
+		me._resyncElements();
 
 		// if stack changed, update stack values for the whole dataset
 		if (stackChanged) {
@@ -587,6 +465,7 @@ export default class DatasetController {
 	 */
 	parseObjectData(meta, data, start, count) {
 		const {xScale, yScale} = meta;
+		const {xAxisKey = 'x', yAxisKey = 'y'} = this._parsing;
 		const parsed = new Array(count);
 		let i, ilen, index, item;
 
@@ -594,8 +473,8 @@ export default class DatasetController {
 			index = i + start;
 			item = data[index];
 			parsed[i] = {
-				x: xScale.parseObject(item, 'x', index),
-				y: yScale.parseObject(item, 'y', index)
+				x: xScale.parse(resolveObjectKey(item, xAxisKey), index),
+				y: yScale.parse(resolveObjectKey(item, yAxisKey), index)
 			};
 		}
 		return parsed;
@@ -625,30 +504,35 @@ export default class DatasetController {
 	/**
 	 * @protected
 	 */
+	updateRangeFromParsed(range, scale, parsed, stack) {
+		let value = parsed[scale.axis];
+		const values = stack && parsed._stacks[scale.axis];
+		if (stack && values) {
+			stack.values = values;
+			// Need to consider individual stack values for data range,
+			// in addition to the stacked value
+			range.min = Math.min(range.min, value);
+			range.max = Math.max(range.max, value);
+			value = applyStack(stack, value, this._cachedMeta.index, true);
+		}
+		range.min = Math.min(range.min, value);
+		range.max = Math.max(range.max, value);
+	}
+
+	/**
+	 * @protected
+	 */
 	getMinMax(scale, canStack) {
-		const meta = this._cachedMeta;
+		const me = this;
+		const meta = me._cachedMeta;
 		const _parsed = meta._parsed;
 		const sorted = meta._sorted && scale === meta.iScale;
 		const ilen = _parsed.length;
-		const otherScale = this._getOtherScale(scale);
-		const stack = canStack && meta._stacked && {keys: getSortedDatasetIndices(this.chart, true), values: null};
-		let min = Number.POSITIVE_INFINITY;
-		let max = Number.NEGATIVE_INFINITY;
+		const otherScale = me._getOtherScale(scale);
+		const stack = canStack && meta._stacked && {keys: getSortedDatasetIndices(me.chart, true), values: null};
+		const range = {min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY};
 		const {min: otherMin, max: otherMax} = getUserBounds(otherScale);
 		let i, value, parsed, otherValue;
-
-		function _compute() {
-			if (stack) {
-				stack.values = parsed._stacks[scale.axis];
-				// Need to consider individual stack values for data range,
-				// in addition to the stacked value
-				min = Math.min(min, value);
-				max = Math.max(max, value);
-				value = applyStack(stack, value, meta.index, true);
-			}
-			min = Math.min(min, value);
-			max = Math.max(max, value);
-		}
 
 		function _skip() {
 			parsed = _parsed[i];
@@ -661,21 +545,23 @@ export default class DatasetController {
 			if (_skip()) {
 				continue;
 			}
-			_compute();
+			me.updateRangeFromParsed(range, scale, parsed, stack);
 			if (sorted) {
+				// if the data is sorted, we don't need to check further from this end of array
 				break;
 			}
 		}
 		if (sorted) {
+			// in the sorted case, find first non-skipped value from other end of array
 			for (i = ilen - 1; i >= 0; --i) {
 				if (_skip()) {
 					continue;
 				}
-				_compute();
+				me.updateRangeFromParsed(range, scale, parsed, stack);
 				break;
 			}
 		}
-		return {min, max};
+		return range;
 	}
 
 	getAllParsedValues(scale) {
@@ -690,37 +576,6 @@ export default class DatasetController {
 			}
 		}
 		return values;
-	}
-
-	/**
-	 * @private
-	 */
-	_cacheScaleStackStatus() {
-		const me = this;
-		const meta = me._cachedMeta;
-		const iScale = meta.iScale;
-		const vScale = meta.vScale;
-		const cache = me._scaleStacked = {};
-		if (iScale && vScale) {
-			cache[iScale.id] = iScale.options.stacked;
-			cache[vScale.id] = vScale.options.stacked;
-		}
-	}
-
-	/**
-	 * @private
-	 */
-	_scaleCheck() {
-		const me = this;
-		const meta = me._cachedMeta;
-		const iScale = meta.iScale;
-		const vScale = meta.vScale;
-		const cache = me._scaleStacked;
-		return !cache ||
-			!iScale ||
-			!vScale ||
-			cache[iScale.id] !== iScale.options.stacked ||
-			cache[vScale.id] !== vScale.options.stacked;
 	}
 
 	/**
@@ -757,7 +612,6 @@ export default class DatasetController {
 		me._cachedDataOpts = {};
 		me.update(mode);
 		meta._clip = toClip(valueOrDefault(me._config.clip, defaultClip(meta.xScale, meta.yScale, me.getMaxOverflow())));
-		me._cacheScaleStackStatus();
 	}
 
 	/**
@@ -836,32 +690,14 @@ export default class DatasetController {
 	}
 
 	/**
+	 * @param {boolean} [active]
 	 * @protected
 	 */
 	resolveDatasetElementOptions(active) {
-		const me = this;
-		const chart = me.chart;
-		const datasetOpts = me._config;
-		// @ts-ignore
-		const options = chart.options.elements[me.datasetElementType._type] || {};
-		const elementOptions = me.datasetElementOptions;
-		const values = {};
-		const context = me._getContext(undefined, active);
-		let i, ilen, key, readKey, value;
-
-		for (i = 0, ilen = elementOptions.length; i < ilen; ++i) {
-			key = elementOptions[i];
-			readKey = active ? 'hover' + key.charAt(0).toUpperCase() + key.slice(1) : key;
-			value = resolve([
-				datasetOpts[readKey],
-				options[readKey]
-			], context);
-			if (value !== undefined) {
-				values[key] = value;
-			}
-		}
-
-		return values;
+		return this._resolveOptions(this.datasetElementOptions, {
+			active,
+			type: this.datasetElementType._type
+		});
 	}
 
 	/**
@@ -876,43 +712,14 @@ export default class DatasetController {
 		if (cached[mode]) {
 			return cached[mode];
 		}
-		const chart = me.chart;
-		const datasetOpts = me._config;
-		// @ts-ignore
-		const options = chart.options.elements[me.dataElementType._type] || {};
-		const elementOptions = me.dataElementOptions;
-		const values = {};
-		const context = me._getContext(index, active);
 		const info = {cacheable: !active};
-		let keys, i, ilen, key, value, readKey;
 
-		if (isArray(elementOptions)) {
-			for (i = 0, ilen = elementOptions.length; i < ilen; ++i) {
-				key = elementOptions[i];
-				readKey = active ? 'hover' + key.charAt(0).toUpperCase() + key.slice(1) : key;
-				value = resolve([
-					datasetOpts[readKey],
-					options[readKey]
-				], context, index, info);
-				if (value !== undefined) {
-					values[key] = value;
-				}
-			}
-		} else {
-			keys = Object.keys(elementOptions);
-			for (i = 0, ilen = keys.length; i < ilen; ++i) {
-				key = keys[i];
-				readKey = active ? 'hover' + key.charAt(0).toUpperCase() + key.slice(1) : key;
-				value = resolve([
-					datasetOpts[elementOptions[readKey]],
-					datasetOpts[readKey],
-					options[readKey]
-				], context, index, info);
-				if (value !== undefined) {
-					values[key] = value;
-				}
-			}
-		}
+		const values = me._resolveOptions(me.dataElementOptions, {
+			index,
+			active,
+			info,
+			type: me.dataElementType._type
+		});
 
 		if (info.cacheable) {
 			// `$shared` indicades this set of options can be shared between multiple elements.
@@ -923,6 +730,35 @@ export default class DatasetController {
 			// to have the 'active' element options and 'default' options to switch between
 			// when interacting.
 			cached[mode] = values;
+		}
+
+		return values;
+	}
+
+	/**
+	 * @private
+	 */
+	_resolveOptions(optionNames, args) {
+		const me = this;
+		const {index, active, type, info} = args;
+		const datasetOpts = me._config;
+		const options = me.chart.options.elements[type] || {};
+		const values = {};
+		const context = me._getContext(index, active);
+		const keys = optionKeys(optionNames);
+
+		for (let i = 0, ilen = keys.length; i < ilen; ++i) {
+			const key = keys[i];
+			const readKey = optionKey(key, active);
+			const value = resolve([
+				datasetOpts[optionNames[readKey]],
+				datasetOpts[readKey],
+				options[readKey]
+			], context, index, info);
+
+			if (value !== undefined) {
+				values[key] = value;
+			}
 		}
 
 		return values;
@@ -1048,7 +884,7 @@ export default class DatasetController {
 	/**
 	 * @private
 	 */
-	_resyncElements(changed) {
+	_resyncElements() {
 		const me = this;
 		const meta = me._cachedMeta;
 		const numMeta = meta.data.length;
@@ -1056,17 +892,12 @@ export default class DatasetController {
 
 		if (numData > numMeta) {
 			me._insertElements(numMeta, numData - numMeta);
-			if (changed && numMeta) {
-				// _insertElements parses the new elements. The old ones might need parsing too.
-				me.parse(0, numMeta);
-			}
 		} else if (numData < numMeta) {
 			meta.data.splice(numData, numMeta - numData);
 			meta._parsed.splice(numData, numMeta - numData);
-			me.parse(0, numData);
-		} else if (changed) {
-			me.parse(0, numData);
 		}
+		// Re-parse the old elements (new elements are parsed in _insertElements)
+		me.parse(0, Math.min(numData, numMeta));
 	}
 
 	/**
@@ -1112,7 +943,6 @@ export default class DatasetController {
 	_onDataPush() {
 		const count = arguments.length;
 		this._insertElements(this.getDataset().data.length - count, count);
-		this._dataModified = true;
 	}
 
 	/**
@@ -1120,7 +950,6 @@ export default class DatasetController {
 	 */
 	_onDataPop() {
 		this._removeElements(this._cachedMeta.data.length - 1, 1);
-		this._dataModified = true;
 	}
 
 	/**
@@ -1128,7 +957,6 @@ export default class DatasetController {
 	 */
 	_onDataShift() {
 		this._removeElements(0, 1);
-		this._dataModified = true;
 	}
 
 	/**
@@ -1137,7 +965,6 @@ export default class DatasetController {
 	_onDataSplice(start, count) {
 		this._removeElements(start, count);
 		this._insertElements(start, arguments.length - 2);
-		this._dataModified = true;
 	}
 
 	/**
@@ -1145,7 +972,6 @@ export default class DatasetController {
 	 */
 	_onDataUnshift() {
 		this._insertElements(0, arguments.length);
-		this._dataModified = true;
 	}
 }
 

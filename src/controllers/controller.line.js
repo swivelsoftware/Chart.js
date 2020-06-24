@@ -14,10 +14,10 @@ defaults.set('line', {
 	},
 
 	scales: {
-		x: {
+		_index_: {
 			type: 'category',
 		},
-		y: {
+		_value_: {
 			type: 'linear',
 		},
 	}
@@ -91,6 +91,7 @@ export default class LineController extends DatasetController {
 	}
 
 	/**
+	 * @param {boolean} [active]
 	 * @protected
 	 */
 	resolveDatasetElementOptions(active) {

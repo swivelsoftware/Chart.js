@@ -2,7 +2,7 @@
 title: Time Cartesian Axis
 ---
 
-The time scale is used to display times and dates. When building its ticks, it will automatically calculate the most comfortable unit base on the size of the scale.
+The time scale is used to display times and dates. Data are spread according to the amount of time between data points. When building its ticks, it will automatically calculate the most comfortable unit base on the size of the scale.
 
 ## Date Adapters
 
@@ -12,17 +12,7 @@ The time scale **requires** both a date library and corresponding adapter to be 
 
 ### Input Data
 
-The x-axis data points may additionally be specified via the `t` or `x` attribute when using the time scale.
-
-```javascript
-data: [{
-    x: new Date(),
-    y: 1
-}, {
-    t: new Date(),
-    y: 10
-}]
-```
+See [data structures](../../general/data-structures.md).
 
 ### Date Formats
 
@@ -30,12 +20,11 @@ When providing data for the time scale, Chart.js supports all of the formats tha
 
 ## Configuration Options
 
-The following options are provided by the time scale. You may also set options provided by the [common tick configuration](README.md#tick-configuration).
+The following options are provided by the time scale. You may also set options provided by the [common tick configuration](index.md#tick-configuration).
 
 | Name | Type | Default | Description
 | ---- | ---- | ------- | -----------
 | `adapters.date` | `object` | `{}` | Options for adapter for external date library if that adapter needs or supports options
-| `distribution` | `string` | `'linear'` | How data is plotted. [more...](#scale-distribution)
 | `bounds` | `string` | `'data'` | Determines the scale bounds. [more...](#scale-bounds)
 | `ticks.source` | `string` | `'auto'` | How ticks are generated. [more...](#ticks-source)
 | `time.displayFormats` | `object` | | Sets how different time units are displayed. [more...](#display-formats)
@@ -117,30 +106,6 @@ var chart = new Chart(ctx, {
 });
 ```
 
-### Scale Distribution
-
-The `distribution` property controls the data distribution along the scale:
-
-* `'linear'`: data are spread according to their time (distances can vary)
-* `'series'`: data are spread at the same distance from each other
-
-```javascript
-var chart = new Chart(ctx, {
-    type: 'line',
-    data: data,
-    options: {
-        scales: {
-            x: {
-                type: 'time',
-                distribution: 'series'
-            }
-        }
-    }
-});
-```
-
-When the scale is in `series` mode, the data indices are expected to be unique, sorted, and consistent across datasets.
-
 ### Scale Bounds
 
 The `bounds` property controls the scale boundary strategy (bypassed by `min`/`max` time options).
@@ -153,7 +118,7 @@ The `bounds` property controls the scale boundary strategy (bypassed by `min`/`m
 The `ticks.source` property controls the ticks generation.
 
 * `'auto'`: generates "optimal" ticks based on scale size and time options
-* `'data'`: generates ticks from data (including labels from data `{t|x|y}` objects)
+* `'data'`: generates ticks from data (including labels from data `{x|y}` objects)
 * `'labels'`: generates ticks from user given `labels` ONLY
 
 ### Parser

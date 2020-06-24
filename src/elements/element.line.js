@@ -9,22 +9,19 @@ import {_updateBezierControlPoints} from '../helpers/helpers.curve';
  * @typedef { import("./element.point").default } Point
  */
 
-const defaultColor = defaults.color;
-
-defaults.set('elements', {
-	line: {
-		backgroundColor: defaultColor,
-		borderCapStyle: 'butt',
-		borderColor: defaultColor,
-		borderDash: [],
-		borderDashOffset: 0,
-		borderJoinStyle: 'miter',
-		borderWidth: 3,
-		capBezierPoints: true,
-		fill: true,
-		tension: 0.4
-	}
+const scope = 'elements.line';
+defaults.set(scope, {
+	borderCapStyle: 'butt',
+	borderDash: [],
+	borderDashOffset: 0,
+	borderJoinStyle: 'miter',
+	borderWidth: 3,
+	capBezierPoints: true,
+	fill: true,
+	tension: 0
 });
+
+defaults.route(scope, ['backgroundColor', 'borderColor'], '', 'color');
 
 function setStyle(ctx, vm) {
 	ctx.lineCap = vm.borderCapStyle;
@@ -121,13 +118,25 @@ function fastPathSegment(ctx, line, segment, params) {
 	let countX = 0;
 	let i, point, prevX, minY, maxY, lastY;
 
+	const pointIndex = (index) => (start + (reverse ? ilen - index : index)) % count;
+	const drawX = () => {
+		if (minY !== maxY) {
+			// Draw line to maxY and minY, using the average x-coordinate
+			ctx.lineTo(avgX, maxY);
+			ctx.lineTo(avgX, minY);
+			// Line to y-value of last point in group. So the line continues
+			// from correct position. Not using move, to have solid path.
+			ctx.lineTo(avgX, lastY);
+		}
+	};
+
 	if (move) {
-		point = points[(start + (reverse ? ilen : 0)) % count];
+		point = points[pointIndex(0)];
 		ctx.moveTo(point.x, point.y);
 	}
 
 	for (i = 0; i <= ilen; ++i) {
-		point = points[(start + (reverse ? ilen - i : i)) % count];
+		point = points[pointIndex(i)];
 
 		if (point.skip) {
 			// If there is a skipped point inside a segment, spanGaps must be true
@@ -148,14 +157,7 @@ function fastPathSegment(ctx, line, segment, params) {
 			// For first point in group, countX is `0`, so average will be `x` / 1.
 			avgX = (countX * avgX + x) / ++countX;
 		} else {
-			if (minY !== maxY) {
-				// Draw line to maxY and minY, using the average x-coordinate
-				ctx.lineTo(avgX, maxY);
-				ctx.lineTo(avgX, minY);
-				// Line to y-value of last point in group. So the line continues
-				// from correct position. Not using move, to have solid path.
-				ctx.lineTo(avgX, lastY);
-			}
+			drawX();
 			// Draw line to next x-position, using the first (or only)
 			// y-value in that group
 			ctx.lineTo(x, y);
@@ -167,6 +169,7 @@ function fastPathSegment(ctx, line, segment, params) {
 		// Keep track of the last y-value in group
 		lastY = y;
 	}
+	drawX();
 }
 
 /**

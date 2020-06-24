@@ -18,38 +18,62 @@ import {version} from '../../package.json';
  */
 
 
+function getIndexAxis(type, options) {
+	const typeDefaults = defaults[type] || {};
+	const datasetDefaults = typeDefaults.datasets || {};
+	const typeOptions = options[type] || {};
+	const datasetOptions = typeOptions.datasets || {};
+	return datasetOptions.indexAxis || options.indexAxis || datasetDefaults.indexAxis || 'x';
+}
+
+function getAxisFromDefaultScaleID(id, indexAxis) {
+	let axis = id;
+	if (id === '_index_') {
+		axis = indexAxis;
+	} else if (id === '_value_') {
+		axis = indexAxis === 'x' ? 'y' : 'x';
+	}
+	return axis;
+}
+
+function getDefaultScaleIDFromAxis(axis, indexAxis) {
+	return axis === indexAxis ? '_index_' : '_value_';
+}
+
 function mergeScaleConfig(config, options) {
 	options = options || {};
 	const chartDefaults = defaults[config.type] || {scales: {}};
 	const configScales = options.scales || {};
+	const chartIndexAxis = getIndexAxis(config.type, options);
 	const firstIDs = {};
 	const scales = {};
 
 	// First figure out first scale id's per axis.
-	// Note: for now, axis is determined from first letter of scale id!
 	Object.keys(configScales).forEach(id => {
-		const axis = id[0];
+		const scaleConf = configScales[id];
+		const axis = determineAxis(id, scaleConf);
+		const defaultId = getDefaultScaleIDFromAxis(axis, chartIndexAxis);
 		firstIDs[axis] = firstIDs[axis] || id;
-		scales[id] = mergeIf({}, [configScales[id], chartDefaults.scales[axis]]);
+		scales[id] = mergeIf({axis}, [scaleConf, chartDefaults.scales[axis], chartDefaults.scales[defaultId]]);
 	});
 
 	// Backward compatibility
 	if (options.scale) {
-		scales[options.scale.id || 'r'] = mergeIf({}, [options.scale, chartDefaults.scales.r]);
+		scales[options.scale.id || 'r'] = mergeIf({axis: 'r'}, [options.scale, chartDefaults.scales.r]);
 		firstIDs.r = firstIDs.r || options.scale.id || 'r';
 	}
 
 	// Then merge dataset defaults to scale configs
 	config.data.datasets.forEach(dataset => {
-		const datasetDefaults = defaults[dataset.type || config.type] || {scales: {}};
+		const type = dataset.type || config.type;
+		const indexAxis = dataset.indexAxis || getIndexAxis(type, options);
+		const datasetDefaults = defaults[type] || {};
 		const defaultScaleOptions = datasetDefaults.scales || {};
 		Object.keys(defaultScaleOptions).forEach(defaultID => {
-			const id = dataset[defaultID + 'AxisID'] || firstIDs[defaultID] || defaultID;
+			const axis = getAxisFromDefaultScaleID(defaultID, indexAxis);
+			const id = dataset[axis + 'AxisID'] || firstIDs[axis] || axis;
 			scales[id] = scales[id] || {};
-			mergeIf(scales[id], [
-				configScales[id],
-				defaultScaleOptions[defaultID]
-			]);
+			mergeIf(scales[id], [{axis}, configScales[id], defaultScaleOptions[defaultID]]);
 		});
 	});
 
@@ -122,9 +146,25 @@ function updateConfig(chart) {
 	chart._animationsDisabled = isAnimationDisabled(newOptions);
 }
 
-const KNOWN_POSITIONS = new Set(['top', 'bottom', 'left', 'right', 'chartArea']);
+const KNOWN_POSITIONS = ['top', 'bottom', 'left', 'right', 'chartArea'];
 function positionIsHorizontal(position, axis) {
-	return position === 'top' || position === 'bottom' || (!KNOWN_POSITIONS.has(position) && axis === 'x');
+	return position === 'top' || position === 'bottom' || (KNOWN_POSITIONS.indexOf(position) === -1 && axis === 'x');
+}
+
+function axisFromPosition(position) {
+	if (position === 'top' || position === 'bottom') {
+		return 'x';
+	}
+	if (position === 'left' || position === 'right') {
+		return 'y';
+	}
+}
+
+function determineAxis(id, scaleOptions) {
+	if (id === 'x' || id === 'y' || id === 'r') {
+		return id;
+	}
+	return scaleOptions.axis || axisFromPosition(scaleOptions.position) || id.charAt(0).toLowerCase();
 }
 
 function compare2Level(l1, l2) {
@@ -218,8 +258,7 @@ class Chart {
 		this.currentDevicePixelRatio = undefined;
 		this.chartArea = undefined;
 		this.data = undefined;
-		this.active = undefined;
-		this.lastActive = [];
+		this._active = [];
 		this._lastEvent = undefined;
 		/** @type {{attach?: function, detach?: function, resize?: function}} */
 		this._listeners = {};
@@ -230,7 +269,7 @@ class Chart {
 		this.$plugins = undefined;
 		this.$proxies = {};
 		this._hiddenIndices = {};
-		this.attached = true;
+		this.attached = false;
 
 		// Add the chart instance to the global namespace
 		Chart.instances[me.id] = me;
@@ -334,16 +373,13 @@ class Chart {
 		retinaScale(me, newRatio);
 
 		if (!silent) {
-			// Notify any plugins about the resize
 			plugins.notify(me, 'resize', [newSize]);
 
-			// Notify of resize
-			if (options.onResize) {
-				options.onResize(me, newSize);
-			}
+			callCallback(options.onResize, [newSize], me);
 
-			// Only apply 'resize' mode if we are attached, else do a regular update.
-			me.update(me.attached && 'resize');
+			if (me.attached) {
+				me.update('resize');
+			}
 		}
 	}
 
@@ -377,12 +413,13 @@ class Chart {
 
 		if (scaleOpts) {
 			items = items.concat(
-				Object.keys(scaleOpts).map((axisID) => {
-					const axisOptions = scaleOpts[axisID];
-					const isRadial = axisID.charAt(0).toLowerCase() === 'r';
-					const isHorizontal = axisID.charAt(0).toLowerCase() === 'x';
+				Object.keys(scaleOpts).map((id) => {
+					const scaleOptions = scaleOpts[id];
+					const axis = determineAxis(id, scaleOptions);
+					const isRadial = axis === 'r';
+					const isHorizontal = axis === 'x';
 					return {
-						options: axisOptions,
+						options: scaleOptions,
 						dposition: isRadial ? 'chartArea' : isHorizontal ? 'bottom' : 'left',
 						dtype: isRadial ? 'radialLinear' : isHorizontal ? 'category' : 'linear'
 					};
@@ -393,9 +430,10 @@ class Chart {
 		each(items, (item) => {
 			const scaleOptions = item.options;
 			const id = scaleOptions.id;
+			const axis = determineAxis(id, scaleOptions);
 			const scaleType = valueOrDefault(scaleOptions.type, item.dtype);
 
-			if (scaleOptions.position === undefined || positionIsHorizontal(scaleOptions.position, scaleOptions.axis || id[0]) !== positionIsHorizontal(item.dposition)) {
+			if (scaleOptions.position === undefined || positionIsHorizontal(scaleOptions.position, axis) !== positionIsHorizontal(item.dposition)) {
 				scaleOptions.position = item.dposition;
 			}
 
@@ -489,6 +527,7 @@ class Chart {
 				meta = me.getDatasetMeta(i);
 			}
 			meta.type = type;
+			meta.indexAxis = dataset.indexAxis || getIndexAxis(type, me.options);
 			meta.order = dataset.order || 0;
 			me._updateMetasetIndex(meta, i);
 			meta.label = '' + dataset.label;
@@ -1030,19 +1069,19 @@ class Chart {
 	/**
 	 * @private
 	 */
-	_updateHoverStyles() {
+	_updateHoverStyles(active, lastActive) {
 		const me = this;
 		const options = me.options || {};
 		const hoverOptions = options.hover;
 
 		// Remove styling for last active (even if it may still be active)
-		if (me.lastActive.length) {
-			me.updateHoverStyle(me.lastActive, hoverOptions.mode, false);
+		if (lastActive.length) {
+			me.updateHoverStyle(lastActive, hoverOptions.mode, false);
 		}
 
 		// Built-in hover styling
-		if (me.active.length && hoverOptions.mode) {
-			me.updateHoverStyle(me.active, hoverOptions.mode, true);
+		if (active.length && hoverOptions.mode) {
+			me.updateHoverStyle(active, hoverOptions.mode, true);
 		}
 	}
 
@@ -1074,6 +1113,7 @@ class Chart {
 	 */
 	_handleEvent(e, replay) {
 		const me = this;
+		const lastActive = me._active || [];
 		const options = me.options;
 		const hoverOptions = options.hover;
 
@@ -1092,35 +1132,31 @@ class Chart {
 		// - it would be expensive.
 		const useFinalPosition = replay;
 
+		let active = [];
 		let changed = false;
 
 		// Find Active Elements for hover and tooltips
 		if (e.type === 'mouseout') {
-			me.active = [];
 			me._lastEvent = null;
 		} else {
-			me.active = me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions, useFinalPosition);
+			active = me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions, useFinalPosition);
 			me._lastEvent = e.type === 'click' ? me._lastEvent : e;
 		}
 
 		// Invoke onHover hook
-		// Need to call with native event here to not break backwards compatibility
-		callCallback(options.onHover || options.hover.onHover, [e.native, me.active, me], me);
+		callCallback(options.onHover || options.hover.onHover, [e, active, me], me);
 
 		if (e.type === 'mouseup' || e.type === 'click') {
 			if (_isPointInArea(e, me.chartArea)) {
-				// Use e.native here for backwards compatibility
-				callCallback(options.onClick, [e, me.active, me], me);
+				callCallback(options.onClick, [e, active, me], me);
 			}
 		}
 
-		changed = !_elementsEqual(me.active, me.lastActive);
+		changed = !_elementsEqual(active, lastActive);
 		if (changed || replay) {
-			me._updateHoverStyles();
+			me._active = active;
+			me._updateHoverStyles(active, lastActive);
 		}
-
-		// Remember Last Actives
-		me.lastActive = me.active;
 
 		return changed;
 	}

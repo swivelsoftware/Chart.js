@@ -1,6 +1,5 @@
 /* eslint-disable import/no-commonjs */
 
-const babel = require('rollup-plugin-babel');
 const commonjs = require('@rollup/plugin-commonjs');
 const json = require('@rollup/plugin-json');
 const resolve = require('@rollup/plugin-node-resolve').default;
@@ -22,7 +21,7 @@ module.exports = function(karma) {
 	// better with source mapping. In other cases, pick the minified build to
 	// make sure that the minification process (terser) doesn't break anything.
 	const regex = karma.autoWatch ? /chart\.js$/ : /chart\.min\.js$/;
-	const build = builds.filter(v => v.output.file.match(regex))[0];
+	const build = builds.filter(v => v.output.file && v.output.file.match(regex))[0];
 
 	karma.set({
 		frameworks: ['jasmine'],
@@ -81,7 +80,6 @@ module.exports = function(karma) {
 			plugins: [
 				json(),
 				resolve(),
-				babel({exclude: 'node_modules/**'}), // use babel since we have ES proposal features
 				commonjs({exclude: ['src/**', 'test/**']}),
 				webWorkerLoader()
 			],
