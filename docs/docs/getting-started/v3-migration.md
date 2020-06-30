@@ -185,6 +185,7 @@ Animation system was completely rewritten in Chart.js v3. Each property can now 
 #### Tooltip
 
 * `xLabel` and `yLabel` were removed. Please use `index` and `value`
+* The `filter` option will now be passed additional parameters when called and should have the method signature `function(tooltipItem, index, tooltipItems, data)`
 
 ## Developer migration
 
@@ -287,6 +288,7 @@ The following properties and methods were removed:
 
 #### Scales
 
+* `LinearScaleBase.handleDirectionalChanges`
 * `LogarithmicScale.minNotZero`
 * `Scale.getRightValue`
 * `Scale.longestLabelWidth`
@@ -409,6 +411,7 @@ The APIs listed in this section have changed in signature or behaviour from vers
 * `Scale.convertTicksToLabels` was renamed to `generateTickLabels`. It is now expected to set the label property on the ticks given as input
 * `Scale.ticks` now contains objects instead of strings
 * When the `autoSkip` option is enabled, `Scale.ticks` now contains only the non-skipped ticks instead of all ticks.
+* Ticks are now always generated in monotonically increasing order
 
 ##### Time Scale
 

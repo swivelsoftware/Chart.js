@@ -603,7 +603,7 @@ export class Tooltip extends Element {
 
 		// If the user provided a filter function, use it to modify the tooltip items
 		if (options.filter) {
-			tooltipItems = tooltipItems.filter((a) => options.filter(a, data));
+			tooltipItems = tooltipItems.filter((element, index, array) => options.filter(element, index, array, data));
 		}
 
 		// If the user provided a sorting function, use it to modify the tooltip items
@@ -695,13 +695,20 @@ export class Tooltip extends Element {
 			if (xAlign === 'left') {
 				x1 = ptX;
 				x2 = x1 - caretSize;
+
+				// Left draws bottom -> top, this y1 is on the bottom
+				y1 = y2 + caretSize;
+				y3 = y2 - caretSize;
 			} else {
 				x1 = ptX + width;
 				x2 = x1 + caretSize;
+
+				// Right draws top -> bottom, thus y1 is on the top
+				y1 = y2 - caretSize;
+				y3 = y2 + caretSize;
 			}
+
 			x3 = x1;
-			y1 = y2 + caretSize;
-			y3 = y2 - caretSize;
 		} else {
 			if (xAlign === 'left') {
 				x2 = ptX + cornerRadius + (caretSize);
@@ -710,14 +717,21 @@ export class Tooltip extends Element {
 			} else {
 				x2 = this.caretX;
 			}
-			x1 = x2 - caretSize;
-			x3 = x2 + caretSize;
+
 			if (yAlign === 'top') {
 				y1 = ptY;
 				y2 = y1 - caretSize;
+
+				// Top draws left -> right, thus x1 is on the left
+				x1 = x2 - caretSize;
+				x3 = x2 + caretSize;
 			} else {
 				y1 = ptY + height;
 				y2 = y1 + caretSize;
+
+				// Bottom draws right -> left, thus x1 is on the right
+				x1 = x2 + caretSize;
+				x3 = x2 - caretSize;
 			}
 			y3 = y1;
 		}
@@ -1063,8 +1077,14 @@ export class Tooltip extends Element {
 			}
 		}
 
+		// When there are multiple items shown, but the tooltip position is nearest mode
+		// an update may need to be made because our position may have changed even though
+		// the items are the same as before.
+		const position = positioners[options.position].call(me, active, e);
+		const positionChanged = this.caretX !== position.x || this.caretY !== position.y;
+
 		// Remember Last Actives
-		changed = replay || !_elementsEqual(active, lastActive);
+		changed = replay || !_elementsEqual(active, lastActive) || positionChanged;
 
 		// Only handle target event on tooltip change
 		if (changed) {
