@@ -4,7 +4,7 @@ title: Tooltip
 
 ## Tooltip Configuration
 
-The tooltip configuration is passed into the `options.tooltips` namespace. The global options for the chart tooltips is defined in `Chart.defaults.tooltips`.
+The tooltip configuration is passed into the `options.tooltips` namespace. The global options for the chart tooltips is defined in `Chart.defaults.plugins.tooltip`.
 
 | Name | Type | Default | Description
 | ---- | ---- | ------- | -----------
@@ -17,14 +17,14 @@ The tooltip configuration is passed into the `options.tooltips` namespace. The g
 | `itemSort` | `function` | | Sort tooltip items. [more...](#sort-callback)
 | `filter` | `function` | | Filter tooltip items. [more...](#filter-callback)
 | `backgroundColor` | `Color` | `'rgba(0, 0, 0, 0.8)'` | Background color of the tooltip.
-| `titleFont` | `Font` | `{style: 'bold', color: '#fff'}` | See [Fonts](fonts.md).
+| `titleFont` | `Font` | `{style: 'bold', color: '#fff'}` | See [Fonts](../general/fonts.md).
 | `titleAlign` | `string` | `'left'` | Horizontal alignment of the title text lines. [more...](#alignment)
 | `titleSpacing` | `number` | `2` | Spacing to add to top and bottom of each title line.
 | `titleMarginBottom` | `number` | `6` | Margin to add on bottom of title section.
-| `bodyFont` | `Font` | `{color: '#fff'}` | See [Fonts](fonts.md).
+| `bodyFont` | `Font` | `{color: '#fff'}` | See [Fonts](../general/fonts.md).
 | `bodyAlign` | `string` | `'left'` | Horizontal alignment of the body text lines. [more...](#alignment)
 | `bodySpacing` | `number` | `2` | Spacing to add to top and bottom of each tooltip item.
-| `footerFont` | `Font` | `{style: 'bold', color: '#fff'}` | See [Fonts](fonts.md).
+| `footerFont` | `Font` | `{style: 'bold', color: '#fff'}` | See [Fonts](../general/fonts.md).
 | `footerAlign` | `string` | `'left'` | Horizontal alignment of the footer text lines. [more...](#alignment)
 | `footerSpacing` | `number` | `2` | Spacing to add to top and bottom of each footer line.
 | `footerMarginTop` | `number` | `6` | Margin to add before drawing the footer.
@@ -63,7 +63,7 @@ Example:
  * @param eventPosition {Point} the position of the event in canvas coordinates
  * @returns {Point} the tooltip position
  */
-const tooltipPlugin = Chart.plugins.getAll().find(p => p.id === 'tooltip');
+const tooltipPlugin = Chart.registry.getPlugin('tooltip');
 tooltipPlugin.positioners.custom = function(elements, eventPosition) {
     /** @type {Tooltip} */
     var tooltip = this;
@@ -99,7 +99,7 @@ Allows filtering of [tooltip items](#tooltip-item-interface). Must implement at 
 
 The tooltip label configuration is nested below the tooltip configuration using the `callbacks` key. The tooltip has the following callbacks for providing text. For all functions, `this` will be the tooltip object created from the `Tooltip` constructor.
 
-All functions are called with the same arguments: a [tooltip item](#tooltip-item-interface) and the `data` object passed to the chart. All functions must return either a string or an array of strings. Arrays of strings are treated as multiple lines of text.
+All functions are called with the same arguments: a [tooltip item context](#tooltip-item-interface). All functions must return either a string or an array of strings. Arrays of strings are treated as multiple lines of text.
 
 | Name | Arguments | Description
 | ---- | --------- | -----------
@@ -128,14 +128,14 @@ var chart = new Chart(ctx, {
     options: {
         tooltips: {
             callbacks: {
-                label: function(tooltipItem, data) {
-                    var label = data.datasets[tooltipItem.datasetIndex].label || '';
+                label: function(context) {
+                    var label = context.dataset.label || '';
 
                     if (label) {
                         label += ': ';
                     }
-                    if (!helpers.isNullOrUndef(tooltipItem.value)) {
-                        label += '$' + tooltipItem.value;
+                    if (!isNaN(context.dataPoint.y)) {
+                        label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.dataPoint.y);
                     }
                     return label;
                 }
@@ -156,13 +156,13 @@ var chart = new Chart(ctx, {
     options: {
         tooltips: {
             callbacks: {
-                labelColor: function(tooltipItem, chart) {
+                labelColor: function(context) {
                     return {
                         borderColor: 'rgb(255, 0, 0)',
                         backgroundColor: 'rgb(255, 0, 0)'
                     };
                 },
-                labelTextColor: function(tooltipItem, chart) {
+                labelTextColor: function(context) {
                     return '#543453';
                 }
             }
@@ -172,29 +172,41 @@ var chart = new Chart(ctx, {
 ```
 
 
-### Tooltip Item Interface
+### Tooltip Item Context
 
 The tooltip items passed to the tooltip callbacks implement the following interface.
 
 ```javascript
 {
+    // The chart the tooltip is being shown on
+    chart: Chart
+
     // Label for the tooltip
     label: string,
 
-    // Value for the tooltip
-    value: string,
+    // Parsed data values for the given `dataIndex` and `datasetIndex`
+    dataPoint: object,
+
+    // Formatted value for the tooltip
+    formattedValue: string,
+
+    // The dataset the item comes from
+    dataset: object
 
     // Index of the dataset the item comes from
     datasetIndex: number,
 
     // Index of this data item in the dataset
-    index: number
+    dataIndex: number,
+
+    // The chart element (point, arc, bar, etc.) for this tooltip item
+    element: Element,
 }
 ```
 
 ## External (Custom) Tooltips
 
-Custom tooltips allow you to hook into the tooltip rendering process so that you can render the tooltip in your own custom way. Generally this is used to create an HTML tooltip instead of an oncanvas one. You can enable custom tooltips in the global or chart configuration like so:
+Custom tooltips allow you to hook into the tooltip rendering process so that you can render the tooltip in your own custom way. Generally this is used to create an HTML tooltip instead of an on-canvas tooltip. The `custom` option takes a function which is passed a context parameter containing the `chart` and `tooltip`. You can enable custom tooltips in the global or chart configuration like so:
 
 ```javascript
 var myPieChart = new Chart(ctx, {
@@ -205,7 +217,7 @@ var myPieChart = new Chart(ctx, {
             // Disable the on-canvas tooltip
             enabled: false,
 
-            custom: function(tooltipModel) {
+            custom: function(context) {
                 // Tooltip Element
                 var tooltipEl = document.getElementById('chartjs-tooltip');
 
@@ -218,6 +230,7 @@ var myPieChart = new Chart(ctx, {
                 }
 
                 // Hide if no tooltip
+                var tooltipModel = context.tooltip;
                 if (tooltipModel.opacity === 0) {
                     tooltipEl.style.opacity = 0;
                     return;
@@ -261,8 +274,7 @@ var myPieChart = new Chart(ctx, {
                     tableRoot.innerHTML = innerHtml;
                 }
 
-                // `this` will be the overall tooltip
-                var position = this._chart.canvas.getBoundingClientRect();
+                var position = context.chart.canvas.getBoundingClientRect();
 
                 // Display, position, and set styles for font
                 tooltipEl.style.opacity = 1;
@@ -290,8 +302,6 @@ The tooltip model contains parameters that can be used to render the tooltip.
     dataPoints: TooltipItem[],
 
     // Positioning
-    xPadding: number,
-    yPadding: number,
     xAlign: string,
     yAlign: string,
 
@@ -315,31 +325,14 @@ The tooltip model contains parameters that can be used to render the tooltip.
     beforeBody: string[],
     // line of text that appear after the body and before the footer
     afterBody: string[],
-    bodyFont: Font,
-    _bodyAlign: string,
-    bodySpacing: number,
 
     // Title
     // lines of text that form the title
     title: string[],
-    titleFont: Font,
-    _titleAlign: string,
-    titleSpacing: number,
-    titleMarginBottom: number,
 
     // Footer
     // lines of text that form the footer
     footer: string[],
-    footerFont: Font,
-    _footerAlign: string,
-    footerSpacing: number,
-    footerMarginTop: number,
-
-    // Appearance
-    caretSize: number,
-    caretPadding: number,
-    cornerRadius: number,
-    backgroundColor: Color,
 
     // colors to render for each item in body[]. This is the color of the squares in the tooltip
     labelColors: Color[],
@@ -347,9 +340,8 @@ The tooltip model contains parameters that can be used to render the tooltip.
 
     // 0 opacity is a hidden tooltip
     opacity: number,
-    multiKeyBackground: Color,
-    displayColors: boolean,
-    borderColor: Color,
-    borderWidth: number
+
+    // tooltip options
+    options : Object
 }
 ```

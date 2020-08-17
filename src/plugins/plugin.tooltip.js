@@ -1,9 +1,8 @@
 import Animations from '../core/core.animations';
 import defaults from '../core/core.defaults';
 import Element from '../core/core.element';
-import plugins from '../core/core.plugins';
 import {drawPoint} from '../helpers/helpers.canvas';
-import {valueOrDefault, each, noop, isNullOrUndef, isArray, _elementsEqual} from '../helpers/helpers.core';
+import {valueOrDefault, each, noop, isNullOrUndef, isArray, _elementsEqual, merge} from '../helpers/helpers.core';
 import {getRtlAdapter, overrideTextDirection, restoreTextDirection} from '../helpers/helpers.rtl';
 import {distanceBetweenPoints} from '../helpers/helpers.math';
 import {toFont} from '../helpers/helpers.options';
@@ -11,114 +10,6 @@ import {toFont} from '../helpers/helpers.options';
 /**
  * @typedef { import("../platform/platform.base").IEvent } IEvent
  */
-
-defaults.set('tooltips', {
-	enabled: true,
-	custom: null,
-	mode: 'nearest',
-	position: 'average',
-	intersect: true,
-	backgroundColor: 'rgba(0,0,0,0.8)',
-	titleFont: {
-		style: 'bold',
-		color: '#fff',
-	},
-	titleSpacing: 2,
-	titleMarginBottom: 6,
-	titleAlign: 'left',
-	bodySpacing: 2,
-	bodyFont: {
-		color: '#fff',
-	},
-	bodyAlign: 'left',
-	footerSpacing: 2,
-	footerMarginTop: 6,
-	footerFont: {
-		color: '#fff',
-		style: 'bold',
-	},
-	footerAlign: 'left',
-	yPadding: 6,
-	xPadding: 6,
-	caretPadding: 2,
-	caretSize: 5,
-	cornerRadius: 6,
-	multiKeyBackground: '#fff',
-	displayColors: true,
-	borderColor: 'rgba(0,0,0,0)',
-	borderWidth: 0,
-	animation: {
-		duration: 400,
-		easing: 'easeOutQuart',
-		numbers: {
-			type: 'number',
-			properties: ['x', 'y', 'width', 'height', 'caretX', 'caretY'],
-		},
-		opacity: {
-			easing: 'linear',
-			duration: 200
-		}
-	},
-	callbacks: {
-		// Args are: (tooltipItems, data)
-		beforeTitle: noop,
-		title(tooltipItems, data) {
-			let title = '';
-			const labels = data.labels;
-			const labelCount = labels ? labels.length : 0;
-
-			if (tooltipItems.length > 0) {
-				const item = tooltipItems[0];
-				if (item.label) {
-					title = item.label;
-				} else if (labelCount > 0 && item.index < labelCount) {
-					title = labels[item.index];
-				}
-			}
-
-			return title;
-		},
-		afterTitle: noop,
-
-		// Args are: (tooltipItems, data)
-		beforeBody: noop,
-
-		// Args are: (tooltipItem, data)
-		beforeLabel: noop,
-		label(tooltipItem, data) {
-			let label = data.datasets[tooltipItem.datasetIndex].label || '';
-
-			if (label) {
-				label += ': ';
-			}
-			const value = tooltipItem.value;
-			if (!isNullOrUndef(value)) {
-				label += value;
-			}
-			return label;
-		},
-		labelColor(tooltipItem, chart) {
-			const meta = chart.getDatasetMeta(tooltipItem.datasetIndex);
-			const options = meta.controller.getStyle(tooltipItem.index);
-			return {
-				borderColor: options.borderColor,
-				backgroundColor: options.backgroundColor
-			};
-		},
-		labelTextColor() {
-			return this.options.bodyFont.color;
-		},
-		afterLabel: noop,
-
-		// Args are: (tooltipItems, data)
-		afterBody: noop,
-
-		// Args are: (tooltipItems, data)
-		beforeFooter: noop,
-		footer: noop,
-		afterFooter: noop
-	}
-});
 
 const positioners = {
 	/**
@@ -222,32 +113,38 @@ function splitNewlines(str) {
 
 /**
  * Private helper to create a tooltip item model
- * @param item - the chart element (point, arc, bar) to create the tooltip item for
+ * @param item - {element, index, datasetIndex} to create the tooltip item for
  * @return new tooltip item
  */
 function createTooltipItem(chart, item) {
-	const {datasetIndex, index} = item;
-	const {label, value} = chart.getDatasetMeta(datasetIndex).controller.getLabelAndValue(index);
+	const {element, datasetIndex, index} = item;
+	const controller = chart.getDatasetMeta(datasetIndex).controller;
+	const {label, value} = controller.getLabelAndValue(index);
 
 	return {
+		chart,
 		label,
-		value,
-		index,
-		datasetIndex
+		dataPoint: controller.getParsed(index),
+		formattedValue: value,
+		dataset: controller.getDataset(),
+		dataIndex: index,
+		datasetIndex,
+		element
 	};
 }
 
 /**
  * Helper to get the reset model for the tooltip
  * @param options {object} the tooltip options
+ * @param fallbackFont {object} the fallback font options
  */
-function resolveOptions(options) {
+function resolveOptions(options, fallbackFont) {
 
-	options = Object.assign({}, defaults.tooltips, options);
+	options = merge({}, [defaults.plugins.tooltip, options]);
 
-	options.bodyFont = toFont(options.bodyFont);
-	options.titleFont = toFont(options.titleFont);
-	options.footerFont = toFont(options.footerFont);
+	options.bodyFont = toFont(options.bodyFont, fallbackFont);
+	options.titleFont = toFont(options.titleFont, fallbackFont);
+	options.footerFont = toFont(options.footerFont, fallbackFont);
 
 	options.boxHeight = valueOrDefault(options.boxHeight, options.bodyFont.size);
 	options.boxWidth = valueOrDefault(options.boxWidth, options.bodyFont.size);
@@ -493,7 +390,8 @@ export class Tooltip extends Element {
 
 	initialize() {
 		const me = this;
-		me.options = resolveOptions(me._chart.options.tooltips);
+		const chartOpts = me._chart.options;
+		me.options = resolveOptions(chartOpts.tooltips, chartOpts.font);
 	}
 
 	/**
@@ -508,23 +406,22 @@ export class Tooltip extends Element {
 		}
 
 		const chart = me._chart;
-		const opts = chart.options.animation && me.options.animation;
+		const options = me.options;
+		const opts = options.enabled && chart.options.animation && options.animation;
 		const animations = new Animations(me._chart, opts);
 		me._cachedAnimations = Object.freeze(animations);
 
 		return animations;
 	}
 
-	// Get the title
-	// Args are: (tooltipItem, data)
-	getTitle(tooltipitem, data) {
+	getTitle(context) {
 		const me = this;
 		const opts = me.options;
 		const callbacks = opts.callbacks;
 
-		const beforeTitle = callbacks.beforeTitle.apply(me, [tooltipitem, data]);
-		const title = callbacks.title.apply(me, [tooltipitem, data]);
-		const afterTitle = callbacks.afterTitle.apply(me, [tooltipitem, data]);
+		const beforeTitle = callbacks.beforeTitle.apply(me, [context]);
+		const title = callbacks.title.apply(me, [context]);
+		const afterTitle = callbacks.afterTitle.apply(me, [context]);
 
 		let lines = [];
 		lines = pushOrConcat(lines, splitNewlines(beforeTitle));
@@ -534,26 +431,24 @@ export class Tooltip extends Element {
 		return lines;
 	}
 
-	// Args are: (tooltipItem, data)
-	getBeforeBody(tooltipitem, data) {
-		return getBeforeAfterBodyLines(this.options.callbacks.beforeBody.apply(this, [tooltipitem, data]));
+	getBeforeBody(tooltipItems) {
+		return getBeforeAfterBodyLines(this.options.callbacks.beforeBody.apply(this, [tooltipItems]));
 	}
 
-	// Args are: (tooltipItem, data)
-	getBody(tooltipItems, data) {
+	getBody(tooltipItems) {
 		const me = this;
 		const callbacks = me.options.callbacks;
 		const bodyItems = [];
 
-		each(tooltipItems, (tooltipItem) => {
+		each(tooltipItems, (context) => {
 			const bodyItem = {
 				before: [],
 				lines: [],
 				after: []
 			};
-			pushOrConcat(bodyItem.before, splitNewlines(callbacks.beforeLabel.call(me, tooltipItem, data)));
-			pushOrConcat(bodyItem.lines, callbacks.label.call(me, tooltipItem, data));
-			pushOrConcat(bodyItem.after, splitNewlines(callbacks.afterLabel.call(me, tooltipItem, data)));
+			pushOrConcat(bodyItem.before, splitNewlines(callbacks.beforeLabel.call(me, context)));
+			pushOrConcat(bodyItem.lines, callbacks.label.call(me, context));
+			pushOrConcat(bodyItem.after, splitNewlines(callbacks.afterLabel.call(me, context)));
 
 			bodyItems.push(bodyItem);
 		});
@@ -561,20 +456,18 @@ export class Tooltip extends Element {
 		return bodyItems;
 	}
 
-	// Args are: (tooltipItem, data)
-	getAfterBody(tooltipitem, data) {
-		return getBeforeAfterBodyLines(this.options.callbacks.afterBody.apply(this, [tooltipitem, data]));
+	getAfterBody(tooltipItems) {
+		return getBeforeAfterBodyLines(this.options.callbacks.afterBody.apply(this, [tooltipItems]));
 	}
 
 	// Get the footer and beforeFooter and afterFooter lines
-	// Args are: (tooltipItem, data)
-	getFooter(tooltipitem, data) {
+	getFooter(tooltipItems) {
 		const me = this;
 		const callbacks = me.options.callbacks;
 
-		const beforeFooter = callbacks.beforeFooter.apply(me, [tooltipitem, data]);
-		const footer = callbacks.footer.apply(me, [tooltipitem, data]);
-		const afterFooter = callbacks.afterFooter.apply(me, [tooltipitem, data]);
+		const beforeFooter = callbacks.beforeFooter.apply(me, [tooltipItems]);
+		const footer = callbacks.footer.apply(me, [tooltipItems]);
+		const afterFooter = callbacks.afterFooter.apply(me, [tooltipItems]);
 
 		let lines = [];
 		lines = pushOrConcat(lines, splitNewlines(beforeFooter));
@@ -612,9 +505,9 @@ export class Tooltip extends Element {
 		}
 
 		// Determine colors for boxes
-		each(tooltipItems, (tooltipItem) => {
-			labelColors.push(options.callbacks.labelColor.call(me, tooltipItem, me._chart));
-			labelTextColors.push(options.callbacks.labelTextColor.call(me, tooltipItem, me._chart));
+		each(tooltipItems, (context) => {
+			labelColors.push(options.callbacks.labelColor.call(me, context));
+			labelTextColors.push(options.callbacks.labelTextColor.call(me, context));
 		});
 
 		me.labelColors = labelColors;
@@ -636,15 +529,14 @@ export class Tooltip extends Element {
 				};
 			}
 		} else {
-			const data = me._chart.data;
 			const position = positioners[options.position].call(me, active, me._eventPosition);
 			const tooltipItems = me._createItems();
 
-			me.title = me.getTitle(tooltipItems, data);
-			me.beforeBody = me.getBeforeBody(tooltipItems, data);
-			me.body = me.getBody(tooltipItems, data);
-			me.afterBody = me.getAfterBody(tooltipItems, data);
-			me.footer = me.getFooter(tooltipItems, data);
+			me.title = me.getTitle(tooltipItems);
+			me.beforeBody = me.getBeforeBody(tooltipItems);
+			me.body = me.getBody(tooltipItems);
+			me.afterBody = me.getAfterBody(tooltipItems);
+			me.footer = me.getFooter(tooltipItems);
 
 			const size = me._size = getTooltipSize(me);
 			const positionAndSize = Object.assign({}, position, size);
@@ -670,7 +562,7 @@ export class Tooltip extends Element {
 		}
 
 		if (changed && options.custom) {
-			options.custom.call(me, [me]);
+			options.custom.call(me, {chart: me._chart, tooltip: me});
 		}
 	}
 
@@ -1141,7 +1033,7 @@ export default {
 			tooltip
 		};
 
-		if (plugins.notify(chart, 'beforeTooltipDraw', [args]) === false) {
+		if (chart._plugins.notify(chart, 'beforeTooltipDraw', [args]) === false) {
 			return;
 		}
 
@@ -1149,7 +1041,7 @@ export default {
 			tooltip.draw(chart.ctx);
 		}
 
-		plugins.notify(chart, 'afterTooltipDraw', [args]);
+		chart._plugins.notify(chart, 'afterTooltipDraw', [args]);
 	},
 
 	afterEvent(chart, e, replay) {
@@ -1158,5 +1050,111 @@ export default {
 			const useFinalPosition = replay;
 			chart.tooltip.handleEvent(e, useFinalPosition);
 		}
-	}
+	},
+
+	defaults: {
+		enabled: true,
+		custom: null,
+		mode: 'nearest',
+		position: 'average',
+		intersect: true,
+		backgroundColor: 'rgba(0,0,0,0.8)',
+		titleFont: {
+			style: 'bold',
+			color: '#fff',
+		},
+		titleSpacing: 2,
+		titleMarginBottom: 6,
+		titleAlign: 'left',
+		bodySpacing: 2,
+		bodyFont: {
+			color: '#fff',
+		},
+		bodyAlign: 'left',
+		footerSpacing: 2,
+		footerMarginTop: 6,
+		footerFont: {
+			color: '#fff',
+			style: 'bold',
+		},
+		footerAlign: 'left',
+		yPadding: 6,
+		xPadding: 6,
+		caretPadding: 2,
+		caretSize: 5,
+		cornerRadius: 6,
+		multiKeyBackground: '#fff',
+		displayColors: true,
+		borderColor: 'rgba(0,0,0,0)',
+		borderWidth: 0,
+		animation: {
+			duration: 400,
+			easing: 'easeOutQuart',
+			numbers: {
+				type: 'number',
+				properties: ['x', 'y', 'width', 'height', 'caretX', 'caretY'],
+			},
+			opacity: {
+				easing: 'linear',
+				duration: 200
+			}
+		},
+		callbacks: {
+			// Args are: (tooltipItems, data)
+			beforeTitle: noop,
+			title(tooltipItems) {
+				if (tooltipItems.length > 0) {
+					const item = tooltipItems[0];
+					const labels = item.chart.data.labels;
+					const labelCount = labels ? labels.length : 0;
+					if (item.label) {
+						return item.label;
+					} else if (labelCount > 0 && item.dataIndex < labelCount) {
+						return labels[item.dataIndex];
+					}
+				}
+
+				return '';
+			},
+			afterTitle: noop,
+
+			// Args are: (tooltipItems, data)
+			beforeBody: noop,
+
+			// Args are: (tooltipItem, data)
+			beforeLabel: noop,
+			label(tooltipItem) {
+				let label = tooltipItem.dataset.label || '';
+
+				if (label) {
+					label += ': ';
+				}
+				const value = tooltipItem.formattedValue;
+				if (!isNullOrUndef(value)) {
+					label += value;
+				}
+				return label;
+			},
+			labelColor(tooltipItem) {
+				const meta = tooltipItem.chart.getDatasetMeta(tooltipItem.datasetIndex);
+				const options = meta.controller.getStyle(tooltipItem.dataIndex);
+				return {
+					borderColor: options.borderColor,
+					backgroundColor: options.backgroundColor
+				};
+			},
+			labelTextColor() {
+				return this.options.bodyFont.color;
+			},
+			afterLabel: noop,
+
+			// Args are: (tooltipItems, data)
+			afterBody: noop,
+
+			// Args are: (tooltipItems, data)
+			beforeFooter: noop,
+			footer: noop,
+			afterFooter: noop
+		}
+	},
 };

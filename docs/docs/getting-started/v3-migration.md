@@ -12,6 +12,7 @@ Chart.js 3.0 introduces a number of breaking changes. Chart.js 2.0 was released 
 * API documentation generated and verified by TypeDoc
 * No more CSS injection
 * Tons of bug fixes
+* Tree shaking
 
 ## End user migration
 
@@ -19,7 +20,33 @@ Chart.js 3.0 introduces a number of breaking changes. Chart.js 2.0 was released 
 
 * Distributed files are now in lower case. For example: `dist/chart.js`.
 * Chart.js is no longer providing the `Chart.bundle.js` and `Chart.bundle.min.js`. Please see the [installation](installation.md) and [integration](integration.md) docs for details on the recommended way to setup Chart.js if you were using these builds.
-* `moment` is no longer specified as an npm dependency. If you are using the time scale, you must include one of [the available adapters](https://github.com/chartjs/awesome#adapters) and corresponding date library. You no longer need to exclude moment from your build.
+* `moment` is no longer specified as an npm dependency. If you are using the `time` or `timeseries` scales, you must include one of [the available adapters](https://github.com/chartjs/awesome#adapters) and corresponding date library. You no longer need to exclude moment from your build.
+* Chart.js 3 is tree-shakeable. So if you are using it as an `npm` module in a project, you need to import and register the controllers, elements, scales and plugins you want to use. You will not have to call `register` if importing Chart.js via a `script` tag, but will not get the tree shaking benefits in this case. Here is an example of registering components:
+
+```javascript
+import { Chart, LineController, Line, Point, LinearScale, Title } from `chart.js`
+
+Chart.register(LineController, Line, Point, LinearScale, Title);
+
+const chart = new Chart(ctx, {
+    type: 'line',
+    // data: ...
+    options: {
+        title: {
+            display: true,
+            text: 'Chart Title'
+        },
+        scales: {
+            x: {
+                type: 'linear'
+            },
+            y: {
+                type: 'linear'
+            }
+        }
+    }
+})
+```
 
 ### Chart types
 
@@ -75,6 +102,7 @@ A number of changes were made to the configuration options passed to the `Chart`
 * `defaultFontStyle` was renamed to `font.style`
 * `defaultLineHeight` was renamed to `font.lineHeight`
 * Horizontal Bar default tooltip mode was changed from `'index'` to `'nearest'` to match vertical bar charts
+* `legend`, `title` and `tooltip` namespaces were moved from `Chart.defaults` to `Chart.defaults.plugins`.
 
 #### Scales
 
@@ -156,7 +184,8 @@ options: {
 }
 ```
 
-Also, the time scale option `distribution: 'series'` was removed and a new scale type `timeseries` was introduced in its place.
+* The time scale option `distribution: 'series'` was removed and a new scale type `timeseries` was introduced in its place
+* In the time scale, `autoSkip` is now enabled by default for consistency with the other scales
 
 #### Animations
 
@@ -184,8 +213,12 @@ Animation system was completely rewritten in Chart.js v3. Each property can now 
 
 #### Tooltip
 
-* `xLabel` and `yLabel` were removed. Please use `index` and `value`
+* `xLabel` and `yLabel` were removed. Please use `label` and `formattedValue`
 * The `filter` option will now be passed additional parameters when called and should have the method signature `function(tooltipItem, index, tooltipItems, data)`
+* The `custom` callback now takes a context object that has `tooltip` and `chart` properties
+* All properties of tooltip model related to the tooltip options have been moved to reside within the `options` property.
+* The callbacks no longer are given a `data` parameter. The tooltip item parameter contains the chart and dataset instead
+* The tooltip item's `index` parameter was renamed to `dataIndex` and `value` was renamed to `formattedValue`
 
 ## Developer migration
 
@@ -212,6 +245,7 @@ The following properties and methods were removed:
 
 #### Chart
 
+* `Chart.animationService`
 * `Chart.active`
 * `Chart.borderWidth`
 * `Chart.chart.chart`
@@ -228,12 +262,14 @@ The following properties and methods were removed:
 * `Chart.offsetX`
 * `Chart.offsetY`
 * `Chart.outerRadius` now lives on doughnut, pie, and polarArea controllers
+* `Chart.plugins` was replaced with `Chart.registry`. Plugin defaults are now in `Chart.defaults.plugins[id]`.
 * `Chart.PolarArea`. New charts are created via `new Chart` and providing the appropriate `type` parameter
 * `Chart.prototype.generateLegend`
 * `Chart.platform`. It only contained `disableCSSInjection`. CSS is never injected in v3.
 * `Chart.PluginBase`
 * `Chart.Radar`. New charts are created via `new Chart` and providing the appropriate `type` parameter
 * `Chart.radiusLength`
+* `Chart.scaleService` was replaced with `Chart.registry`. Scale defaults are now in `Chart.defaults.scales[type]`.
 * `Chart.Scatter`. New charts are created via `new Chart` and providing the appropriate `type` parameter
 * `Chart.types`
 * `Chart.Title` was moved to `Chart.plugins.title._element` and made private
@@ -307,7 +343,7 @@ The following properties and methods were removed:
 * Legend `onClick`, `onHover`, and `onLeave` options now receive the legend as the 3rd argument in addition to implicitly via `this`
 * Legend `onClick`, `onHover`, and `onLeave` options now receive a wrapped `event` as the first parameter. The previous first parameter value is accessible via `event.native`.
 * `Title.margins` is now private
-* The tooltip item's `x` and `y` attributes were removed. Use `datasetIndex` and `index` to get the element and any corresponding data from it
+* The tooltip item's `x` and `y` attributes were replaced by `element`. You can use `element.x` and `element.y` or `element.tooltipPosition()` instead.
 
 #### Removal of private APIs
 
@@ -402,7 +438,6 @@ The APIs listed in this section have changed in signature or behaviour from vers
 
 * `Scale.getLabelForIndex` was replaced by `scale.getLabelForValue`
 * `Scale.getPixelForValue` now has only one parameter. For the `TimeScale` that parameter must be millis since the epoch
-* `ScaleService.registerScaleType` was renamed to `ScaleService.registerScale` and now takes a scale constructors which is expected to have `id` and `defaults` properties.
 
 ##### Ticks
 

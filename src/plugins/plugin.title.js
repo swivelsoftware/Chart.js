@@ -4,19 +4,6 @@ import layouts from '../core/core.layouts';
 import {isArray, mergeIf} from '../helpers/helpers.core';
 import {toPadding, toFont} from '../helpers/helpers.options';
 
-defaults.set('title', {
-	align: 'center',
-	display: false,
-	font: {
-		style: 'bold',
-	},
-	fullWidth: true,
-	padding: 10,
-	position: 'top',
-	text: '',
-	weight: 2000         // by default greater than legend (1000) to be above
-});
-
 export class Title extends Element {
 	constructor(config) {
 		super();
@@ -28,7 +15,6 @@ export class Title extends Element {
 		this.ctx = config.ctx;
 		this._margins = undefined;
 		this._padding = undefined;
-		this.legendHitBoxes = []; // Contains hit boxes for each dataset (in dataset order)
 		this.top = undefined;
 		this.bottom = undefined;
 		this.left = undefined;
@@ -121,7 +107,7 @@ export class Title extends Element {
 
 		const lineCount = isArray(opts.text) ? opts.text.length : 1;
 		me._padding = toPadding(opts.padding);
-		const textSize = lineCount * toFont(opts.font).lineHeight + me._padding.height;
+		const textSize = lineCount * toFont(opts.font, me.chart.options.font).lineHeight + me._padding.height;
 		me.width = minSize.width = isHorizontal ? me.maxWidth : textSize;
 		me.height = minSize.height = isHorizontal ? textSize : me.maxHeight;
 	}
@@ -144,7 +130,7 @@ export class Title extends Element {
 			return;
 		}
 
-		const fontOpts = toFont(opts.font);
+		const fontOpts = toFont(opts.font, me.chart.options.font);
 		const lineHeight = fontOpts.lineHeight;
 		const offset = lineHeight / 2 + me._padding.top;
 		let rotation = 0;
@@ -257,7 +243,7 @@ export default {
 		const titleBlock = chart.titleBlock;
 
 		if (titleOpts) {
-			mergeIf(titleOpts, defaults.title);
+			mergeIf(titleOpts, defaults.plugins.title);
 
 			if (titleBlock) {
 				layouts.configure(chart, titleBlock, titleOpts);
@@ -269,5 +255,18 @@ export default {
 			layouts.removeBox(chart, titleBlock);
 			delete chart.titleBlock;
 		}
+	},
+
+	defaults: {
+		align: 'center',
+		display: false,
+		font: {
+			style: 'bold',
+		},
+		fullWidth: true,
+		padding: 10,
+		position: 'top',
+		text: '',
+		weight: 2000         // by default greater than legend (1000) to be above
 	}
 };

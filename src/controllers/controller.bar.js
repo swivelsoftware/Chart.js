@@ -1,40 +1,7 @@
 import DatasetController from '../core/core.datasetController';
-import defaults from '../core/core.defaults';
-import {Rectangle} from '../elements/index';
 import {clipArea, unclipArea} from '../helpers/helpers.canvas';
 import {isArray, isNullOrUndef, valueOrDefault, resolveObjectKey} from '../helpers/helpers.core';
 import {_limitValue, sign} from '../helpers/helpers.math';
-
-defaults.set('bar', {
-	hover: {
-		mode: 'index'
-	},
-
-	datasets: {
-		categoryPercentage: 0.8,
-		barPercentage: 0.9,
-		animation: {
-			numbers: {
-				type: 'number',
-				properties: ['x', 'y', 'base', 'width', 'height']
-			}
-		}
-	},
-
-	scales: {
-		_index_: {
-			type: 'category',
-			offset: true,
-			gridLines: {
-				offsetGridLines: true
-			}
-		},
-		_value_: {
-			type: 'linear',
-			beginAtZero: true,
-		}
-	}
-});
 
 /**
  * Computes the "optimal" sample size to maintain bars equally sized while preventing overlap.
@@ -224,7 +191,7 @@ export default class BarController extends DatasetController {
 	updateRangeFromParsed(range, scale, parsed, stack) {
 		super.updateRangeFromParsed(range, scale, parsed, stack);
 		const custom = parsed._custom;
-		if (custom) {
+		if (custom && scale === this._cachedMeta.vScale) {
 			// float bar: only one end of the bar is considered by `super`
 			range.min = Math.min(range.min, custom.min);
 			range.max = Math.max(range.max, custom.max);
@@ -388,7 +355,7 @@ export default class BarController extends DatasetController {
 		let i, ilen;
 
 		for (i = 0, ilen = meta.data.length; i < ilen; ++i) {
-			pixels.push(iScale.getPixelForValue(me.getParsed(i)[iScale.axis]));
+			pixels.push(iScale.getPixelForValue(me.getParsed(i)[iScale.axis], i));
 		}
 
 		// Note: a potential optimization would be to skip computing this
@@ -442,7 +409,7 @@ export default class BarController extends DatasetController {
 		// So we don't try to draw so huge rectangles.
 		// https://github.com/chartjs/Chart.js/issues/5247
 		// TODO: use borderWidth instead (need to move the parsing from rectangle)
-		const base = _limitValue(vScale.getPixelForValue(start),
+		let base = _limitValue(vScale.getPixelForValue(start),
 			vScale._startPixel - 10,
 			vScale._endPixel + 10);
 
@@ -451,6 +418,9 @@ export default class BarController extends DatasetController {
 
 		if (minBarLength !== undefined && Math.abs(size) < minBarLength) {
 			size = size < 0 ? -minBarLength : minBarLength;
+			if (value === 0) {
+				base -= size / 2;
+			}
 			head = base + size;
 		}
 
@@ -507,16 +477,51 @@ export default class BarController extends DatasetController {
 
 }
 
-BarController.prototype.dataElementType = Rectangle;
+BarController.id = 'bar';
 
-BarController.prototype.dataElementOptions = [
-	'backgroundColor',
-	'borderColor',
-	'borderSkipped',
-	'borderWidth',
-	'barPercentage',
-	'barThickness',
-	'categoryPercentage',
-	'maxBarThickness',
-	'minBarLength'
-];
+/**
+ * @type {any}
+ */
+BarController.defaults = {
+	datasetElementType: false,
+	dataElementType: 'rectangle',
+	dataElementOptions: [
+		'backgroundColor',
+		'borderColor',
+		'borderSkipped',
+		'borderWidth',
+		'barPercentage',
+		'barThickness',
+		'categoryPercentage',
+		'maxBarThickness',
+		'minBarLength'
+	],
+	hover: {
+		mode: 'index'
+	},
+
+	datasets: {
+		categoryPercentage: 0.8,
+		barPercentage: 0.9,
+		animation: {
+			numbers: {
+				type: 'number',
+				properties: ['x', 'y', 'base', 'width', 'height']
+			}
+		}
+	},
+
+	scales: {
+		_index_: {
+			type: 'category',
+			offset: true,
+			gridLines: {
+				offsetGridLines: true
+			}
+		},
+		_value_: {
+			type: 'linear',
+			beginAtZero: true,
+		}
+	}
+};

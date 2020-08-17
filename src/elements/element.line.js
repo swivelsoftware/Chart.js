@@ -1,4 +1,3 @@
-import defaults from '../core/core.defaults';
 import Element from '../core/core.element';
 import {_bezierInterpolation, _pointInLine, _steppedInterpolation} from '../helpers/helpers.interpolation';
 import {_computeSegments, _boundSegments} from '../helpers/helpers.segment';
@@ -8,20 +7,6 @@ import {_updateBezierControlPoints} from '../helpers/helpers.curve';
 /**
  * @typedef { import("./element.point").default } Point
  */
-
-const scope = 'elements.line';
-defaults.set(scope, {
-	borderCapStyle: 'butt',
-	borderDash: [],
-	borderDashOffset: 0,
-	borderJoinStyle: 'miter',
-	borderWidth: 3,
-	capBezierPoints: true,
-	fill: true,
-	tension: 0
-});
-
-defaults.route(scope, ['backgroundColor', 'borderColor'], '', 'color');
 
 function setStyle(ctx, vm) {
 	ctx.lineCap = vm.borderCapStyle;
@@ -199,7 +184,7 @@ function _getInterpolationMethod(options) {
 	return _pointInLine;
 }
 
-class Line extends Element {
+export default class Line extends Element {
 
 	constructor(cfg) {
 		super();
@@ -207,9 +192,9 @@ class Line extends Element {
 		this.options = undefined;
 		this._loop = undefined;
 		this._fullLoop = undefined;
-		this._controlPointsUpdated = undefined;
 		this._points = undefined;
 		this._segments = undefined;
+		this._pointsUpdated = false;
 
 		if (cfg) {
 			Object.assign(this, cfg);
@@ -218,13 +203,11 @@ class Line extends Element {
 
 	updateControlPoints(chartArea) {
 		const me = this;
-		if (me._controlPointsUpdated) {
-			return;
-		}
 		const options = me.options;
-		if (options.tension && !options.stepped) {
+		if (options.tension && !options.stepped && !me._pointsUpdated) {
 			const loop = options.spanGaps ? me._loop : me._fullLoop;
 			_updateBezierControlPoints(me._points, options, chartArea, loop);
+			me._pointsUpdated = true;
 		}
 	}
 
@@ -338,27 +321,50 @@ class Line extends Element {
 	 * @param {CanvasRenderingContext2D} ctx
 	 */
 	draw(ctx) {
-		const me = this;
+		const options = this.options || {};
+		const points = this.points || [];
 
-		if (!me.points.length) {
+		if (!points.length || !options.borderWidth) {
 			return;
 		}
 
 		ctx.save();
 
-		setStyle(ctx, me.options);
+		setStyle(ctx, options);
 
 		ctx.beginPath();
 
-		if (me.path(ctx)) {
+		if (this.path(ctx)) {
 			ctx.closePath();
 		}
 
 		ctx.stroke();
 		ctx.restore();
+
+		this._pointsUpdated = false;
 	}
 }
 
-Line._type = 'line';
+Line.id = 'line';
 
-export default Line;
+/**
+ * @type {any}
+ */
+Line.defaults = {
+	borderCapStyle: 'butt',
+	borderDash: [],
+	borderDashOffset: 0,
+	borderJoinStyle: 'miter',
+	borderWidth: 3,
+	capBezierPoints: true,
+	fill: true,
+	tension: 0
+};
+
+/**
+ * @type {any}
+ */
+Line.defaultRoutes = {
+	backgroundColor: 'color',
+	borderColor: 'color'
+};

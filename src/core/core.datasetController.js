@@ -1,5 +1,5 @@
 import Animations from './core.animations';
-import {isObject, merge, _merger, isArray, valueOrDefault, mergeIf, resolveObjectKey} from '../helpers/helpers.core';
+import {isObject, merge, _merger, isArray, valueOrDefault, mergeIf, resolveObjectKey, _capitalize} from '../helpers/helpers.core';
 import {listenArrayEvents, unlistenArrayEvents} from '../helpers/helpers.collection';
 import {resolve} from '../helpers/helpers.options';
 import {getHoverColor} from '../helpers/helpers.color';
@@ -152,7 +152,7 @@ function optionKeys(optionNames) {
 }
 
 function optionKey(key, active) {
-	return active ? 'hover' + key.charAt(0).toUpperCase() + key.slice(1) : key;
+	return active ? 'hover' + _capitalize(key) : key;
 }
 
 export default class DatasetController {
@@ -620,18 +620,30 @@ export default class DatasetController {
 	update(mode) {} // eslint-disable-line no-unused-vars
 
 	draw() {
-		const ctx = this._ctx;
-		const meta = this._cachedMeta;
+		const me = this;
+		const ctx = me._ctx;
+		const chart = me.chart;
+		const meta = me._cachedMeta;
 		const elements = meta.data || [];
-		const ilen = elements.length;
-		let i = 0;
+		const area = chart.chartArea;
+		const active = [];
+		let i, ilen;
 
 		if (meta.dataset) {
-			meta.dataset.draw(ctx);
+			meta.dataset.draw(ctx, area);
 		}
 
-		for (; i < ilen; ++i) {
-			elements[i].draw(ctx);
+		for (i = 0, ilen = elements.length; i < ilen; ++i) {
+			const element = elements[i];
+			if (element.active) {
+				active.push(element);
+			} else {
+				element.draw(ctx, area);
+			}
+		}
+
+		for (i = 0, ilen = active.length; i < ilen; ++i) {
+			active[i].draw(ctx, area);
 		}
 	}
 
@@ -681,12 +693,12 @@ export default class DatasetController {
 	_getContext(index, active) {
 		return {
 			chart: this.chart,
+			dataPoint: this.getParsed(index),
 			dataIndex: index,
 			dataset: this.getDataset(),
 			datasetIndex: this.index,
 			active
 		};
-
 	}
 
 	/**
@@ -696,13 +708,13 @@ export default class DatasetController {
 	resolveDatasetElementOptions(active) {
 		return this._resolveOptions(this.datasetElementOptions, {
 			active,
-			type: this.datasetElementType._type
+			type: this.datasetElementType.id
 		});
 	}
 
 	/**
 	 * @param {number} index
-	 * @param {string} mode
+	 * @param {string} [mode]
 	 * @protected
 	 */
 	resolveDataElementOptions(index, mode) {
@@ -718,7 +730,7 @@ export default class DatasetController {
 			index,
 			active,
 			info,
-			type: me.dataElementType._type
+			type: me.dataElementType.id
 		});
 
 		if (info.cacheable) {
@@ -974,6 +986,11 @@ export default class DatasetController {
 		this._insertElements(0, arguments.length);
 	}
 }
+
+/**
+ * @type {any}
+ */
+DatasetController.defaults = {};
 
 /**
  * Element type used to generate a meta dataset (e.g. Chart.element.Line).

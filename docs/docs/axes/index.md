@@ -20,6 +20,7 @@ The following options are common to all axes provided by Chart.js.
 | Name | Type | Default | Description
 | ---- | ---- | ------- | -----------
 | `display` | `boolean`\|`string` | `true` | Controls the axis global visibility (visible when `true`, hidden when `false`). When `display: 'auto'`, the axis is visible only if at least one associated dataset is visible.
+| `reverse` | `boolean` | `false` | Reverse the scale.
 | `weight` | `number` | `0` | The weight used to sort the axis. Higher weights are further away from the chart area.
 
 ### Callbacks
@@ -45,14 +46,12 @@ There are a number of config callbacks that can be used to change parameters in 
 
 ### Updating Axis Defaults
 
-The default configuration for a scale can be easily changed using the scale service. All you need to do is to pass in a partial configuration that will be merged with the current scale default configuration to form the new default.
+The default configuration for a scale can be easily changed. All you need to do is set the new options to `Chart.defaults.scales[type]`.
 
 For example, to set the minimum value of 0 for all linear scales, you would do the following. Any linear scales created after this time would now have a minimum of 0.
 
 ```javascript
-Chart.scaleService.updateScaleDefaults('linear', {
-    min: 0
-});
+Chart.defaults.scales.linear.min = 0;
 ```
 
 ## Creating New Axes

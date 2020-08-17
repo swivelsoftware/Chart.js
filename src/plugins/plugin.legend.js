@@ -2,101 +2,13 @@ import defaults from '../core/core.defaults';
 import Element from '../core/core.element';
 import layouts from '../core/core.layouts';
 import {drawPoint} from '../helpers/helpers.canvas';
-import {callback as call, mergeIf, valueOrDefault, isNullOrUndef} from '../helpers/helpers.core';
+import {callback as call, merge, valueOrDefault, isNullOrUndef} from '../helpers/helpers.core';
 import {toFont, toPadding} from '../helpers/helpers.options';
 import {getRtlAdapter, overrideTextDirection, restoreTextDirection} from '../helpers/helpers.rtl';
 
 /**
  * @typedef { import("../platform/platform.base").IEvent } IEvent
  */
-
-defaults.set('legend', {
-	display: true,
-	position: 'top',
-	align: 'center',
-	fullWidth: true,
-	reverse: false,
-	weight: 1000,
-
-	// a callback that will handle
-	onClick(e, legendItem, legend) {
-		const index = legendItem.datasetIndex;
-		const ci = legend.chart;
-
-		var hiddens = (ci.data.datasets || []).map(function(meta, i) {
-			return !ci.isDatasetVisible(i);
-		});
-
-		// all hidden except the selected one
-		var allHidden = hiddens.reduce(function(result, flag, i) {
-			if (i === index) {
-				return result;
-			}
-			return result && (flag || false);
-		}, true);
-
-		if (!allHidden) {
-			if (ci.isDatasetVisible(index)) {
-				ci.hide(index);
-				legendItem.hidden = true;
-			} else {
-				ci.show(index);
-				legendItem.hidden = false;
-			}
-		}
-	},
-
-	onHover: null,
-	onLeave: null,
-
-	labels: {
-		boxWidth: 40,
-		padding: 10,
-		// Generates labels shown in the legend
-		// Valid properties to return:
-		// text : text to display
-		// fillStyle : fill of coloured box
-		// strokeStyle: stroke of coloured box
-		// hidden : if this legend item refers to a hidden item
-		// lineCap : cap style for line
-		// lineDash
-		// lineDashOffset :
-		// lineJoin :
-		// lineWidth :
-		generateLabels(chart) {
-			const datasets = chart.data.datasets;
-			const options = chart.options.legend || {};
-			const usePointStyle = options.labels && options.labels.usePointStyle;
-
-			return chart._getSortedDatasetMetas().map((meta) => {
-				const style = meta.controller.getStyle(usePointStyle ? 0 : undefined);
-
-				return {
-					text: datasets[meta.index].label,
-					fillStyle: style.backgroundColor,
-					hidden: !meta.visible,
-					lineCap: style.borderCapStyle,
-					lineDash: style.borderDash,
-					lineDashOffset: style.borderDashOffset,
-					lineJoin: style.borderJoinStyle,
-					lineWidth: style.borderWidth,
-					strokeStyle: style.borderColor,
-					pointStyle: style.pointStyle,
-					rotation: style.rotation,
-
-					// Below is extra data used for toggling the datasets
-					datasetIndex: meta.index
-				};
-			}, this);
-		}
-	},
-
-	title: {
-		display: false,
-		position: 'center',
-		text: '',
-	}
-});
 
 /**
  * Helper function to get the box width based on the usePointStyle option
@@ -266,7 +178,7 @@ export class Legend extends Element {
 		const display = opts.display;
 
 		const ctx = me.ctx;
-		const labelFont = toFont(labelOpts.font);
+		const labelFont = toFont(labelOpts.font, me.chart.options.font);
 		const fontSize = labelFont.size;
 		const boxWidth = getBoxWidth(labelOpts, fontSize);
 		const boxHeight = getBoxHeight(labelOpts, fontSize);
@@ -380,7 +292,6 @@ export class Legend extends Element {
 		const opts = me.options;
 		const labelOpts = opts.labels;
 		const defaultColor = defaults.color;
-		const lineDefault = defaults.elements.line;
 		const legendHeight = me.height;
 		const columnHeights = me.columnHeights;
 		const legendWidth = me.width;
@@ -393,7 +304,7 @@ export class Legend extends Element {
 		me.drawTitle();
 		const rtlHelper = getRtlAdapter(opts.rtl, me.left, me._minSize.width);
 		const ctx = me.ctx;
-		const labelFont = toFont(labelOpts.font);
+		const labelFont = toFont(labelOpts.font, me.chart.options.font);
 		const fontColor = labelFont.color;
 		const fontSize = labelFont.size;
 		let cursor;
@@ -424,17 +335,17 @@ export class Legend extends Element {
 			// Set the ctx for the box
 			ctx.save();
 
-			const lineWidth = valueOrDefault(legendItem.lineWidth, lineDefault.borderWidth);
+			const lineWidth = valueOrDefault(legendItem.lineWidth, 1);
 			ctx.fillStyle = valueOrDefault(legendItem.fillStyle, defaultColor);
-			ctx.lineCap = valueOrDefault(legendItem.lineCap, lineDefault.borderCapStyle);
-			ctx.lineDashOffset = valueOrDefault(legendItem.lineDashOffset, lineDefault.borderDashOffset);
-			ctx.lineJoin = valueOrDefault(legendItem.lineJoin, lineDefault.borderJoinStyle);
+			ctx.lineCap = valueOrDefault(legendItem.lineCap, 'butt');
+			ctx.lineDashOffset = valueOrDefault(legendItem.lineDashOffset, 0);
+			ctx.lineJoin = valueOrDefault(legendItem.lineJoin, 'miter');
 			ctx.lineWidth = lineWidth;
 			ctx.strokeStyle = valueOrDefault(legendItem.strokeStyle, defaultColor);
 
 			if (ctx.setLineDash) {
 				// IE 9 and 10 do not support line dash
-				ctx.setLineDash(valueOrDefault(legendItem.lineDash, lineDefault.borderDash));
+				ctx.setLineDash(valueOrDefault(legendItem.lineDash, []));
 			}
 
 			if (labelOpts && labelOpts.usePointStyle) {
@@ -578,7 +489,7 @@ export class Legend extends Element {
 		const me = this;
 		const opts = me.options;
 		const titleOpts = opts.title;
-		const titleFont = toFont(titleOpts.font);
+		const titleFont = toFont(titleOpts.font, me.chart.options.font);
 		const titlePadding = toPadding(titleOpts.padding);
 
 		if (!titleOpts.display) {
@@ -660,7 +571,7 @@ export class Legend extends Element {
 	 */
 	_computeTitleHeight() {
 		const titleOpts = this.options.title;
-		const titleFont = toFont(titleOpts.font);
+		const titleFont = toFont(titleOpts.font, this.chart.options.font);
 		const titlePadding = toPadding(titleOpts.padding);
 		return titleOpts.display ? titleFont.lineHeight + titlePadding.height : 0;
 	}
@@ -731,6 +642,10 @@ export class Legend extends Element {
 	}
 }
 
+function resolveOptions(options) {
+	return options !== false && merge({}, [defaults.plugins.legend, options]);
+}
+
 function createNewLegendAndAttach(chart, legendOpts) {
 	const legend = new Legend({
 		ctx: chart.ctx,
@@ -756,7 +671,7 @@ export default {
 	_element: Legend,
 
 	beforeInit(chart) {
-		const legendOpts = chart.options.legend;
+		const legendOpts = resolveOptions(chart.options.legend);
 
 		if (legendOpts) {
 			createNewLegendAndAttach(chart, legendOpts);
@@ -767,12 +682,10 @@ export default {
 	// This ensures that if the legend position changes (via an option update)
 	// the layout system respects the change. See https://github.com/chartjs/Chart.js/issues/7527
 	beforeUpdate(chart) {
-		const legendOpts = chart.options.legend;
+		const legendOpts = resolveOptions(chart.options.legend);
 		const legend = chart.legend;
 
 		if (legendOpts) {
-			mergeIf(legendOpts, defaults.legend);
-
 			if (legend) {
 				layouts.configure(chart, legend, legendOpts);
 				legend.options = legendOpts;
@@ -798,6 +711,94 @@ export default {
 		const legend = chart.legend;
 		if (legend) {
 			legend.handleEvent(e);
+		}
+	},
+
+	defaults: {
+		display: true,
+		position: 'top',
+		align: 'center',
+		fullWidth: true,
+		reverse: false,
+		weight: 1000,
+
+		// a callback that will handle
+		onClick(e, legendItem, legend) {
+			const index = legendItem.datasetIndex;
+			const ci = legend.chart;
+
+			var hiddens = (ci.data.datasets || []).map(function(meta, i) {
+				return !ci.isDatasetVisible(i);
+			});
+
+			// all hidden except the selected one
+			var allHidden = hiddens.reduce(function(result, flag, i) {
+				if (i === index) {
+					return result;
+				}
+				return result && (flag || false);
+			}, true);
+
+			if (!allHidden) {
+				if (ci.isDatasetVisible(index)) {
+					ci.hide(index);
+					legendItem.hidden = true;
+				} else {
+					ci.show(index);
+					legendItem.hidden = false;
+				}
+			}
+		},
+
+		onHover: null,
+		onLeave: null,
+
+		labels: {
+			boxWidth: 40,
+			padding: 10,
+			// Generates labels shown in the legend
+			// Valid properties to return:
+			// text : text to display
+			// fillStyle : fill of coloured box
+			// strokeStyle: stroke of coloured box
+			// hidden : if this legend item refers to a hidden item
+			// lineCap : cap style for line
+			// lineDash
+			// lineDashOffset :
+			// lineJoin :
+			// lineWidth :
+			generateLabels(chart) {
+				const datasets = chart.data.datasets;
+				const options = chart.options.legend || {};
+				const usePointStyle = options.labels && options.labels.usePointStyle;
+
+				return chart._getSortedDatasetMetas().map((meta) => {
+					const style = meta.controller.getStyle(usePointStyle ? 0 : undefined);
+
+					return {
+						text: datasets[meta.index].label,
+						fillStyle: style.backgroundColor,
+						hidden: !meta.visible,
+						lineCap: style.borderCapStyle,
+						lineDash: style.borderDash,
+						lineDashOffset: style.borderDashOffset,
+						lineJoin: style.borderJoinStyle,
+						lineWidth: style.borderWidth,
+						strokeStyle: style.borderColor,
+						pointStyle: style.pointStyle,
+						rotation: style.rotation,
+
+						// Below is extra data used for toggling the datasets
+						datasetIndex: meta.index
+					};
+				}, this);
+			}
+		},
+
+		title: {
+			display: false,
+			position: 'center',
+			text: '',
 		}
 	}
 };
