@@ -1,7 +1,6 @@
 /_book
 /coverage
 /custom
-/dist
 /docs/index.md
 /gh-pages
 /jsdoc
@@ -15,3 +14,4 @@ bower.json
 *.log
 *.swp
 *.stackdump
+yarn.lock
