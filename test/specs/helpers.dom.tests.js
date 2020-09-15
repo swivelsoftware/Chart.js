@@ -256,4 +256,57 @@ describe('DOM helpers tests', function() {
 		expect(canvas.style.width).toBe('400px');
 	});
 
+	describe('getRelativePosition', function() {
+		it('should use offsetX/Y when available', function() {
+			const event = {offsetX: 0, offsetY: 10};
+			const chart = undefined;
+			expect(helpers.getRelativePosition(event, chart)).toEqual({x: 0, y: 10});
+		});
+
+		it('should calculate from clientX/Y as fallback', function() {
+			const chart = window.acquireChart({}, {
+				canvas: {
+					height: 200,
+					width: 200,
+				}
+			});
+
+			const event = {
+				clientX: 50,
+				clientY: 100
+			};
+
+			const rect = chart.canvas.getBoundingClientRect();
+			expect(helpers.getRelativePosition(event, chart)).toEqual({
+				x: Math.round(event.clientX - rect.x),
+				y: Math.round(event.clientY - rect.y)
+			});
+
+			const chart2 = window.acquireChart({}, {
+				canvas: {
+					height: 200,
+					width: 200,
+					style: 'padding: 10px'
+				}
+			});
+			const rect2 = chart2.canvas.getBoundingClientRect();
+			expect(helpers.getRelativePosition(event, chart2)).toEqual({
+				x: Math.round((event.clientX - rect2.x - 10) / 180 * 200),
+				y: Math.round((event.clientY - rect2.y - 10) / 180 * 200)
+			});
+
+			const chart3 = window.acquireChart({}, {
+				canvas: {
+					height: 200,
+					width: 200,
+					style: 'width: 400px, height: 400px; padding: 10px'
+				}
+			});
+			const rect3 = chart3.canvas.getBoundingClientRect();
+			expect(helpers.getRelativePosition(event, chart3)).toEqual({
+				x: Math.round((event.clientX - rect3.x - 10) / 360 * 400),
+				y: Math.round((event.clientY - rect3.y - 10) / 360 * 400)
+			});
+		});
+	});
 });

@@ -177,18 +177,18 @@ function compare2Level(l1, l2) {
 	};
 }
 
-function onAnimationsComplete(ctx) {
-	const chart = ctx.chart;
+function onAnimationsComplete(context) {
+	const chart = context.chart;
 	const animationOptions = chart.options.animation;
 
 	chart._plugins.notify(chart, 'afterRender');
-	callCallback(animationOptions && animationOptions.onComplete, [ctx], chart);
+	callCallback(animationOptions && animationOptions.onComplete, [context], chart);
 }
 
-function onAnimationProgress(ctx) {
-	const chart = ctx.chart;
+function onAnimationProgress(context) {
+	const chart = context.chart;
 	const animationOptions = chart.options.animation;
-	callCallback(animationOptions && animationOptions.onProgress, [ctx], chart);
+	callCallback(animationOptions && animationOptions.onProgress, [context], chart);
 }
 
 function isDomSupported() {
@@ -202,7 +202,7 @@ function isDomSupported() {
 function getCanvas(item) {
 	if (isDomSupported() && typeof item === 'string') {
 		item = document.getElementById(item);
-	} else if (item.length) {
+	} else if (item && item.length) {
 		// Support for array based queries (such as jQuery)
 		item = item[0];
 	}
@@ -701,14 +701,9 @@ class Chart {
 
 	render() {
 		const me = this;
-		const animationOptions = me.options.animation;
 		if (me._plugins.notify(me, 'beforeRender') === false) {
 			return;
 		}
-		const onComplete = function() {
-			me._plugins.notify(me, 'afterRender');
-			callCallback(animationOptions && animationOptions.onComplete, [], me);
-		};
 
 		if (animator.has(me)) {
 			if (me.attached && !animator.running(me)) {
@@ -716,7 +711,7 @@ class Chart {
 			}
 		} else {
 			me.draw();
-			onComplete();
+			onAnimationsComplete({chart: me});
 		}
 	}
 
@@ -998,7 +993,9 @@ class Chart {
 			}
 		};
 
-		let listener = function(e) {
+		let listener = function(e, x, y) {
+			e.offsetX = x;
+			e.offsetY = y;
 			me._eventHandler(e);
 		};
 
@@ -1015,8 +1012,8 @@ class Chart {
 			const attached = () => {
 				_remove('attach', attached);
 
-				me.resize();
 				me.attached = true;
+				me.resize();
 
 				_add('resize', listener);
 				_add('detach', detached);
