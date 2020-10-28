@@ -2,9 +2,9 @@
 title: Category Axis
 ---
 
-If global configuration is used, labels are drawn from one of the label arrays included in the chart data. If only `data.labels` is defined, this will be used. If `data.xLabels` is defined and the axis is horizontal, this will be used. Similarly, if `data.yLabels` is defined and the axis is vertical, this property will be used. Using both `xLabels` and `yLabels` together can create a chart that uses strings for both the X and Y axes.
+If the global configuration is used, labels are drawn from one of the label arrays included in the chart data. If only `data.labels` is defined, this will be used. If `data.xLabels` is defined and the axis is horizontal, this will be used. Similarly, if `data.yLabels` is defined and the axis is vertical, this property will be used. Using both `xLabels` and `yLabels` together can create a chart that uses strings for both the X and Y axes.
 
-Specifying any of the settings above defines the x axis as `type: 'category'` if not defined otherwise. For more fine-grained control of category labels it is also possible to add `labels` as part of the category axis definition. Doing so does not apply the global defaults.
+Specifying any of the settings above defines the x-axis as `type: 'category'` if not defined otherwise. For more fine-grained control of category labels, it is also possible to add `labels` as part of the category axis definition. Doing so does not apply the global defaults.
 
 ## Category Axis Definition
 
@@ -45,7 +45,7 @@ These options extend the [common configuration for all cartesian axes](index.md#
 | ---- | ---- | -----------
 | `min` | `string`\|`number` | | The minimum item to display. [more...](#min-max-configuration)
 | `max` | `string`\|`number` | | The maximum item to display. [more...](#min-max-configuration)
-| `labels` | `string[]` | - | An array of labels to display.
+| `labels` | `string[]|string[][]` | - | An array of labels to display. When an individual label is an array of strings, each item is rendered on a new line.
 
 ## Min Max Configuration
 

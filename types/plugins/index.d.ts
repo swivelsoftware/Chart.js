@@ -1,4 +1,4 @@
-import { Chart, Element, IAnimationSpecContainer, InteractionMode, LayoutPosition, IPlugin } from '../core';
+import { ActiveDataPoint, ActiveElement, Chart, Element, IAnimationSpecContainer, InteractionMode, LayoutPosition, IPlugin } from '../core';
 import { Color, IChartArea, IFontSpec, Scriptable, TextAlign, IEvent, IHoverInteractionOptions } from '../core/interfaces';
 import { PointStyle } from '../elements';
 import { IChartData, IChartDataset } from '../interfaces';
@@ -9,7 +9,7 @@ export interface IFillerOptions {
   propagate: boolean;
 }
 
-export type FillTarget = number | string | 'start' | 'end' | 'origin' | false;
+export type FillTarget = number | string | { value: number } | 'start' | 'end' | 'origin' | 'stack' | false;
 
 export interface IFillTarget {
   /**
@@ -166,6 +166,16 @@ export interface ILegendOptions {
     filter(item: ILegendItem, data: IChartData): boolean;
 
     /**
+     * Sorts the legend items
+     */
+    sort(a: ILegendItem, b: ILegendItem, data: IChartData): number;
+
+    /**
+     * Override point style for the legend. Only applies if usePointStyle is true
+     */
+    pointStyle: PointStyle;
+
+    /**
      * Label style will match corresponding point style (size is based on the mimimum value between boxWidth and font.size).
      * @default false
      */
@@ -229,13 +239,15 @@ export interface ITitleChartOptions {
   title: ITitleOptions;
 }
 
+export type TooltipAlignment = 'start' | 'center' | 'end';
+
 export interface TooltipModel {
   // The items that we are rendering in the tooltip. See Tooltip Item Interface section
   dataPoints: ITooltipItem[];
 
   // Positioning
-  xAlign: 'start' | 'center' | 'end';
-  yAlign: 'start' | 'center' | 'end';
+  xAlign: TooltipAlignment;
+  yAlign: TooltipAlignment;
 
   // X and Y properties are the top left of the tooltip
   x: number;
@@ -281,6 +293,9 @@ export const Tooltip: IPlugin & {
   readonly positioners: {
     [key: string]: (items: readonly Element[], eventPosition: { x: number; y: number }) => { x: number; y: number };
   };
+
+  getActiveElements(): ActiveElement[];
+  setActiveElements(active: ActiveDataPoint[], eventPosition: { x: number, y: number }): void;
 };
 
 export interface ITooltipCallbacks {
@@ -339,6 +354,12 @@ export interface ITooltipOptions extends IHoverInteractionOptions {
    * The mode for positioning the tooltip
    */
   position: 'average' | 'nearest';
+
+  /**
+   * Override the tooltip alignment calculations
+   */
+  xAlign: TooltipAlignment;
+  yAlign: TooltipAlignment;
 
   /**
    * Sort tooltip items.

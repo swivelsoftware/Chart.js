@@ -22,6 +22,9 @@
 		}, {
 			title: 'Floating',
 			path: 'charts/bar/float.html'
+		}, {
+			title: 'Border Radius',
+			path: 'charts/bar/border-radius.html'
 		}]
 	}, {
 		title: 'Line charts',
@@ -146,6 +149,9 @@
 			title: 'Filtering Labels',
 			path: 'scales/filtering-labels.html'
 		}, {
+			title: 'Label Text Alignment',
+			path: 'scales/label-text-alignment.html'
+		}, {
 			title: 'Non numeric Y Axis',
 			path: 'scales/non-numeric-y.html'
 		}, {
@@ -187,6 +193,9 @@
 		items: [{
 			title: 'Positioning',
 			path: 'tooltips/positioning.html'
+		}, {
+			title: 'Custom Positioning',
+			path: 'tooltips/position-custom.html'
 		}, {
 			title: 'Interactions',
 			path: 'tooltips/interactions.html'
@@ -250,6 +259,9 @@
 		}, {
 			title: 'Line Gradient',
 			path: 'advanced/line-gradient.html'
+		}, {
+			title: 'Programmatic Event Triggers',
+			path: 'advanced/programmatic-events.html'
 		}]
 	}];
 

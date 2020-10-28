@@ -147,17 +147,11 @@ function getFirstScaleId(chart, axis) {
 	return Object.keys(scales).filter(key => scales[key].axis === axis).shift();
 }
 
-function optionKeys(optionNames) {
-	return isArray(optionNames) ? optionNames : Object.keys(optionNames);
-}
-
-function optionKey(key, active) {
-	return active ? 'hover' + _capitalize(key) : key;
-}
-
-function isDirectUpdateMode(mode) {
-	return mode === 'reset' || mode === 'none';
-}
+const optionKeys = (optionNames) => isArray(optionNames) ? optionNames : Object.keys(optionNames);
+const optionKey = (key, active) => active ? 'hover' + _capitalize(key) : key;
+const isDirectUpdateMode = (mode) => mode === 'reset' || mode === 'none';
+const cloneIfNotShared = (cached, shared) => shared ? cached : Object.assign({}, cached);
+const freezeIfShared = (values, shared) => shared ? Object.freeze(values) : values;
 
 export default class DatasetController {
 
@@ -179,6 +173,8 @@ export default class DatasetController {
 		this._data = undefined;
 		this._objectData = undefined;
 		this._sharedOptions = undefined;
+		this._drawStart = undefined;
+		this._drawCount = undefined;
 		this.enableOptionSharing = false;
 
 		this.initialize();
@@ -338,7 +334,7 @@ export default class DatasetController {
 	 */
 	configure() {
 		const me = this;
-		me._config = merge({}, [
+		me._config = merge(Object.create(null), [
 			me.chart.options[me._type].datasets,
 			me.getDataset(),
 		], {
@@ -380,11 +376,11 @@ export default class DatasetController {
 				parsed = me.parsePrimitiveData(meta, data, start, count);
 			}
 
-
+			const isNotInOrderComparedToPrev = () => isNaN(cur[iAxis]) || (prev && cur[iAxis] < prev[iAxis]);
 			for (i = 0; i < count; ++i) {
 				meta._parsed[i + start] = cur = parsed[i];
 				if (sorted) {
-					if (prev && cur[iAxis] < prev[iAxis]) {
+					if (isNotInOrderComparedToPrev()) {
 						sorted = false;
 					}
 					prev = cur;
@@ -544,7 +540,7 @@ export default class DatasetController {
 			parsed = _parsed[i];
 			value = parsed[scale.axis];
 			otherValue = parsed[otherScale.axis];
-			return (isNaN(value) || otherMin > otherValue || otherMax < otherValue);
+			return (isNaN(value) || isNaN(otherValue) || otherMin > otherValue || otherMax < otherValue);
 		}
 
 		for (i = 0; i < ilen; ++i) {
@@ -633,13 +629,15 @@ export default class DatasetController {
 		const elements = meta.data || [];
 		const area = chart.chartArea;
 		const active = [];
-		let i, ilen;
+		const start = me._drawStart || 0;
+		const count = me._drawCount || (elements.length - start);
+		let i;
 
 		if (meta.dataset) {
-			meta.dataset.draw(ctx, area);
+			meta.dataset.draw(ctx, area, start, count);
 		}
 
-		for (i = 0, ilen = elements.length; i < ilen; ++i) {
+		for (i = start; i < start + count; ++i) {
 			const element = elements[i];
 			if (element.active) {
 				active.push(element);
@@ -648,7 +646,7 @@ export default class DatasetController {
 			}
 		}
 
-		for (i = 0, ilen = active.length; i < ilen; ++i) {
+		for (i = 0; i < active.length; ++i) {
 			active[i].draw(ctx, area);
 		}
 	}
@@ -695,9 +693,9 @@ export default class DatasetController {
 	}
 
 	/**
-	 * @private
+	 * @protected
 	 */
-	_getContext(index, active) {
+	getContext(index, active) {
 		return {
 			chart: this.chart,
 			dataPoint: this.getParsed(index),
@@ -728,10 +726,11 @@ export default class DatasetController {
 		mode = mode || 'default';
 		const me = this;
 		const active = mode === 'active';
-		const cached = me._cachedDataOpts;
+		const cache = me._cachedDataOpts;
+		const cached = cache[mode];
 		const sharing = me.enableOptionSharing;
-		if (cached[mode]) {
-			return cached[mode];
+		if (cached) {
+			return cloneIfNotShared(cached, sharing);
 		}
 		const info = {cacheable: !active};
 
@@ -743,14 +742,14 @@ export default class DatasetController {
 		});
 
 		if (info.cacheable) {
-			// `$shared` indicades this set of options can be shared between multiple elements.
+			// `$shared` indicates this set of options can be shared between multiple elements.
 			// Sharing is used to reduce number of properties to change during animation.
 			values.$shared = sharing;
 
 			// We cache options by `mode`, which can be 'active' for example. This enables us
 			// to have the 'active' element options and 'default' options to switch between
 			// when interacting.
-			cached[mode] = sharing ? Object.freeze(values) : values;
+			cache[mode] = freezeIfShared(values, sharing);
 		}
 
 		return values;
@@ -765,7 +764,7 @@ export default class DatasetController {
 		const datasetOpts = me._config;
 		const options = me.chart.options.elements[type] || {};
 		const values = {};
-		const context = me._getContext(index, active);
+		const context = me.getContext(index, active);
 		const keys = optionKeys(optionNames);
 
 		for (let i = 0, ilen = keys.length; i < ilen; ++i) {
@@ -799,10 +798,10 @@ export default class DatasetController {
 		}
 
 		const info = {cacheable: true};
-		const context = me._getContext(index, active);
-		const datasetAnim = resolve([me._config.animation], context, index, info);
+		const context = me.getContext(index, active);
 		const chartAnim = resolve([chart.options.animation], context, index, info);
-		let config = mergeIf({}, [datasetAnim, chartAnim]);
+		const datasetAnim = resolve([me._config.animation], context, index, info);
+		let config = chartAnim && mergeIf({}, [datasetAnim, chartAnim]);
 
 		if (config[mode]) {
 			config = Object.assign({}, config, config[mode]);
@@ -936,10 +935,10 @@ export default class DatasetController {
 		}
 		me.parse(start, count);
 
-		me.updateElements(elements, start, 'reset');
+		me.updateElements(data, start, count, 'reset');
 	}
 
-	updateElements(element, start, mode) {} // eslint-disable-line no-unused-vars
+	updateElements(element, start, count, mode) {} // eslint-disable-line no-unused-vars
 
 	/**
 	 * @private
@@ -997,12 +996,12 @@ export default class DatasetController {
 DatasetController.defaults = {};
 
 /**
- * Element type used to generate a meta dataset (e.g. Chart.element.Line).
+ * Element type used to generate a meta dataset (e.g. Chart.element.LineElement).
  */
 DatasetController.prototype.datasetElementType = null;
 
 /**
- * Element type used to generate a meta data (e.g. Chart.element.Point).
+ * Element type used to generate a meta data (e.g. Chart.element.PointElement).
  */
 DatasetController.prototype.dataElementType = null;
 

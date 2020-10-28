@@ -2,9 +2,11 @@ import defaults from '../core/core.defaults';
 import Element from '../core/core.element';
 import layouts from '../core/core.layouts';
 import {drawPoint} from '../helpers/helpers.canvas';
-import {callback as call, merge, valueOrDefault, isNullOrUndef} from '../helpers/helpers.core';
-import {toFont, toPadding} from '../helpers/helpers.options';
-import {getRtlAdapter, overrideTextDirection, restoreTextDirection} from '../helpers/helpers.rtl';
+import {
+	callback as call, merge, valueOrDefault, isNullOrUndef, toFont,
+	toPadding, getRtlAdapter, overrideTextDirection, restoreTextDirection,
+	INFINITY
+} from '../helpers/index';
 
 /**
  * @typedef { import("../platform/platform.base").IEvent } IEvent
@@ -160,6 +162,10 @@ export class Legend extends Element {
 			legendItems = legendItems.filter((item) => labelOpts.filter(item, me.chart.data));
 		}
 
+		if (labelOpts.sort) {
+			legendItems = legendItems.sort((a, b) => labelOpts.sort(a, b, me.chart.data));
+		}
+
 		if (me.options.reverse) {
 			legendItems.reverse();
 		}
@@ -275,8 +281,8 @@ export class Legend extends Element {
 			minSize.width += totalWidth;
 		}
 
-		me.width = minSize.width;
-		me.height = minSize.height;
+		me.width = Math.min(minSize.width, opts.maxWidth || INFINITY);
+		me.height = Math.min(minSize.height, opts.maxHeight || INFINITY);
 	}
 
 	afterFit() {}
@@ -643,7 +649,7 @@ export class Legend extends Element {
 }
 
 function resolveOptions(options) {
-	return options !== false && merge({}, [defaults.plugins.legend, options]);
+	return options !== false && merge(Object.create(null), [defaults.plugins.legend, options]);
 }
 
 function createNewLegendAndAttach(chart, legendOpts) {
@@ -769,8 +775,9 @@ export default {
 			// lineWidth :
 			generateLabels(chart) {
 				const datasets = chart.data.datasets;
-				const options = chart.options.legend || {};
-				const usePointStyle = options.labels && options.labels.usePointStyle;
+				const {labels} = chart.legend.options;
+				const usePointStyle = labels.usePointStyle;
+				const overrideStyle = labels.pointStyle;
 
 				return chart._getSortedDatasetMetas().map((meta) => {
 					const style = meta.controller.getStyle(usePointStyle ? 0 : undefined);
@@ -785,7 +792,7 @@ export default {
 						lineJoin: style.borderJoinStyle,
 						lineWidth: style.borderWidth,
 						strokeStyle: style.borderColor,
-						pointStyle: style.pointStyle,
+						pointStyle: overrideStyle || style.pointStyle,
 						rotation: style.rotation,
 
 						// Below is extra data used for toggling the datasets

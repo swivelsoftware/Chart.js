@@ -311,6 +311,85 @@ describe('Legend block tests', function() {
 		}]);
 	});
 
+	it('should sort items', function() {
+		var chart = window.acquireChart({
+			type: 'line',
+			data: {
+				datasets: [{
+					label: 'dataset1',
+					backgroundColor: '#f31',
+					borderCapStyle: 'round',
+					borderDash: [2, 2],
+					borderDashOffset: 5.5,
+					data: []
+				}, {
+					label: 'dataset2',
+					hidden: true,
+					borderJoinStyle: 'round',
+					data: []
+				}, {
+					label: 'dataset3',
+					borderWidth: 10,
+					borderColor: 'green',
+					pointStyle: 'crossRot',
+					fill: false,
+					data: []
+				}],
+				labels: []
+			},
+			options: {
+				legend: {
+					labels: {
+						sort: function(a, b) {
+							return b.datasetIndex > a.datasetIndex ? 1 : -1;
+						}
+					}
+				}
+			}
+		});
+
+		expect(chart.legend.legendItems).toEqual([{
+			text: 'dataset3',
+			fillStyle: 'rgba(0,0,0,0.1)',
+			hidden: false,
+			lineCap: 'butt',
+			lineDash: [],
+			lineDashOffset: 0,
+			lineJoin: 'miter',
+			lineWidth: 10,
+			strokeStyle: 'green',
+			pointStyle: undefined,
+			rotation: undefined,
+			datasetIndex: 2
+		}, {
+			text: 'dataset2',
+			fillStyle: 'rgba(0,0,0,0.1)',
+			hidden: true,
+			lineCap: 'butt',
+			lineDash: [],
+			lineDashOffset: 0,
+			lineJoin: 'round',
+			lineWidth: 3,
+			strokeStyle: 'rgba(0,0,0,0.1)',
+			pointStyle: undefined,
+			rotation: undefined,
+			datasetIndex: 1
+		}, {
+			text: 'dataset1',
+			fillStyle: '#f31',
+			hidden: false,
+			lineCap: 'round',
+			lineDash: [2, 2],
+			lineDashOffset: 5.5,
+			lineJoin: 'miter',
+			lineWidth: 3,
+			strokeStyle: 'rgba(0,0,0,0.1)',
+			pointStyle: undefined,
+			rotation: undefined,
+			datasetIndex: 0
+		}]);
+	});
+
 	it('should not throw when the label options are missing', function() {
 		var makeChart = function() {
 			window.acquireChart({
@@ -538,6 +617,74 @@ describe('Legend block tests', function() {
 			lineWidth: 2,
 			strokeStyle: '#f31',
 			pointStyle: 'crossRot',
+			rotation: 15,
+			datasetIndex: 1
+		}]);
+	});
+
+	it('should draw correctly when usePointStyle is true and pointStyle override is set', function() {
+		var chart = window.acquireChart({
+			type: 'line',
+			data: {
+				datasets: [{
+					label: 'dataset1',
+					backgroundColor: '#f31',
+					borderCapStyle: 'butt',
+					borderDash: [2, 2],
+					borderDashOffset: 5.5,
+					borderWidth: 0,
+					borderColor: '#f31',
+					pointStyle: 'crossRot',
+					pointBackgroundColor: 'rgba(0,0,0,0.1)',
+					pointBorderWidth: 5,
+					pointBorderColor: 'green',
+					data: []
+				}, {
+					label: 'dataset2',
+					backgroundColor: '#f31',
+					borderJoinStyle: 'miter',
+					borderWidth: 2,
+					borderColor: '#f31',
+					pointStyle: 'crossRot',
+					pointRotation: 15,
+					data: []
+				}],
+				labels: []
+			},
+			options: {
+				legend: {
+					labels: {
+						usePointStyle: true,
+						pointStyle: 'star'
+					}
+				}
+			}
+		});
+
+		expect(chart.legend.legendItems).toEqual([{
+			text: 'dataset1',
+			fillStyle: 'rgba(0,0,0,0.1)',
+			hidden: false,
+			lineCap: undefined,
+			lineDash: undefined,
+			lineDashOffset: undefined,
+			lineJoin: undefined,
+			lineWidth: 5,
+			strokeStyle: 'green',
+			pointStyle: 'star',
+			rotation: undefined,
+			datasetIndex: 0
+		}, {
+			text: 'dataset2',
+			fillStyle: '#f31',
+			hidden: false,
+			lineCap: undefined,
+			lineDash: undefined,
+			lineDashOffset: undefined,
+			lineJoin: undefined,
+			lineWidth: 2,
+			strokeStyle: '#f31',
+			pointStyle: 'star',
 			rotation: 15,
 			datasetIndex: 1
 		}]);

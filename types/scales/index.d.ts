@@ -129,6 +129,11 @@ export interface ICartesianScaleOptions extends ICoreScaleOptions {
      */
     sampleSize: number;
     /**
+     * The label alignment
+     * @default 'center'
+     */
+    align: 'start' | 'center' | 'end';
+    /**
      * 	If true, automatically calculates how many labels can be shown and hides labels accordingly. Labels will be rotated up to maxRotation before skipping any. Turn autoSkip off to show all labels no matter what.
      * @default true
      */
@@ -138,6 +143,14 @@ export interface ICartesianScaleOptions extends ICoreScaleOptions {
      * @default 0
      */
     autoSkipPadding: number;
+
+    /**
+     * How is the label positioned perpendicular to the axis direction.
+     * This only applies when the rotation is 0 and the axis position is one of "top", "left", "right", or "bottom"
+     * @default 'near'
+     */
+    crossAlign: 'near' | 'center' | 'far';
+
     /**
      * Distance in pixels to offset the label from the centre point of the tick (in the x direction for the x axis, and the y direction for the y axis). Note: this can cause labels at the edges to be cropped by the edge of the canvas
      * @default 0
@@ -170,7 +183,7 @@ export interface ICartesianScaleOptions extends ICoreScaleOptions {
 export type ICategoryScaleOptions = ICartesianScaleOptions & {
   min: string | number;
   max: string | number;
-  labels: string[];
+  labels: string[] | string[][];
 };
 
 export interface CategoryScale<O extends ICategoryScaleOptions = ICategoryScaleOptions> extends Scale<O> {}
@@ -231,6 +244,17 @@ export const LinearScale: IChartComponent & {
 
 export type ILogarithmicScaleOptions = ICartesianScaleOptions & {
   stacked?: boolean;
+
+  /**
+   * Adjustment used when calculating the maximum data value.
+   * @see https://www.chartjs.org/docs/next/axes/cartesian/linear#axis-range-settings
+   */
+  suggestedMin?: number;
+  /**
+   * Adjustment used when calculating the minimum data value.
+   * @see https://www.chartjs.org/docs/next/axes/cartesian/linear#axis-range-settings
+   */
+  suggestedMax?: number;
 
   ticks: {
     /**

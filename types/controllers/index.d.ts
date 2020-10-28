@@ -10,7 +10,7 @@ import {
   IPointOptions,
   IPointPrefixedHoverOptions,
   IPointPrefixedOptions,
-  IRectangleOptions,
+  IBarOptions,
 } from '../elements';
 
 export interface IControllerDatasetOptions {
@@ -30,7 +30,7 @@ export interface IControllerDatasetOptions {
 
 export interface IBarControllerDatasetOptions
   extends IControllerDatasetOptions,
-    ScriptableAndArrayOptions<IRectangleOptions>,
+    ScriptableAndArrayOptions<IBarOptions>,
     ScriptableAndArrayOptions<ICommonHoverOptions> {
   /**
    * The base axis of the dataset. 'x' for vertical bars and 'y' for horizontal bars.
@@ -79,6 +79,10 @@ export interface IBarControllerDatasetOptions
 }
 
 export interface IBarControllerChartOptions {
+  /**
+   * Should null or undefined values be omitted from drawing
+   */
+  skipNull?: boolean;
 }
 
 export interface BarController extends DatasetController {}
@@ -119,7 +123,8 @@ export interface ILineControllerDatasetOptions
   extends IControllerDatasetOptions,
     ScriptableAndArrayOptions<IPointPrefixedOptions>,
     ScriptableAndArrayOptions<IPointPrefixedHoverOptions>,
-    ScriptableOptions<ILineOptions> {
+    ScriptableOptions<ILineOptions>,
+    ScriptableOptions<ILineHoverOptions> {
   /**
    * The ID of the x axis to plot this dataset on.
    */
@@ -148,7 +153,7 @@ export interface ILineControllerChartOptions {
    * If false, the lines between points are not drawn.
    * @default true
    */
-  showLines: boolean;
+  showLine: boolean;
 }
 
 export interface LineController extends DatasetController {}
@@ -176,6 +181,19 @@ export interface IDoughnutControllerDatasetOptions
   extends IControllerDatasetOptions,
     ScriptableAndArrayOptions<IArcOptions>,
     ScriptableAndArrayOptions<IArcHoverOptions> {
+
+  /**
+   * Sweep to allow arcs to cover.
+   * @default 2 * Math.PI
+   */
+  circumference: number;
+
+  /**
+   * Starting angle to draw this dataset from.
+   * @default -0.5 * Math.PI
+   */
+  rotation: number;
+
   /**
    * The relative thickness of the dataset. Providing a value for weight will cause the pie or doughnut dataset to be drawn with a thickness relative to the sum of all the dataset weight values.
    * @default 1

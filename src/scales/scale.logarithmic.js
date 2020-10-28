@@ -1,4 +1,4 @@
-import {isFinite} from '../helpers/helpers.core';
+import {isFinite, isNullOrUndef} from '../helpers/helpers.core';
 import {_setMinAndMaxByKey, log10} from '../helpers/helpers.math';
 import Scale from '../core/core.scale';
 import LinearScaleBase from './scale.linearbase';
@@ -64,6 +64,7 @@ export default class LogarithmicScale extends Scale {
 	parse(raw, index) {
 		const value = LinearScaleBase.prototype.parse.apply(this, [raw, index]);
 		if (value === 0) {
+			this._zero = true;
 			return undefined;
 		}
 		return isFinite(value) && value > 0 ? value : NaN;
@@ -76,15 +77,27 @@ export default class LogarithmicScale extends Scale {
 		me.min = isFinite(min) ? Math.max(0, min) : null;
 		me.max = isFinite(max) ? Math.max(0, max) : null;
 
+		if (me.options.beginAtZero) {
+			me._zero = true;
+		}
+
 		me.handleTickRangeOptions();
 	}
 
 	handleTickRangeOptions() {
 		const me = this;
+		const {suggestedMax, suggestedMin} = me.options;
 		const DEFAULT_MIN = 1;
 		const DEFAULT_MAX = 10;
 		let min = me.min;
 		let max = me.max;
+
+		if (!isNullOrUndef(suggestedMin)) {
+			min = Math.min(min, suggestedMin);
+		}
+		if (!isNullOrUndef(suggestedMax)) {
+			max = Math.max(max, suggestedMax);
+		}
 
 		if (min === max) {
 			if (min <= 0) { // includes null
@@ -100,6 +113,11 @@ export default class LogarithmicScale extends Scale {
 		}
 		if (max <= 0) {
 			max = Math.pow(10, Math.floor(log10(min)) + 1);
+		}
+		// if data has `0` in it or `beginAtZero` is true, and min (non zero) value is at bottom
+		// of scale, lower the min bound by one exp.
+		if (!me._userMin && me._zero && min === Math.pow(10, Math.floor(log10(me.min)))) {
+			min = Math.pow(10, Math.floor(log10(min)) - 1);
 		}
 		me.min = min;
 		me.max = max;
