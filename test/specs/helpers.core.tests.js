@@ -265,6 +265,11 @@ describe('Chart.helpers.core', function() {
 	});
 
 	describe('clone', function() {
+		it('should not allow prototype pollution', function() {
+			var test = helpers.clone(JSON.parse('{"__proto__":{"polluted": true}}'));
+			expect(test.prototype).toBeUndefined();
+			expect(Object.prototype.polluted).toBeUndefined();
+		});
 		it('should clone primitive values', function() {
 			expect(helpers.clone()).toBe(undefined);
 			expect(helpers.clone(null)).toBe(null);
@@ -323,6 +328,11 @@ describe('Chart.helpers.core', function() {
 	});
 
 	describe('merge', function() {
+		it('should not allow prototype pollution', function() {
+			var test = helpers.merge({}, JSON.parse('{"__proto__":{"polluted": true}}'));
+			expect(test.prototype).toBeUndefined();
+			expect(Object.prototype.polluted).toBeUndefined();
+		});
 		it('should update target and return it', function() {
 			var target = {a: 1};
 			var result = helpers.merge(target, {a: 2, b: 'foo'});
