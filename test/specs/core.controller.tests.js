@@ -92,11 +92,11 @@ describe('Chart', function() {
 		it('should initialize config with default interaction options', function() {
 			var callback = function() {};
 			var defaults = Chart.defaults;
-			var defaultMode = defaults.line.interaction.mode;
+			var defaultMode = defaults.controllers.line.interaction.mode;
 
 			defaults.hover.onHover = callback;
-			defaults.line.spanGaps = true;
-			defaults.line.interaction.mode = 'test';
+			defaults.controllers.line.spanGaps = true;
+			defaults.controllers.line.interaction.mode = 'test';
 
 			var chart = acquireChart({
 				type: 'line'
@@ -104,14 +104,14 @@ describe('Chart', function() {
 
 			var options = chart.options;
 			expect(options.font.size).toBe(defaults.font.size);
-			expect(options.showLine).toBe(defaults.line.showLine);
+			expect(options.showLine).toBe(defaults.controllers.line.showLine);
 			expect(options.spanGaps).toBe(true);
 			expect(options.hover.onHover).toBe(callback);
 			expect(options.hover.mode).toBe('test');
 
 			defaults.hover.onHover = null;
-			defaults.line.spanGaps = false;
-			defaults.line.interaction.mode = defaultMode;
+			defaults.controllers.line.spanGaps = false;
+			defaults.controllers.line.interaction.mode = defaultMode;
 		});
 
 		it('should initialize config with default hover options', function() {
@@ -119,8 +119,8 @@ describe('Chart', function() {
 			var defaults = Chart.defaults;
 
 			defaults.hover.onHover = callback;
-			defaults.line.spanGaps = true;
-			defaults.line.hover.mode = 'test';
+			defaults.controllers.line.spanGaps = true;
+			defaults.controllers.line.hover.mode = 'test';
 
 			var chart = acquireChart({
 				type: 'line'
@@ -128,14 +128,14 @@ describe('Chart', function() {
 
 			var options = chart.options;
 			expect(options.font.size).toBe(defaults.font.size);
-			expect(options.showLine).toBe(defaults.line.showLine);
+			expect(options.showLine).toBe(defaults.controllers.line.showLine);
 			expect(options.spanGaps).toBe(true);
 			expect(options.hover.onHover).toBe(callback);
 			expect(options.hover.mode).toBe('test');
 
 			defaults.hover.onHover = null;
-			defaults.line.spanGaps = false;
-			delete defaults.line.hover.mode;
+			defaults.controllers.line.spanGaps = false;
+			delete defaults.controllers.line.hover.mode;
 		});
 
 		it('should override default options', function() {
@@ -143,8 +143,8 @@ describe('Chart', function() {
 			var defaults = Chart.defaults;
 
 			defaults.hover.onHover = callback;
-			defaults.line.hover.mode = 'x-axis';
-			defaults.line.spanGaps = true;
+			defaults.controllers.line.hover.mode = 'x-axis';
+			defaults.controllers.line.spanGaps = true;
 
 			var chart = acquireChart({
 				type: 'line',
@@ -166,8 +166,8 @@ describe('Chart', function() {
 			expect(options.title.position).toBe('bottom');
 
 			defaults.hover.onHover = null;
-			delete defaults.line.hover.mode;
-			defaults.line.spanGaps = false;
+			delete defaults.controllers.line.hover.mode;
+			defaults.controllers.line.spanGaps = false;
 		});
 
 		it('should override axis positions that are incorrect', function() {
@@ -348,10 +348,32 @@ describe('Chart', function() {
 			expect(chart.scales.x.options._jasmineCheck).toBeDefined();
 			expect(chart.scales.y.options._jasmineCheck).toBeDefined();
 
-			expect(Chart.defaults.line._jasmineCheck).not.toBeDefined();
+			expect(Chart.defaults.controllers.line._jasmineCheck).not.toBeDefined();
 			expect(Chart.defaults._jasmineCheck).not.toBeDefined();
 			expect(Chart.defaults.scales.linear._jasmineCheck).not.toBeDefined();
 			expect(Chart.defaults.scales.category._jasmineCheck).not.toBeDefined();
+		});
+	});
+
+	describe('Updating options', function() {
+		it('update should result to same set of options as construct', function() {
+			var chart = acquireChart({
+				type: 'line',
+				data: [],
+				options: {
+					animation: false,
+					locale: 'en-US',
+					responsive: false
+				}
+			});
+			const options = chart.options;
+			chart.options = {
+				animation: false,
+				locale: 'en-US',
+				responsive: false
+			};
+			chart.update();
+			expect(chart.options).toEqual(jasmine.objectContaining(options));
 		});
 	});
 
@@ -1289,6 +1311,7 @@ describe('Chart', function() {
 			var hooks = {
 				init: [
 					'beforeInit',
+					'resize',
 					'afterInit'
 				],
 				update: [
@@ -1490,6 +1513,22 @@ describe('Chart', function() {
 
 			chart.update();
 			expect(chart.getDataVisibility(1)).toBe(false);
+		});
+	});
+
+	describe('isDatasetVisible', function() {
+		it('should return false if index is out of bounds', function() {
+			var chart = acquireChart({
+				type: 'line',
+				data: {
+					datasets: [{
+						data: [0, 1, 2]
+					}],
+					labels: ['a', 'b', 'c']
+				}
+			});
+
+			expect(chart.isDatasetVisible(1)).toBe(false);
 		});
 	});
 

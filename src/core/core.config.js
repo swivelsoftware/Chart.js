@@ -3,7 +3,7 @@ import defaults from './core.defaults';
 import {mergeIf, merge, _merger} from '../helpers/helpers.core';
 
 export function getIndexAxis(type, options) {
-	const typeDefaults = defaults[type] || {};
+	const typeDefaults = defaults.controllers[type] || {};
 	const datasetDefaults = typeDefaults.datasets || {};
 	const typeOptions = options[type] || {};
 	const datasetOptions = typeOptions.datasets || {};
@@ -42,7 +42,7 @@ export function determineAxis(id, scaleOptions) {
 
 function mergeScaleConfig(config, options) {
 	options = options || {};
-	const chartDefaults = defaults[config.type] || {scales: {}};
+	const chartDefaults = defaults.controllers[config.type] || {scales: {}};
 	const configScales = options.scales || {};
 	const chartIndexAxis = getIndexAxis(config.type, options);
 	const firstIDs = Object.create(null);
@@ -67,7 +67,7 @@ function mergeScaleConfig(config, options) {
 	config.data.datasets.forEach(dataset => {
 		const type = dataset.type || config.type;
 		const indexAxis = dataset.indexAxis || getIndexAxis(type, options);
-		const datasetDefaults = defaults[type] || {};
+		const datasetDefaults = defaults.controllers[type] || {};
 		const defaultScaleOptions = datasetDefaults.scales || {};
 		Object.keys(defaultScaleOptions).forEach(defaultID => {
 			const axis = getAxisFromDefaultScaleID(defaultID, indexAxis);
@@ -94,32 +94,19 @@ function mergeScaleConfig(config, options) {
 function mergeConfig(...args/* config objects ... */) {
 	return merge(Object.create(null), args, {
 		merger(key, target, source, options) {
-			if (key !== 'scales' && key !== 'scale') {
+			if (key !== 'scales' && key !== 'scale' && key !== 'controllers') {
 				_merger(key, target, source, options);
 			}
 		}
 	});
 }
 
-function includeDefaults(options, type) {
-	return mergeConfig(
+function includeDefaults(config, options) {
+	const scaleConfig = mergeScaleConfig(config, options);
+	options = mergeConfig(
 		defaults,
-		defaults[type],
+		defaults.controllers[config.type],
 		options || {});
-}
-
-function initConfig(config) {
-	config = config || {};
-
-	// Do NOT use mergeConfig for the data object because this method merges arrays
-	// and so would change references to labels and datasets, preventing data updates.
-	const data = config.data = config.data || {datasets: [], labels: []};
-	data.datasets = data.datasets || [];
-	data.labels = data.labels || [];
-
-	const scaleConfig = mergeScaleConfig(config, config.options);
-
-	const options = config.options = includeDefaults(config.options, config.type);
 
 	options.hover = merge(Object.create(null), [
 		defaults.interaction,
@@ -140,6 +127,19 @@ function initConfig(config) {
 		options.interaction,
 		options.tooltips
 	]);
+	return options;
+}
+
+function initConfig(config) {
+	config = config || {};
+
+	// Do NOT use mergeConfig for the data object because this method merges arrays
+	// and so would change references to labels and datasets, preventing data updates.
+	const data = config.data = config.data || {datasets: [], labels: []};
+	data.datasets = data.datasets || [];
+	data.labels = data.labels || [];
+
+	config.options = includeDefaults(config, config.options);
 
 	return config;
 }
@@ -171,11 +171,6 @@ export default class Config {
 
 	update(options) {
 		const config = this._config;
-		const scaleConfig = mergeScaleConfig(config, options);
-
-		options = includeDefaults(options, config.type);
-
-		options.scales = scaleConfig;
-		config.options = options;
+		config.options = includeDefaults(config, options);
 	}
 }

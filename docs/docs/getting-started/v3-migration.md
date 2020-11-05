@@ -90,7 +90,6 @@ A number of changes were made to the configuration options passed to the `Chart`
 * `scales.[x/y]Axes.time.min` was renamed to `scales[id].min`
 * `scales.[x/y]Axes.zeroLine*` options of axes were removed. Use scriptable scale options instead.
 * The dataset option `steppedLine` was removed. Use `stepped`
-* The dataset option `tension` was removed. Use `lineTension`
 * The chart option `showLines` was renamed to `showLine` to match the dataset option.
 * Dataset options are now configured as `options[type].datasets` rather than `options.datasets[type]`
 * To override the platform class used in a chart instance, pass `platform: PlatformClass` in the config object. Note that the class should be passed, not an instance of the class.
@@ -100,6 +99,7 @@ A number of changes were made to the configuration options passed to the `Chart`
 #### Defaults
 
 * `global` namespace was removed from `defaults`. So `Chart.defaults.global` is now `Chart.defaults`
+* Dataset controller defaults were relocate to `controllers`. For example `Chart.defaults.line` is now `Chart.defaults.controllers.line`
 * `default` prefix was removed from defaults. For example `Chart.defaults.global.defaultColor` is now `Chart.defaults.color`
 * `defaultColor` was renamed to `color`
 * `defaultFontColor` was renamed to `font.color`
@@ -366,6 +366,8 @@ The following public APIs were removed.
 
 The following private APIs were removed.
 
+* `Chart._bufferedRender`
+* `Chart._updating`
 * `Chart.data.datasets[datasetIndex]._meta`
 * `DatasetController._getIndexScaleId`
 * `DatasetController._getIndexScale`
@@ -457,6 +459,7 @@ The APIs listed in this section have changed in signature or behaviour from vers
 ##### Core Controller
 
 * The first parameter to `updateHoverStyle` is now an array of objects containing the `element`, `datasetIndex`, and `index`
+* The signature or `resize` changed, the first `silent` parameter was removed.
 
 ##### Dataset Controllers
 
@@ -492,3 +495,4 @@ All helpers are now exposed in a flat hierarchy, e.g., `Chart.helpers.canvas.cli
 
 * `afterDatasetsUpdate`, `afterUpdate`, `beforeDatasetsUpdate`, and `beforeUpdate` now receive `args` object as second argument. `options` argument is always the last and thus was moved from 2nd to 3rd place.
 * `afterEvent` and `beforeEvent` now receive a wrapped `event` as the second argument. The native event is available via `event.native`.
+* Initial `resize` is no longer silent. Meaning that `resize` event can fire between `beforeInit` and `afterInit`

@@ -1219,7 +1219,7 @@ describe('Chart.controllers.bar', function() {
 			},
 			options: {
 				elements: {
-					bars: {
+					bar: {
 						backgroundColor: 'rgb(255, 0, 0)',
 						borderColor: 'rgb(0, 0, 255)',
 						borderWidth: 2,
@@ -1286,7 +1286,7 @@ describe('Chart.controllers.bar', function() {
 			var chart = window.acquireChart(this.config);
 			var meta = chart.getDatasetMeta(0);
 			var xScale = chart.scales[meta.xAxisID];
-			var options = Chart.defaults.bar.datasets;
+			var options = Chart.defaults.controllers.bar.datasets;
 
 			var categoryPercentage = options.categoryPercentage;
 			var barPercentage = options.barPercentage;
@@ -1462,7 +1462,7 @@ describe('Chart.controllers.bar', function() {
 						expected = barThickness;
 					} else {
 						var scale = chart.scales.x;
-						var options = Chart.defaults.bar.datasets;
+						var options = Chart.defaults.controllers.bar.datasets;
 						var categoryPercentage = options.categoryPercentage;
 						var barPercentage = options.barPercentage;
 						var tickInterval = scale.getPixelForTick(1) - scale.getPixelForTick(0);

@@ -1,4 +1,5 @@
 import Animations from './core.animations';
+import defaults from './core.defaults';
 import {isObject, merge, _merger, isArray, valueOrDefault, mergeIf, resolveObjectKey, _capitalize} from '../helpers/helpers.core';
 import {listenArrayEvents, unlistenArrayEvents} from '../helpers/helpers.collection';
 import {resolve} from '../helpers/helpers.options';
@@ -147,6 +148,49 @@ function getFirstScaleId(chart, axis) {
 	return Object.keys(scales).filter(key => scales[key].axis === axis).shift();
 }
 
+function createDatasetContext(parent, index, dataset) {
+	return Object.create(parent, {
+		active: {
+			writable: true,
+			value: false
+		},
+		dataset: {
+			value: dataset
+		},
+		datasetIndex: {
+			value: index
+		},
+		index: {
+			get() {
+				return this.datasetIndex;
+			}
+		}
+	});
+}
+
+function createDataContext(parent, index, point, element) {
+	return Object.create(parent, {
+		active: {
+			writable: true,
+			value: false
+		},
+		dataIndex: {
+			value: index
+		},
+		dataPoint: {
+			value: point
+		},
+		element: {
+			value: element
+		},
+		index: {
+			get() {
+				return this.dataIndex;
+			}
+		}
+	});
+}
+
 const optionKeys = (optionNames) => isArray(optionNames) ? optionNames : Object.keys(optionNames);
 const optionKey = (key, active) => active ? 'hover' + _capitalize(key) : key;
 const isDirectUpdateMode = (mode) => mode === 'reset' || mode === 'none';
@@ -176,6 +220,7 @@ export default class DatasetController {
 		this._drawStart = undefined;
 		this._drawCount = undefined;
 		this.enableOptionSharing = false;
+		this.$context = undefined;
 
 		this.initialize();
 	}
@@ -335,7 +380,8 @@ export default class DatasetController {
 	configure() {
 		const me = this;
 		me._config = merge(Object.create(null), [
-			me.chart.options[me._type].datasets,
+			defaults.controllers[me._type].datasets,
+			(me.chart.options[me._type] || {}).datasets,
 			me.getDataset(),
 		], {
 			merger(key, target, source) {
@@ -487,6 +533,13 @@ export default class DatasetController {
 	 */
 	getParsed(index) {
 		return this._cachedMeta._parsed[index];
+	}
+
+	/**
+	 * @protected
+	 */
+	getDataElement(index) {
+		return this._cachedMeta.data[index];
 	}
 
 	/**
@@ -696,14 +749,18 @@ export default class DatasetController {
 	 * @protected
 	 */
 	getContext(index, active) {
-		return {
-			chart: this.chart,
-			dataPoint: this.getParsed(index),
-			dataIndex: index,
-			dataset: this.getDataset(),
-			datasetIndex: this.index,
-			active
-		};
+		const me = this;
+		let context;
+		if (index >= 0 && index < me._cachedMeta.data.length) {
+			const element = me._cachedMeta.data[index];
+			context = element.$context ||
+				(element.$context = createDataContext(me.getContext(), index, me.getParsed(index), element));
+		} else {
+			context = me.$context || (me.$context = createDatasetContext(me.chart.getContext(), me.index, me.getDataset()));
+		}
+
+		context.active = !!active;
+		return context;
 	}
 
 	/**

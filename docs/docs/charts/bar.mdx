@@ -53,7 +53,8 @@ export const ExampleChart0 = () => {
         }
       }
     };
-    new Chart(document.getElementById('chartjs-0').getContext('2d'), cfg);
+    const chart = new Chart(document.getElementById('chartjs-0').getContext('2d'), cfg);
+    return () => chart.destroy();
   });
   return <div className="chartjs-wrapper"><canvas id="chartjs-0" className="chartjs"></canvas></div>;
 }
@@ -79,7 +80,7 @@ the color of the bars is generally set this way.
 | Name | Type | [Scriptable](../general/options.md#scriptable-options) | [Indexable](../general/options.md#indexable-options) | Default
 | ---- | ---- | :----: | :----: | ----
 | [`backgroundColor`](#styling) | [`Color`](../general/colors.md) | Yes | Yes | `'rgba(0, 0, 0, 0.1)'`
-| [`base`](#general) | `number` | Yes | Yes | 
+| [`base`](#general) | `number` | Yes | Yes |
 | [`borderColor`](#styling) | [`Color`](../general/colors.md) | Yes | Yes | `'rgba(0, 0, 0, 0.1)'`
 | [`borderSkipped`](#borderskipped) | `string` | Yes | Yes | `'start'`
 | [`borderWidth`](#borderwidth) | <code>number&#124;object</code> | Yes | Yes | `0`
@@ -234,7 +235,7 @@ If true, the bars for a particular data point fall between the grid lines. The g
 
 ## Default Options
 
-It is common to want to apply a configuration setting to all created bar charts. The global bar chart settings are stored in `Chart.defaults.bar`. Changing the global options only affects charts created after the change. Existing charts are not changed.
+It is common to want to apply a configuration setting to all created bar charts. The global bar chart settings are stored in `Chart.defaults.controllers.bar`. Changing the global options only affects charts created after the change. Existing charts are not changed.
 
 ## barPercentage vs categoryPercentage
 
@@ -335,7 +336,8 @@ export const ExampleChart1 = () => {
         }
       }
     };
-    new Chart(document.getElementById('chartjs-1').getContext('2d'), cfg);
+    const chart = new Chart(document.getElementById('chartjs-1').getContext('2d'), cfg);
+    return () => chart.destroy();
   });
   return <div className="chartjs-wrapper"><canvas id="chartjs-1" className="chartjs"></canvas></div>;
 }
