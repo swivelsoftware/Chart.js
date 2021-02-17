@@ -64,15 +64,19 @@
 				}]
 			},
 			options: {
-				legend: {
-					position: 'top',
+				plugins: {
+					legend: {
+						position: 'top',
+					},
+					title: {
+						display: true,
+						text: 'Chart.js Radar Chart'
+					},
 				},
-				title: {
-					display: true,
-					text: 'Chart.js Radar Chart'
-				},
-				scale: {
-					beginAtZero: true
+				scales: {
+					r: {
+						beginAtZero: true
+					}
 				}
 			}
 		};

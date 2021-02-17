@@ -74,17 +74,21 @@
 				}]
 			},
 			options: {
-				title: {
-					display: true,
-					text: 'Chart.js Radar Chart - Skip Points'
+				plugins: {
+					title: {
+						display: true,
+						text: 'Chart.js Radar Chart - Skip Points'
+					}
 				},
 				elements: {
 					line: {
 						tension: 0.0,
 					}
 				},
-				scale: {
-					beginAtZero: true,
+				scales: {
+					r: {
+						beginAtZero: true,
+					},
 				}
 			}
 		};

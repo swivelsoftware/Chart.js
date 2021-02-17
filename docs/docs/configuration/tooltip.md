@@ -4,7 +4,7 @@ title: Tooltip
 
 ## Tooltip Configuration
 
-The tooltip configuration is passed into the `options.tooltips` namespace. The global options for the chart tooltips is defined in `Chart.defaults.plugins.tooltip`.
+The tooltip configuration is passed into the `options.plugins.tooltip` namespace. The global options for the chart tooltips is defined in `Chart.defaults.plugins.tooltip`.
 
 | Name | Type | Default | Description
 | ---- | ---- | ------- | -----------
@@ -16,15 +16,18 @@ The tooltip configuration is passed into the `options.tooltips` namespace. The g
 | `callbacks` | `object` | | See the [callbacks section](#tooltip-callbacks).
 | `itemSort` | `function` | | Sort tooltip items. [more...](#sort-callback)
 | `filter` | `function` | | Filter tooltip items. [more...](#filter-callback)
-| `backgroundColor` | `Color` | `'rgba(0, 0, 0, 0.8)'` | Background color of the tooltip.
-| `titleFont` | `Font` | `{style: 'bold', color: '#fff'}` | See [Fonts](../general/fonts.md).
+| `backgroundColor` | [`Color`](../general/colors.md) | `'rgba(0, 0, 0, 0.8)'` | Background color of the tooltip.
+| `titleColor` | [`Color`](../general/colors.md) | `'#fff'` | Color of title text.
+| `titleFont` | `Font` | `{style: 'bold'}` | See [Fonts](../general/fonts.md).
 | `titleAlign` | `string` | `'left'` | Horizontal alignment of the title text lines. [more...](#alignment)
 | `titleSpacing` | `number` | `2` | Spacing to add to top and bottom of each title line.
 | `titleMarginBottom` | `number` | `6` | Margin to add on bottom of title section.
-| `bodyFont` | `Font` | `{color: '#fff'}` | See [Fonts](../general/fonts.md).
+| `bodyColor` | [`Color`](../general/colors.md) | `'#fff'` | Color of body text.
+| `bodyFont` | `Font` | `{}` | See [Fonts](../general/fonts.md).
 | `bodyAlign` | `string` | `'left'` | Horizontal alignment of the body text lines. [more...](#alignment)
 | `bodySpacing` | `number` | `2` | Spacing to add to top and bottom of each tooltip item.
-| `footerFont` | `Font` | `{style: 'bold', color: '#fff'}` | See [Fonts](../general/fonts.md).
+| `footerColor` | [`Color`](../general/colors.md) | `'#fff'` | Color of footer text.
+| `footerFont` | `Font` | `{style: 'bold'}` | See [Fonts](../general/fonts.md).
 | `footerAlign` | `string` | `'left'` | Horizontal alignment of the footer text lines. [more...](#alignment)
 | `footerSpacing` | `number` | `2` | Spacing to add to top and bottom of each footer line.
 | `footerMarginTop` | `number` | `6` | Margin to add before drawing the footer.
@@ -33,14 +36,14 @@ The tooltip configuration is passed into the `options.tooltips` namespace. The g
 | `caretPadding` | `number` | `2` | Extra distance to move the end of the tooltip arrow away from the tooltip point.
 | `caretSize` | `number` | `5` | Size, in px, of the tooltip arrow.
 | `cornerRadius` | `number` | `6` | Radius of tooltip corner curves.
-| `multiKeyBackground` | `Color` | `'#fff'` | Color to draw behind the colored boxes when multiple items are in the tooltip.
+| `multiKeyBackground` | [`Color`](../general/colors.md) | `'#fff'` | Color to draw behind the colored boxes when multiple items are in the tooltip.
 | `displayColors` | `boolean` | `true` | If true, color boxes are shown in the tooltip.
 | `boxWidth` | `number` | `bodyFont.size` | Width of the color box if displayColors is true.
 | `boxHeight` | `number` | `bodyFont.size` | Height of the color box if displayColors is true.
 | `usePointStyle` | `boolean` | `false` | Use the corresponding point style (from dataset options) instead of color boxes, ex: star, triangle etc. (size is based on the minimum value between boxWidth and boxHeight).
-| `borderColor` | `Color` | `'rgba(0, 0, 0, 0)'` | Color of the border.
+| `borderColor` | [`Color`](../general/colors.md) | `'rgba(0, 0, 0, 0)'` | Color of the border.
 | `borderWidth` | `number` | `0` | Size of the border.
-| `rtl` | `boolean` | | `true` for rendering the legends from right to left.
+| `rtl` | `boolean` | | `true` for rendering the tooltip from right to left.
 | `textDirection` | `string` | canvas' default | This will force the text direction `'rtl' or 'ltr` on the canvas for rendering the tooltips, regardless of the css specified on the canvas
 
 ### Position Modes
@@ -90,17 +93,17 @@ These options are only applied to text lines. Color boxes are always aligned to 
 
 ### Sort Callback
 
-Allows sorting of [tooltip items](#tooltip-item-interface). Must implement at minimum a function that can be passed to [Array.prototype.sort](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort). This function can also accept a third parameter that is the data object passed to the chart.
+Allows sorting of [tooltip items](#tooltip-item-context). Must implement at minimum a function that can be passed to [Array.prototype.sort](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort). This function can also accept a third parameter that is the data object passed to the chart.
 
 ### Filter Callback
 
-Allows filtering of [tooltip items](#tooltip-item-interface). Must implement at minimum a function that can be passed to [Array.prototype.filter](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Array/filter). This function can also accept a fourth parameter that is the data object passed to the chart.
+Allows filtering of [tooltip items](#tooltip-item-context). Must implement at minimum a function that can be passed to [Array.prototype.filter](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Array/filter). This function can also accept a fourth parameter that is the data object passed to the chart.
 
 ## Tooltip Callbacks
 
 The tooltip label configuration is nested below the tooltip configuration using the `callbacks` key. The tooltip has the following callbacks for providing text. For all functions, `this` will be the tooltip object created from the `Tooltip` constructor.
 
-All functions are called with the same arguments: a [tooltip item context](#tooltip-item-interface). All functions must return either a string or an array of strings. Arrays of strings are treated as multiple lines of text.
+All functions are called with the same arguments: a [tooltip item context](#tooltip-item-context). All functions must return either a string or an array of strings. Arrays of strings are treated as multiple lines of text.
 
 | Name | Arguments | Description
 | ---- | --------- | -----------
@@ -128,18 +131,20 @@ var chart = new Chart(ctx, {
     type: 'line',
     data: data,
     options: {
-        tooltips: {
-            callbacks: {
-                label: function(context) {
-                    var label = context.dataset.label || '';
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        var label = context.dataset.label || '';
 
-                    if (label) {
-                        label += ': ';
+                        if (label) {
+                            label += ': ';
+                        }
+                        if (!isNaN(context.parsed.y)) {
+                            label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
+                        }
+                        return label;
                     }
-                    if (!isNaN(context.dataPoint.y)) {
-                        label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.dataPoint.y);
-                    }
-                    return label;
                 }
             }
         }
@@ -156,16 +161,18 @@ var chart = new Chart(ctx, {
     type: 'line',
     data: data,
     options: {
-        tooltips: {
-            callbacks: {
-                labelColor: function(context) {
-                    return {
-                        borderColor: 'rgb(255, 0, 0)',
-                        backgroundColor: 'rgb(255, 0, 0)'
-                    };
-                },
-                labelTextColor: function(context) {
-                    return '#543453';
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    labelColor: function(context) {
+                        return {
+                            borderColor: 'rgb(255, 0, 0)',
+                            backgroundColor: 'rgb(255, 0, 0)'
+                        };
+                    },
+                    labelTextColor: function(context) {
+                        return '#543453';
+                    }
                 }
             }
         }
@@ -182,14 +189,16 @@ var chart = new Chart(ctx, {
     type: 'line',
     data: data,
     options: {
-        tooltips: {
-            usePointStyle: true,
-            callbacks: {
-                labelPointStyle: function(context) {
-                    return {
-                        pointStyle: 'triangle',
-                        rotation: 0
-                    };
+        plugins: {
+            tooltip: {
+                usePointStyle: true,
+                callbacks: {
+                    labelPointStyle: function(context) {
+                        return {
+                            pointStyle: 'triangle',
+                            rotation: 0
+                        };
+                    }
                 }
             }
         }
@@ -211,7 +220,10 @@ The tooltip items passed to the tooltip callbacks implement the following interf
     label: string,
 
     // Parsed data values for the given `dataIndex` and `datasetIndex`
-    dataPoint: object,
+    parsed: object,
+
+    // Raw data values for the given `dataIndex` and `datasetIndex`
+    raw: object,
 
     // Formatted value for the tooltip
     formattedValue: string,
@@ -239,77 +251,79 @@ var myPieChart = new Chart(ctx, {
     type: 'pie',
     data: data,
     options: {
-        tooltips: {
-            // Disable the on-canvas tooltip
-            enabled: false,
+        plugins: {
+            tooltip: {
+                // Disable the on-canvas tooltip
+                enabled: false,
 
-            custom: function(context) {
-                // Tooltip Element
-                var tooltipEl = document.getElementById('chartjs-tooltip');
+                custom: function(context) {
+                    // Tooltip Element
+                    var tooltipEl = document.getElementById('chartjs-tooltip');
 
-                // Create element on first render
-                if (!tooltipEl) {
-                    tooltipEl = document.createElement('div');
-                    tooltipEl.id = 'chartjs-tooltip';
-                    tooltipEl.innerHTML = '<table></table>';
-                    document.body.appendChild(tooltipEl);
+                    // Create element on first render
+                    if (!tooltipEl) {
+                        tooltipEl = document.createElement('div');
+                        tooltipEl.id = 'chartjs-tooltip';
+                        tooltipEl.innerHTML = '<table></table>';
+                        document.body.appendChild(tooltipEl);
+                    }
+
+                    // Hide if no tooltip
+                    var tooltipModel = context.tooltip;
+                    if (tooltipModel.opacity === 0) {
+                        tooltipEl.style.opacity = 0;
+                        return;
+                    }
+
+                    // Set caret Position
+                    tooltipEl.classList.remove('above', 'below', 'no-transform');
+                    if (tooltipModel.yAlign) {
+                        tooltipEl.classList.add(tooltipModel.yAlign);
+                    } else {
+                        tooltipEl.classList.add('no-transform');
+                    }
+
+                    function getBody(bodyItem) {
+                        return bodyItem.lines;
+                    }
+
+                    // Set Text
+                    if (tooltipModel.body) {
+                        var titleLines = tooltipModel.title || [];
+                        var bodyLines = tooltipModel.body.map(getBody);
+
+                        var innerHtml = '<thead>';
+
+                        titleLines.forEach(function(title) {
+                            innerHtml += '<tr><th>' + title + '</th></tr>';
+                        });
+                        innerHtml += '</thead><tbody>';
+
+                        bodyLines.forEach(function(body, i) {
+                            var colors = tooltipModel.labelColors[i];
+                            var style = 'background:' + colors.backgroundColor;
+                            style += '; border-color:' + colors.borderColor;
+                            style += '; border-width: 2px';
+                            var span = '<span style="' + style + '"></span>';
+                            innerHtml += '<tr><td>' + span + body + '</td></tr>';
+                        });
+                        innerHtml += '</tbody>';
+
+                        var tableRoot = tooltipEl.querySelector('table');
+                        tableRoot.innerHTML = innerHtml;
+                    }
+
+                    var position = context.chart.canvas.getBoundingClientRect();
+
+                    // Display, position, and set styles for font
+                    tooltipEl.style.opacity = 1;
+                    tooltipEl.style.position = 'absolute';
+                    tooltipEl.style.left = position.left + window.pageXOffset + tooltipModel.caretX + 'px';
+                    tooltipEl.style.top = position.top + window.pageYOffset + tooltipModel.caretY + 'px';
+                    tooltipEl.style.font = tooltipModel.bodyFont.string;
+                    tooltipEl.style.padding = tooltipModel.yPadding + 'px ' + tooltipModel.xPadding + 'px';
+                    tooltipEl.style.pointerEvents = 'none';
                 }
-
-                // Hide if no tooltip
-                var tooltipModel = context.tooltip;
-                if (tooltipModel.opacity === 0) {
-                    tooltipEl.style.opacity = 0;
-                    return;
-                }
-
-                // Set caret Position
-                tooltipEl.classList.remove('above', 'below', 'no-transform');
-                if (tooltipModel.yAlign) {
-                    tooltipEl.classList.add(tooltipModel.yAlign);
-                } else {
-                    tooltipEl.classList.add('no-transform');
-                }
-
-                function getBody(bodyItem) {
-                    return bodyItem.lines;
-                }
-
-                // Set Text
-                if (tooltipModel.body) {
-                    var titleLines = tooltipModel.title || [];
-                    var bodyLines = tooltipModel.body.map(getBody);
-
-                    var innerHtml = '<thead>';
-
-                    titleLines.forEach(function(title) {
-                        innerHtml += '<tr><th>' + title + '</th></tr>';
-                    });
-                    innerHtml += '</thead><tbody>';
-
-                    bodyLines.forEach(function(body, i) {
-                        var colors = tooltipModel.labelColors[i];
-                        var style = 'background:' + colors.backgroundColor;
-                        style += '; border-color:' + colors.borderColor;
-                        style += '; border-width: 2px';
-                        var span = '<span style="' + style + '"></span>';
-                        innerHtml += '<tr><td>' + span + body + '</td></tr>';
-                    });
-                    innerHtml += '</tbody>';
-
-                    var tableRoot = tooltipEl.querySelector('table');
-                    tableRoot.innerHTML = innerHtml;
-                }
-
-                var position = context.chart.canvas.getBoundingClientRect();
-
-                // Display, position, and set styles for font
-                tooltipEl.style.opacity = 1;
-                tooltipEl.style.position = 'absolute';
-                tooltipEl.style.left = position.left + window.pageXOffset + tooltipModel.caretX + 'px';
-                tooltipEl.style.top = position.top + window.pageYOffset + tooltipModel.caretY + 'px';
-                tooltipEl.style.font = tooltipModel.bodyFont.string;
-                tooltipEl.style.padding = tooltipModel.yPadding + 'px ' + tooltipModel.xPadding + 'px';
-                tooltipEl.style.pointerEvents = 'none';
             }
         }
     }

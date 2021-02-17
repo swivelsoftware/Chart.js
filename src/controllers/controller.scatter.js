@@ -10,28 +10,34 @@ ScatterController.id = 'scatter';
  * @type {any}
  */
 ScatterController.defaults = {
-	scales: {
-		x: {
-			type: 'linear'
-		},
-		y: {
-			type: 'linear'
-		}
-	},
+  scales: {
+    x: {
+      type: 'linear'
+    },
+    y: {
+      type: 'linear'
+    }
+  },
 
-	datasets: {
-		showLine: false,
-		fill: false
-	},
+  datasets: {
+    showLine: false,
+    fill: false
+  },
 
-	tooltips: {
-		callbacks: {
-			title() {
-				return '';     // doesn't make sense for scatter since data are formatted as a point
-			},
-			label(item) {
-				return '(' + item.label + ', ' + item.formattedValue + ')';
-			}
-		}
-	}
+  interaction: {
+    mode: 'point'
+  },
+
+  plugins: {
+    tooltip: {
+      callbacks: {
+        title() {
+          return '';     // doesn't make sense for scatter since data are formatted as a point
+        },
+        label(item) {
+          return '(' + item.label + ', ' + item.formattedValue + ')';
+        }
+      }
+    }
+  }
 };

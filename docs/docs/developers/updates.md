@@ -35,16 +35,18 @@ To update the options, mutating the options property in place or passing in a ne
 
 ```javascript
 function updateConfigByMutating(chart) {
-    chart.options.title.text = 'new title';
+    chart.options.plugins.title.text = 'new title';
     chart.update();
 }
 
 function updateConfigAsNewObject(chart) {
     chart.options = {
         responsive: true,
-        title: {
-            display: true,
-            text: 'Chart.js'
+        plugins: {
+            title: {
+                display: true,
+                text: 'Chart.js'
+            }
         },
         scales: {
             x: {
@@ -95,7 +97,7 @@ function updateScale(chart) {
 }
 ```
 
-Code sample for updating options can be found in [toggle-scale-type.html](./../../samples/latest/scales/toggle-scale-type.html).
+Code sample for updating options can be found in [toggle-scale-type.html](./../../../samples/latest/scales/toggle-scale-type.html).
 
 ## Preventing Animations
 

@@ -44,7 +44,7 @@
 		}
 
 		function adjustRadiusBasedOnData(ctx) {
-			var v = ctx.dataPoint.y;
+			var v = ctx.parsed.y;
 			return v < 10 ? 5
 				: v < 25 ? 7
 				: v < 50 ? 9
@@ -68,8 +68,10 @@
 		};
 
 		var options = {
-			legend: false,
-			tooltips: true,
+			plugins: {
+				legend: false,
+				tooltip: false,
+			},
 			elements: {
 				line: {
 					backgroundColor: make20PercentOpaque,

@@ -25,17 +25,19 @@ Chart.js 3.0 introduces a number of breaking changes. Chart.js 2.0 was released 
 * Chart.js 3 is tree-shakeable. So if you are using it as an `npm` module in a project, you need to import and register the controllers, elements, scales and plugins you want to use. You will not have to call `register` if importing Chart.js via a `script` tag, but will not get the tree shaking benefits in this case. Here is an example of registering components:
 
 ```javascript
-import { Chart, LineController, Line, Point, LinearScale, Title } from `chart.js`
+import { Chart, LineController, LineElement, PointElement, LinearScale, Title } from `chart.js`
 
-Chart.register(LineController, Line, Point, LinearScale, Title);
+Chart.register(LineController, LineElement, PointElement, LinearScale, Title);
 
 const chart = new Chart(ctx, {
     type: 'line',
     // data: ...
     options: {
-        title: {
-            display: true,
-            text: 'Chart Title'
+        plugins: {
+            title: {
+                display: true,
+                text: 'Chart Title'
+            }
         },
         scales: {
             x: {
@@ -51,7 +53,7 @@ const chart = new Chart(ctx, {
 
 ### Chart types
 
-* `horizontalBar` chart type was removed. Horizontal bar charts can be configured using the new [`indexAxis`](./charts/bar.mdx#general) option
+* `horizontalBar` chart type was removed. Horizontal bar charts can be configured using the new [`indexAxis`](./charts/bar.mdx#horizontal-bar-chart) option
 
 ### Options
 
@@ -61,6 +63,10 @@ A number of changes were made to the configuration options passed to the `Chart`
 
 * Indexable options are now looping. `backgroundColor: ['red', 'green']` will result in alternating `'red'` / `'green'` if there are more than 2 data points.
 * The input properties of object data can now be freely specified, see [data structures](../general/data-structures.md) for details.
+* Most options are resolved utilizing proxies, instead merging with defaults. In addition to easily enabling different resolution routes for different contexts, it allows using other resolved options in scriptable options.
+  * Options are by default scriptable and indexable, unless disabled for some reason.
+  * Scriptable options receive a option reolver as second parameter for accessing other options in same context.
+  * Resolution falls to upper scopes, if no match is found earlier. See [options](./general/options.md) for details.
 
 #### Specific changes
 
@@ -70,7 +76,8 @@ A number of changes were made to the configuration options passed to the `Chart`
 * Polar area `elements.arc.angle` is now configured in degrees instead of radians.
 * Polar area `startAngle` option is now consistent with `Radar`, 0 is at top and value is in degrees. Default is changed from `-½π` to  `0`.
 * Doughnut `rotation` option is now in degrees and 0 is at top. Default is changed from `-½π` to  `0`.
-* Doughnut `circumference` option is now in degrees. Default is changed from `2π` to `0`.
+* Doughnut `circumference` option is now in degrees. Default is changed from `2π` to `360`.
+* `scale` option was removed in favor of `options.scales.r` (or any other scale id, with `axis: 'r'`)
 * `scales.[x/y]Axes` arrays were removed. Scales are now configured directly to `options.scales` object with the object key being the scale Id.
 * `scales.[x/y]Axes.barPercentage` was moved to dataset option `barPercentage`
 * `scales.[x/y]Axes.barThickness` was moved to dataset option `barThickness`
@@ -91,24 +98,26 @@ A number of changes were made to the configuration options passed to the `Chart`
 * `scales.[x/y]Axes.zeroLine*` options of axes were removed. Use scriptable scale options instead.
 * The dataset option `steppedLine` was removed. Use `stepped`
 * The chart option `showLines` was renamed to `showLine` to match the dataset option.
-* Dataset options are now configured as `options[type].datasets` rather than `options.datasets[type]`
 * To override the platform class used in a chart instance, pass `platform: PlatformClass` in the config object. Note that the class should be passed, not an instance of the class.
 * `aspectRatio` defaults to 1 for doughnut, pie, polarArea, and radar charts
 * `TimeScale` does not read `t` from object data by default anymore. The default property is `x` or `y`, depending on the orientation. See [data structures](../general/data-structures.md) for details on how to change the default.
+* `tooltips` namespace was renamed to `tooltip` to match the plugin name
+* `legend`, `title` and `tooltip` namespaces were moved from `options` to `options.plugins`.
 
 #### Defaults
 
 * `global` namespace was removed from `defaults`. So `Chart.defaults.global` is now `Chart.defaults`
 * Dataset controller defaults were relocate to `controllers`. For example `Chart.defaults.line` is now `Chart.defaults.controllers.line`
 * `default` prefix was removed from defaults. For example `Chart.defaults.global.defaultColor` is now `Chart.defaults.color`
-* `defaultColor` was renamed to `color`
-* `defaultFontColor` was renamed to `font.color`
+* `defaultColor` was split to `color`, `borderColor` and `backgroundColor`
+* `defaultFontColor` was renamed to `color`
 * `defaultFontFamily` was renamed to `font.family`
 * `defaultFontSize` was renamed to `font.size`
 * `defaultFontStyle` was renamed to `font.style`
 * `defaultLineHeight` was renamed to `font.lineHeight`
 * Horizontal Bar default tooltip mode was changed from `'index'` to `'nearest'` to match vertical bar charts
 * `legend`, `title` and `tooltip` namespaces were moved from `Chart.defaults` to `Chart.defaults.plugins`.
+* `elements.line.fill` default changed from `true` to `false`.
 
 #### Scales
 
@@ -169,11 +178,11 @@ options: {
         major: {
           enabled: true
         },
+        color: (context) => context.tick && context.tick.major && '#FF0000',
         font: function(context) {
           if (context.tick && context.tick.major) {
             return {
-              style: 'bold',
-              color: '#FF0000'
+              style: 'bold'
             };
           }
         }
@@ -204,7 +213,7 @@ Animation system was completely rewritten in Chart.js v3. Each property can now 
 
 #### Interactions
 
-* To allow DRY configuration, a root options scope for common interaction options was added. `options.hover` and `options.tooltips` now both extend from `options.interaction`. Defaults are defined at `defaults.interaction` level, so by default hover and tooltip interactions share the same mode etc.
+* To allow DRY configuration, a root options scope for common interaction options was added. `options.hover` and `options.plugins.tooltip` now both extend from `options.interaction`. Defaults are defined at `defaults.interaction` level, so by default hover and tooltip interactions share the same mode etc.
 * `interactions` are now limited to the chart area
 * `{mode: 'label'}` was replaced with `{mode: 'index'}`
 * `{mode: 'single'}` was replaced with `{mode: 'nearest', intersect: true}`
@@ -215,6 +224,7 @@ Animation system was completely rewritten in Chart.js v3. Each property can now 
 
 #### Ticks
 
+* `options.gridLines.tickMarkLength` was renamed to `options.gridLines.tickLength`.
 * `options.ticks.major` and `options.ticks.minor` were replaced with scriptable options for tick fonts.
 * `Chart.Ticks.formatters.linear` was renamed to `Chart.Ticks.formatters.numeric`.
 
@@ -397,6 +407,7 @@ The following properties were renamed during v3 development:
 * `helpers.callCallback` was renamed to `helpers.callback`
 * `helpers.drawRoundedRectangle` was renamed to `helpers.roundedRect`
 * `helpers.getValueOrDefault` was renamed to `helpers.valueOrDefault`
+* `LayoutItem.fullWidth` was renamed to `LayoutItem.fullSize`
 * `Scale.calculateTickRotation` was renamed to `Scale.calculateLabelRotation`
 * `Tooltip.options.legendColorBackgroupd` was renamed to `Tooltip.options.multiKeyBackground`
 
@@ -429,6 +440,7 @@ The private APIs listed below were renamed:
 * `DatasetController.onDataUnshift` was renamed to `DatasetController._onDataUnshift`
 * `DatasetController.removeElements` was renamed to `DatasetController._removeElements`
 * `DatasetController.resyncElements` was renamed to `DatasetController._resyncElements`
+* `LayoutItem.isFullWidth` was renamed to `LayoutItem.isFullSize`
 * `RadialLinearScale.setReductions` was renamed to `RadialLinearScale._setReductions`
 * `Scale.handleMargins` was renamed to `Scale._handleMargins`
 
@@ -483,6 +495,8 @@ All helpers are now exposed in a flat hierarchy, e.g., `Chart.helpers.canvas.cli
 * The second parameter to `drawPoint` is now the full options object, so `style`, `rotation`, and `radius` are no longer passed explicitly
 * `helpers.getMaximumHeight` was replaced by `helpers.dom.getMaximumSize`
 * `helpers.getMaximumWidth` was replaced by `helpers.dom.getMaximumSize`
+* `helpers.clear` was renamed to `helpers.clearCanvas` and now takes `canvas` and optionally `ctx` as parameter(s).
+* `helpers.retinaScale` accepts optional third parameter `forceStyle`, which forces overriding current canvas style. `forceRatio` no longer falls back to `window.devicePixelRatio`, instead it defaults to `1`.
 
 #### Platform
 
@@ -493,6 +507,9 @@ All helpers are now exposed in a flat hierarchy, e.g., `Chart.helpers.canvas.cli
 
 #### IPlugin interface
 
+* All plugin hooks have unified signature with 3 arguments: `chart`, `args` and `options`. This means change in signature for these hooks: `beforeInit`, `afterInit`, `reset`, `beforeLayout`, `afterLayout`, `beforeRender`, `afterRender`, `beforeDraw`, `afterDraw`, `beforeDatasetsDraw`, `afterDatasetsDraw`, `beforeEvent`, `afterEvent`, `resize`, `destroy`.
 * `afterDatasetsUpdate`, `afterUpdate`, `beforeDatasetsUpdate`, and `beforeUpdate` now receive `args` object as second argument. `options` argument is always the last and thus was moved from 2nd to 3rd place.
-* `afterEvent` and `beforeEvent` now receive a wrapped `event` as the second argument. The native event is available via `event.native`.
+* `afterEvent` and `beforeEvent` now receive a wrapped `event` as the `event` property of the second argument. The native event is available via `args.event.native`.
 * Initial `resize` is no longer silent. Meaning that `resize` event can fire between `beforeInit` and `afterInit`
+* New hooks: `install`, `start`, `stop`, and `uninstall`
+* `afterEvent` should notify about changes that need a render by setting `args.changed` to true. Because the `args` are shared with all plugins, it should only be set to true and not false.

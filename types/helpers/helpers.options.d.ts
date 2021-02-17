@@ -1,14 +1,14 @@
-import { IFontSpec } from '../core/interfaces';
+import { FontSpec } from '../index.esm';
 
-export interface ICanvasFontSpec extends IFontSpec {
-  string: string;
+export interface CanvasFontSpec extends FontSpec {
+	string: string;
 }
 /**
  * Parses font options and returns the font object.
  * @param {object} options - A object that contains font options to be parsed.
  * @return {object} The font object.
  */
-export function toFont(options: Partial<IFontSpec>): ICanvasFontSpec;
+export function toFont(options: Partial<FontSpec>): CanvasFontSpec;
 
 /**
  * Converts the given line height `value` in pixels for a specific font `size`.
@@ -28,7 +28,7 @@ export function toLineHeight(value: string, size: number): number;
  * @since 2.7.0
  */
 export function toPadding(
-  value?: number | { top?: number; left?: number; right?: number; bottom?: number }
+	value?: number | { top?: number; left?: number; right?: number; bottom?: number }
 ): { top: number; left: number; right: number; bottom: number; width: number; height: number };
 
 /**
@@ -43,8 +43,8 @@ export function toPadding(
  * @since 2.7.0
  */
 export function resolve<T, C>(
-  inputs: undefined | T | ((c: C) => T) | readonly T[],
-  context?: C,
-  index?: number,
-  info?: { cacheable?: boolean }
+	inputs: undefined | T | ((c: C) => T) | readonly T[],
+	context?: C,
+	index?: number,
+	info?: { cacheable?: boolean }
 ): T | undefined;

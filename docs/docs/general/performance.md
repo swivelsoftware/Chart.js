@@ -18,7 +18,7 @@ Chart.js is fastest if you provide data with indices that are unique, sorted, an
 
 Decimating your data will achieve the best results. When there is a lot of data to display on the graph, it doesn't make sense to show tens of thousands of data points on a graph that is only a few hundred pixels wide.
 
-There are many approaches to data decimation and selection of an algorithm will depend on your data and the results you want to achieve. For instance, [min/max](https://digital.ni.com/public.nsf/allkb/F694FFEEA0ACF282862576020075F784) decimation will preserve peaks in your data but could require up to 4 points for each pixel. This type of decimation would work well for a very noisy signal where you need to see data peaks.
+The [decimation plugin](./configuration/decimation.md) can be used with line charts to decimate data before the chart is rendered. This will provide the best performance since it will reduce the memory needed to render the chart.
 
 Line charts are able to do [automatic data decimation during draw](#automatic-data-decimation-during-draw), when certain conditions are met. You should still consider decimating data yourself before passing it in for maximum performance since the automatic decimation occurs late in the chart life cycle.
 
@@ -35,6 +35,7 @@ Set the [`ticks.sampleSize`](./axes/cartesian/index.mdx#tick-configuration) opti
 ## Disable Animations
 
 If your charts have long render times, it is a good idea to disable animations. Doing so will mean that the chart needs to only be rendered once during an update instead of multiple times. This will have the effect of reducing CPU usage and improving general page performance.
+Line charts use Path2D caching when animations are disabled.
 
 To disable animations
 
@@ -73,15 +74,15 @@ new Chart(ctx, {
 });
 ```
 
-## Parallel rendering with web workers (Chrome only)
+## Parallel rendering with web workers (Chromium only)
 
-Chrome (in version 69) added the ability to [transfer rendering control of a canvas](https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/transferControlToOffscreen) to a web worker. Web workers can use the [OffscreenCanvas API](https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas) to render from a web worker onto canvases in the DOM. Chart.js is a canvas-based library and supports rendering in a web worker - just pass an OffscreenCanvas into the Chart constructor instead of a Canvas element. Note that as of today, this API is only supported in Chrome.
+Chromium (Chrome: version 69, Edge: 79, Opera: 56) added the ability to [transfer rendering control of a canvas](https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/transferControlToOffscreen) to a web worker. Web workers can use the [OffscreenCanvas API](https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas) to render from a web worker onto canvases in the DOM. Chart.js is a canvas-based library and supports rendering in a web worker - just pass an OffscreenCanvas into the Chart constructor instead of a Canvas element. Note that as of today, this API is only supported in Chromium based browsers.
 
 By moving all Chart.js calculations onto a separate thread, the main thread can be freed up for other uses. Some tips and tricks when using Chart.js in a web worker:
 * Transferring data between threads can be expensive, so ensure that your config and data objects are as small as possible. Try generating them on the worker side if you can (workers can make HTTP requests!) or passing them to your worker as ArrayBuffers, which can be transferred quickly from one thread to another.
 * You can't transfer functions between threads, so if your config object includes functions you'll have to strip them out before transferring and then add them back later.
 * You can't access the DOM from worker threads, so Chart.js plugins that use the DOM (including any mouse interactions) will likely not work.
-* Ensure that you have a fallback if you support browsers other than the most modern Chrome browser.
+* Ensure that you have a fallback if you support browsers other than the most modern Chromium browsers.
 * Resizing the chart must be done manually. See an example in the worker code below.
 
 Example main thread code:
@@ -133,8 +134,7 @@ new Chart(ctx, {
 
 ### Automatic data decimation during draw
 
-Line element will automatically decimate data, when the following conditions are met: `tension` is `0`, `stepped` is `false` (default) and `borderDash` is `[]` (default).`
-This improves rendering speed by skipping drawing of invisible line segments.
+Line element will automatically decimate data, when the following conditions are met: `tension` is `0`, `stepped` is `false` (default) and `borderDash` is `[]` (default). This improves rendering speed by skipping drawing of invisible line segments.
 
 ```javascript
 new Chart(ctx, {

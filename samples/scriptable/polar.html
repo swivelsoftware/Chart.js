@@ -26,7 +26,7 @@
 		utils.srand(110);
 
 		function colorize(opaque, hover, ctx) {
-			var v = ctx.dataset.data[ctx.dataIndex];
+			var v = ctx.raw;
 			var c = v < 35 ? '#D60000'
 				: v < 55 ? '#F46300'
 				: v < 75 ? '#0358B6'
@@ -56,8 +56,10 @@
 		};
 
 		var options = {
-			legend: false,
-			tooltips: false,
+			plugins: {
+				legend: false,
+				tooltip: false,
+			},
 			elements: {
 				arc: {
 					backgroundColor: colorize.bind(null, false, false),
