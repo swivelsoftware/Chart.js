@@ -1,7 +1,7 @@
 /*!
  * Chart.js v2.9.4
  * https://www.chartjs.org
- * (c) 2020 Chart.js Contributors
+ * (c) 2021 Chart.js Contributors
  * Released under the MIT License
  */
 (function (global, factory) {
@@ -5396,15 +5396,22 @@ core_defaults._set('doughnut', {
 			var chart = this.chart;
 			var i, ilen, meta;
 
+			// for (i = 0, ilen = (chart.data.datasets || []).length; i < ilen; ++i) {
+			// 	meta = chart.getDatasetMeta(i);
+			// 	// toggle visibility of index if exists
+			// 	if (meta.data[index]) {
+			// 		meta.data[index].hidden = !meta.data[index].hidden;
+			// 	}
+			// 	chart.update();
+			// }
+			/**
+			 * Customized. Avoid disabling all datasets
+			 * by kennys.ng@swivelsoftware.com
+			 */
 			meta = chart.getDatasetMeta(0);
 			var hiddens = meta.data.map(function(m) {
 				return m.hidden;
 			});
-
-			/**
-			 * Customized. Avoid disabling all datasets
-			 * by kennysng@hotmail.com.hk
-			 */
 
 			var allHidden = hiddens.reduce(function(result, flag, i) {
 				if (i !== index && (flag || false) === false) {
@@ -5424,6 +5431,7 @@ core_defaults._set('doughnut', {
 
 				chart.update();
 			}
+			/****** Customized end ******/
 		}
 	},
 
@@ -8926,8 +8934,6 @@ var exports$4 = core_element.extend({
 	},
 
 	drawBody: function(pt, vm, ctx) {
-		var me = this;
-		var ci = me._chart;
 		var bodyFontSize = vm.bodyFontSize;
 		var bodySpacing = vm.bodySpacing;
 		var bodyAlign = vm._bodyAlign;
@@ -8962,9 +8968,6 @@ var exports$4 = core_element.extend({
 
 		// Draw body lines now
 		for (i = 0, ilen = body.length; i < ilen; ++i) {
-			var point = vm.dataPoints[i];
-			var meta = ci.getDatasetMeta(point.datasetIndex);
-			var style = meta.controller.getStyle(undefined);
 			bodyItem = body[i];
 			textColor = vm.labelTextColors[i];
 			labelColors = vm.labelColors[i];
@@ -8976,7 +8979,30 @@ var exports$4 = core_element.extend({
 			for (j = 0, jlen = lines.length; j < jlen; ++j) {
 				// Draw Legend-like boxes if needed
 				if (drawColorBoxes) {
+					// var rtlColorX = rtlHelper.x(colorX);
+
+					// // Fill a white rect so that colours merge nicely if the opacity is < 1
+					// ctx.fillStyle = vm.legendColorBackground;
+					// ctx.fillRect(rtlHelper.leftForLtr(rtlColorX, bodyFontSize), pt.y, bodyFontSize, bodyFontSize);
+
+					// // Border
+					// ctx.lineWidth = 1;
+					// ctx.strokeStyle = labelColors.borderColor;
+					// ctx.strokeRect(rtlHelper.leftForLtr(rtlColorX, bodyFontSize), pt.y, bodyFontSize, bodyFontSize);
+
+					// // Inner square
+					// ctx.fillStyle = labelColors.backgroundColor;
+					// ctx.fillRect(rtlHelper.leftForLtr(rtlHelper.xPlus(rtlColorX, 1), bodyFontSize - 2), pt.y + 1, bodyFontSize - 2, bodyFontSize - 2);
+					/**
+					 * Customized. Update dataset icon(s) for line chart
+					 * by kennys.ng@swivelsoftware.com
+					 */
 					if (meta.type === 'line') {
+						var ci = this._chart;
+						var point = vm.dataPoints[i];
+						var meta = ci.getDatasetMeta(point.datasetIndex);
+						var style = meta.controller.getStyle(undefined);
+
 						var x = colorX;
 						var y = pt.y;
 						var fontSize = bodyFontSize;
@@ -9010,6 +9036,7 @@ var exports$4 = core_element.extend({
 						ctx.fillStyle = labelColors.backgroundColor;
 						ctx.fillRect(rtlHelper.leftForLtr(rtlHelper.xPlus(rtlColorX, 1), bodyFontSize - 2), pt.y + 1, bodyFontSize - 2, bodyFontSize - 2);
 					}
+					/****** Customized end ******/
 					ctx.fillStyle = textColor;
 				}
 
@@ -20865,16 +20892,21 @@ core_defaults._set('global', {
 		onClick: function(e, legendItem) {
 			var index = legendItem.datasetIndex;
 			var ci = this.chart;
+			// var meta = ci.getDatasetMeta(index);
 
-			var datasets = ci.data.datasets || [];
-			var metas = datasets.map(function(dataset, i) {
-				return ci.getDatasetMeta(i);
-			});
+			// // See controller.isDatasetVisible comment
+			// meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
 
+			// // We hid a dataset ... rerender the chart
+			// ci.update();
 			/**
 			 * Customized. Avoid disabling all datasets
 			 * by kennysng@hotmail.com.hk
 			 */
+			var datasets = ci.data.datasets || [];
+			var metas = datasets.map(function(dataset, i) {
+				return ci.getDatasetMeta(i);
+			});
 
 			var hiddens = metas.map(function(meta) {
 				return meta.hidden || ci.data.datasets[index].hidden;
@@ -20895,6 +20927,7 @@ core_defaults._set('global', {
 				// We hid a dataset ... rerender the chart
 				ci.update();
 			}
+			/****** Customized end ******/
 		},
 
 		onHover: null,
@@ -21242,10 +21275,6 @@ var Legend = core_element.extend({
 
 		// current position
 		var drawLegendBox = function(x, y, legendItem) {
-			var index = legendItem.datasetIndex || 0;
-			var ci = me.chart;
-			var meta = ci.getDatasetMeta(index);
-
 			if (isNaN(boxWidth) || boxWidth <= 0) {
 				return;
 			}
@@ -21275,7 +21304,16 @@ var Legend = core_element.extend({
 
 				// Draw pointStyle as legend symbol
 				helpers$1.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY, legendItem.rotation);
-			} else if (meta.type === 'line') {
+			}
+			/**
+			 * Customized. Update dataset icon(s) for line chart
+			 * by kennys.ng@swivelsoftware.com
+			 */
+			else if (meta.type === 'line') {
+				var index = legendItem.datasetIndex || 0;
+				var ci = me.chart;
+				var meta = ci.getDatasetMeta(index);
+
 				// Draw line as legend symbol
 				ctx.fillStyle = 'transparent';
 				ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
@@ -21286,7 +21324,9 @@ var Legend = core_element.extend({
 				var centerY = y + fontSize / 2;
 				ctx.lineWidth *= Math.SQRT2 / 2;
 				helpers$1.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY, legendItem.rotation);
-			} else {
+			}
+			/****** Customized end ******/
+			else {
 				// Draw box as legend symbol
 				ctx.fillRect(rtlHelper.leftForLtr(x, boxWidth), y, boxWidth, fontSize);
 				if (lineWidth !== 0) {
