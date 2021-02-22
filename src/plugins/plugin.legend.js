@@ -22,16 +22,21 @@ defaults._set('global', {
 		onClick: function(e, legendItem) {
 			var index = legendItem.datasetIndex;
 			var ci = this.chart;
+			// var meta = ci.getDatasetMeta(index);
 
-			var datasets = ci.data.datasets || [];
-			var metas = datasets.map(function(dataset, i) {
-				return ci.getDatasetMeta(i);
-			});
+			// // See controller.isDatasetVisible comment
+			// meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
 
+			// // We hid a dataset ... rerender the chart
+			// ci.update();
 			/**
 			 * Customized. Avoid disabling all datasets
 			 * by kennysng@hotmail.com.hk
 			 */
+			var datasets = ci.data.datasets || [];
+			var metas = datasets.map(function(dataset, i) {
+				return ci.getDatasetMeta(i);
+			});
 
 			var hiddens = metas.map(function(meta) {
 				return meta.hidden || ci.data.datasets[index].hidden;
@@ -52,6 +57,7 @@ defaults._set('global', {
 				// We hid a dataset ... rerender the chart
 				ci.update();
 			}
+			/****** Customized end ******/
 		},
 
 		onHover: null,
@@ -399,10 +405,6 @@ var Legend = Element.extend({
 
 		// current position
 		var drawLegendBox = function(x, y, legendItem) {
-			var index = legendItem.datasetIndex || 0;
-			var ci = me.chart;
-			var meta = ci.getDatasetMeta(index);
-
 			if (isNaN(boxWidth) || boxWidth <= 0) {
 				return;
 			}
@@ -432,7 +434,16 @@ var Legend = Element.extend({
 
 				// Draw pointStyle as legend symbol
 				helpers.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY, legendItem.rotation);
-			} else if (meta.type === 'line') {
+			}
+			/**
+			 * Customized. Update dataset icon(s) for line chart
+			 * by kennys.ng@swivelsoftware.com
+			 */
+			else if (meta.type === 'line') {
+				var index = legendItem.datasetIndex || 0;
+				var ci = me.chart;
+				var meta = ci.getDatasetMeta(index);
+
 				// Draw line as legend symbol
 				ctx.fillStyle = 'transparent';
 				ctx.strokeRect(x, y + fontSize / 2, boxWidth, 0);
@@ -443,7 +454,9 @@ var Legend = Element.extend({
 				var centerY = y + fontSize / 2;
 				ctx.lineWidth *= Math.SQRT2 / 2;
 				helpers.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY, legendItem.rotation);
-			} else {
+			}
+			/****** Customized end ******/
+			else {
 				// Draw box as legend symbol
 				ctx.fillRect(rtlHelper.leftForLtr(x, boxWidth), y, boxWidth, fontSize);
 				if (lineWidth !== 0) {

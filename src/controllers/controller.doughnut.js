@@ -73,15 +73,22 @@ defaults._set('doughnut', {
 			var chart = this.chart;
 			var i, ilen, meta;
 
+			// for (i = 0, ilen = (chart.data.datasets || []).length; i < ilen; ++i) {
+			// 	meta = chart.getDatasetMeta(i);
+			// 	// toggle visibility of index if exists
+			// 	if (meta.data[index]) {
+			// 		meta.data[index].hidden = !meta.data[index].hidden;
+			// 	}
+			// 	chart.update();
+			// }
+			/**
+			 * Customized. Avoid disabling all datasets
+			 * by kennys.ng@swivelsoftware.com
+			 */
 			meta = chart.getDatasetMeta(0);
 			var hiddens = meta.data.map(function(m) {
 				return m.hidden;
 			});
-
-			/**
-			 * Customized. Avoid disabling all datasets
-			 * by kennysng@hotmail.com.hk
-			 */
 
 			var allHidden = hiddens.reduce(function(result, flag, i) {
 				if (i !== index && (flag || false) === false) {
@@ -101,6 +108,7 @@ defaults._set('doughnut', {
 
 				chart.update();
 			}
+			/****** Customized end ******/
 		}
 	},
 

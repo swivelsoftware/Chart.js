@@ -782,8 +782,6 @@ var exports = Element.extend({
 	},
 
 	drawBody: function(pt, vm, ctx) {
-		var me = this;
-		var ci = me._chart;
 		var bodyFontSize = vm.bodyFontSize;
 		var bodySpacing = vm.bodySpacing;
 		var bodyAlign = vm._bodyAlign;
@@ -818,9 +816,6 @@ var exports = Element.extend({
 
 		// Draw body lines now
 		for (i = 0, ilen = body.length; i < ilen; ++i) {
-			var point = vm.dataPoints[i];
-			var meta = ci.getDatasetMeta(point.datasetIndex);
-			var style = meta.controller.getStyle(undefined);
 			bodyItem = body[i];
 			textColor = vm.labelTextColors[i];
 			labelColors = vm.labelColors[i];
@@ -832,7 +827,30 @@ var exports = Element.extend({
 			for (j = 0, jlen = lines.length; j < jlen; ++j) {
 				// Draw Legend-like boxes if needed
 				if (drawColorBoxes) {
+					// var rtlColorX = rtlHelper.x(colorX);
+
+					// // Fill a white rect so that colours merge nicely if the opacity is < 1
+					// ctx.fillStyle = vm.legendColorBackground;
+					// ctx.fillRect(rtlHelper.leftForLtr(rtlColorX, bodyFontSize), pt.y, bodyFontSize, bodyFontSize);
+
+					// // Border
+					// ctx.lineWidth = 1;
+					// ctx.strokeStyle = labelColors.borderColor;
+					// ctx.strokeRect(rtlHelper.leftForLtr(rtlColorX, bodyFontSize), pt.y, bodyFontSize, bodyFontSize);
+
+					// // Inner square
+					// ctx.fillStyle = labelColors.backgroundColor;
+					// ctx.fillRect(rtlHelper.leftForLtr(rtlHelper.xPlus(rtlColorX, 1), bodyFontSize - 2), pt.y + 1, bodyFontSize - 2, bodyFontSize - 2);
+					/**
+					 * Customized. Update dataset icon(s) for line chart
+					 * by kennys.ng@swivelsoftware.com
+					 */
 					if (meta.type === 'line') {
+						var ci = this._chart;
+						var point = vm.dataPoints[i];
+						var meta = ci.getDatasetMeta(point.datasetIndex);
+						var style = meta.controller.getStyle(undefined);
+
 						var x = colorX;
 						var y = pt.y;
 						var fontSize = bodyFontSize;
@@ -866,6 +884,7 @@ var exports = Element.extend({
 						ctx.fillStyle = labelColors.backgroundColor;
 						ctx.fillRect(rtlHelper.leftForLtr(rtlHelper.xPlus(rtlColorX, 1), bodyFontSize - 2), pt.y + 1, bodyFontSize - 2, bodyFontSize - 2);
 					}
+					/****** Customized end ******/
 					ctx.fillStyle = textColor;
 				}
 
