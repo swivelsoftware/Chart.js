@@ -674,6 +674,31 @@ describe('Chart.DatasetController', function() {
     Chart.defaults.borderColor = oldColor;
   });
 
+  it('should read parsing from options when default is false', function() {
+    const originalDefault = Chart.defaults.parsing;
+    Chart.defaults.parsing = false;
+
+    var chart = acquireChart({
+      type: 'line',
+      data: {
+        datasets: [{
+          data: [{t: 1, y: 0}]
+        }]
+      },
+      options: {
+        parsing: {
+          xAxisKey: 't'
+        }
+      }
+    });
+
+    var meta = chart.getDatasetMeta(0);
+    expect(meta.data[0].x).not.toBeNaN();
+
+    // Reset old shared state
+    Chart.defaults.parsing = originalDefault;
+  });
+
   describe('resolveDataElementOptions', function() {
     it('should cache options when possible', function() {
       const chart = acquireChart({
@@ -742,6 +767,18 @@ describe('Chart.DatasetController', function() {
   });
 
   describe('_resolveAnimations', function() {
+    function animationsExpectations(anims, props) {
+      for (const [prop, opts] of Object.entries(props)) {
+        const anim = anims._properties.get(prop);
+        expect(anim).withContext(prop).toBeInstanceOf(Object);
+        if (anim) {
+          for (const [name, value] of Object.entries(opts)) {
+            expect(anim[name]).withContext('"' + name + '" of ' + JSON.stringify(anim)).toEqual(value);
+          }
+        }
+      }
+    }
+
     it('should resolve to empty Animations when globally disabled', function() {
       const chart = acquireChart({
         type: 'line',
@@ -777,6 +814,71 @@ describe('Chart.DatasetController', function() {
       const controller = chart.getDatasetMeta(0).controller;
 
       expect(controller._resolveAnimations(0)._properties.size).toEqual(0);
+    });
+
+    it('should fallback properly', function() {
+      const chart = acquireChart({
+        type: 'line',
+        data: {
+          datasets: [{
+            data: [1],
+            animation: {
+              duration: 200
+            }
+          }, {
+            type: 'bar',
+            data: [2]
+          }]
+        },
+        options: {
+          animation: {
+            delay: 100
+          },
+          animations: {
+            x: {
+              delay: 200
+            }
+          },
+          transitions: {
+            show: {
+              x: {
+                delay: 300
+              }
+            }
+          },
+          datasets: {
+            bar: {
+              animation: {
+                duration: 500
+              }
+            }
+          }
+        }
+      });
+      const controller = chart.getDatasetMeta(0).controller;
+
+      expect(Chart.defaults.animation.duration).toEqual(1000);
+
+      const def0 = controller._resolveAnimations(0, 'default', false);
+      animationsExpectations(def0, {
+        x: {
+          delay: 200,
+          duration: 200
+        },
+        y: {
+          delay: 100,
+          duration: 200
+        }
+      });
+
+      const controller2 = chart.getDatasetMeta(1).controller;
+      const def1 = controller2._resolveAnimations(0, 'default', false);
+      animationsExpectations(def1, {
+        x: {
+          delay: 200,
+          duration: 500
+        }
+      });
     });
   });
 });

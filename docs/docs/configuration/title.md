@@ -6,13 +6,14 @@ The chart title defines text to draw at the top of the chart.
 
 ## Title Configuration
 
-The title configuration is passed into the `options.plugins.title` namespace. The global options for the chart title is defined in `Chart.defaults.plugins.title`.
+Namespace: `options.plugins.title`, the global options for the chart title is defined in `Chart.defaults.plugins.title`.
 
 | Name | Type | Default | Description
 | ---- | ---- | ------- | -----------
 | `align` | `string` | `'center'` | Alignment of the title. [more...](#align)
 | `color` | [`Color`](../general/colors.md) | `Chart.defaults.color` | Color of text.
 | `display` | `boolean` | `false` | Is the title shown?
+| `fullSize` | `boolean` | `true` | Marks that this box should take the full width/height of the canvas. If `false`, the box is sized and placed above/beside the chart area.
 | `position` | `string` | `'top'` | Position of title. [more...](#position)
 | `font` | `Font` | `{style: 'bold'}` | See [Fonts](../general/fonts.md)
 | `padding` | `number`\|`{top: number, bottom: number}` | `10` | Adds padding above and below the title text if a single number is specified. It is also possible to change top and bottom padding separately.

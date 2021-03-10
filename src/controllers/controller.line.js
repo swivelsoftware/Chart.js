@@ -12,7 +12,7 @@ export default class LineController extends DatasetController {
   update(mode) {
     const me = this;
     const meta = me._cachedMeta;
-    const {dataset: line, data: points = []} = meta;
+    const {dataset: line, data: points = [], _dataset} = meta;
     // @ts-ignore
     const animationsDisabled = me.chart._animationsDisabled;
     let {start, count} = getStartAndCountOfVisiblePoints(meta, points, animationsDisabled);
@@ -26,6 +26,7 @@ export default class LineController extends DatasetController {
     }
 
     // Update Line
+    line._decimated = !!_dataset._decimated;
     line.points = points;
 
     // In resize mode only point locations change, so no need to set the options.
@@ -61,7 +62,7 @@ export default class LineController extends DatasetController {
       const parsed = me.getParsed(i);
       const properties = directUpdate ? point : {};
       const x = properties.x = xScale.getPixelForValue(parsed.x, i);
-      const y = properties.y = reset ? yScale.getBasePixel() : yScale.getPixelForValue(_stacked ? me.applyStack(yScale, parsed) : parsed.y, i);
+      const y = properties.y = reset ? yScale.getBasePixel() : yScale.getPixelForValue(_stacked ? me.applyStack(yScale, parsed, _stacked) : parsed.y, i);
       properties.skip = isNaN(x) || isNaN(y);
       properties.stop = i > 0 && (parsed.x - prevParsed.x) > maxGapLength;
 
@@ -110,11 +111,14 @@ LineController.defaults = {
   datasetElementType: 'line',
   dataElementType: 'point',
 
-  datasets: {
-    showLine: true,
-    spanGaps: false,
-  },
+  showLine: true,
+  spanGaps: false,
+};
 
+/**
+ * @type {any}
+ */
+LineController.overrides = {
   interaction: {
     mode: 'index'
   },

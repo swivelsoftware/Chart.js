@@ -1,13 +1,11 @@
-import defaults from './core.defaults';
+import defaults, {overrides, descriptors} from './core.defaults';
 import {mergeIf, resolveObjectKey, isArray, isFunction, valueOrDefault, isObject} from '../helpers/helpers.core';
 import {_attachContext, _createResolver, _descriptors} from '../helpers/helpers.config';
 
 export function getIndexAxis(type, options) {
-  const typeDefaults = defaults.controllers[type] || {};
-  const datasetDefaults = typeDefaults.datasets || {};
-  const datasetOptions = options.datasets || {};
-  const typeOptions = datasetOptions[type] || {};
-  return typeOptions.indexAxis || options.indexAxis || datasetDefaults.indexAxis || 'x';
+  const datasetDefaults = defaults.datasets[type] || {};
+  const datasetOptions = (options.datasets || {})[type] || {};
+  return datasetOptions.indexAxis || options.indexAxis || datasetDefaults.indexAxis || 'x';
 }
 
 function getAxisFromDefaultScaleID(id, indexAxis) {
@@ -34,14 +32,14 @@ function axisFromPosition(position) {
 }
 
 export function determineAxis(id, scaleOptions) {
-  if (id === 'x' || id === 'y' || id === 'r') {
+  if (id === 'x' || id === 'y') {
     return id;
   }
   return scaleOptions.axis || axisFromPosition(scaleOptions.position) || id.charAt(0).toLowerCase();
 }
 
 function mergeScaleConfig(config, options) {
-  const chartDefaults = defaults.controllers[config.type] || {scales: {}};
+  const chartDefaults = overrides[config.type] || {scales: {}};
   const configScales = options.scales || {};
   const chartIndexAxis = getIndexAxis(config.type, options);
   const firstIDs = Object.create(null);
@@ -61,7 +59,7 @@ function mergeScaleConfig(config, options) {
   config.data.datasets.forEach(dataset => {
     const type = dataset.type || config.type;
     const indexAxis = dataset.indexAxis || getIndexAxis(type, options);
-    const datasetDefaults = defaults.controllers[type] || {};
+    const datasetDefaults = overrides[type] || {};
     const defaultScaleOptions = datasetDefaults.scales || {};
     Object.keys(defaultScaleOptions).forEach(defaultID => {
       const axis = getAxisFromDefaultScaleID(defaultID, indexAxis);
@@ -80,25 +78,21 @@ function mergeScaleConfig(config, options) {
   return scales;
 }
 
-function initOptions(config, options) {
-  options = options || {};
+function initOptions(config) {
+  const options = config.options || (config.options = {});
 
   options.plugins = valueOrDefault(options.plugins, {});
   options.scales = mergeScaleConfig(config, options);
-
-  return options;
 }
 
 function initConfig(config) {
   config = config || {};
 
-  // Do NOT use mergeConfig for the data object because this method merges arrays
-  // and so would change references to labels and datasets, preventing data updates.
   const data = config.data = config.data || {datasets: [], labels: []};
   data.datasets = data.datasets || [];
   data.labels = data.labels || [];
 
-  config.options = initOptions(config, config.options);
+  initOptions(config);
 
   return config;
 }
@@ -150,14 +144,18 @@ export default class Config {
     return this._config.options;
   }
 
+  set options(options) {
+    this._config.options = options;
+  }
+
   get plugins() {
     return this._config.plugins;
   }
 
-  update(options) {
+  update() {
     const config = this._config;
     this.clearCache();
-    config.options = initOptions(config, options);
+    initOptions(config);
   }
 
   clearCache() {
@@ -166,45 +164,50 @@ export default class Config {
   }
 
   /**
-	 * Returns the option scope keys for resolving dataset options.
-	 * These keys do not include the dataset itself, because it is not under options.
-	 * @param {string} datasetType
-	 * @return {string[]}
-	 */
+   * Returns the option scope keys for resolving dataset options.
+   * These keys do not include the dataset itself, because it is not under options.
+   * @param {string} datasetType
+   * @return {string[]}
+   */
   datasetScopeKeys(datasetType) {
     return cachedKeys(datasetType,
-      () => [`datasets.${datasetType}`, `controllers.${datasetType}.datasets`, '']);
-  }
-
-  /**
-	 * Returns the option scope keys for resolving dataset animation options.
-	 * These keys do not include the dataset itself, because it is not under options.
-	 * @param {string} datasetType
-	 * @return {string[]}
-	 */
-  datasetAnimationScopeKeys(datasetType) {
-    return cachedKeys(`${datasetType}.animation`,
       () => [
-        `datasets.${datasetType}.animation`,
-        `controllers.${datasetType}.datasets.animation`,
-        'animation'
+        `datasets.${datasetType}`,
+        ''
       ]);
   }
 
   /**
-	 * Returns the options scope keys for resolving element options that belong
-	 * to an dataset. These keys do not include the dataset itself, because it
-	 * is not under options.
-	 * @param {string} datasetType
-	 * @param {string} elementType
-	 * @return {string[]}
-	 */
+   * Returns the option scope keys for resolving dataset animation options.
+   * These keys do not include the dataset itself, because it is not under options.
+   * @param {string} datasetType
+   * @param {string} transition
+   * @return {string[]}
+   */
+  datasetAnimationScopeKeys(datasetType, transition) {
+    return cachedKeys(`${datasetType}.transition.${transition}`,
+      () => [
+        `datasets.${datasetType}.transitions.${transition}`,
+        `transitions.${transition}`,
+        // The following are used for looking up the `animations` and `animation` keys
+        `datasets.${datasetType}`,
+        ''
+      ]);
+  }
+
+  /**
+   * Returns the options scope keys for resolving element options that belong
+   * to an dataset. These keys do not include the dataset itself, because it
+   * is not under options.
+   * @param {string} datasetType
+   * @param {string} elementType
+   * @return {string[]}
+   */
   datasetElementScopeKeys(datasetType, elementType) {
     return cachedKeys(`${datasetType}-${elementType}`,
       () => [
+        `datasets.${datasetType}.elements.${elementType}`,
         `datasets.${datasetType}`,
-        `controllers.${datasetType}.datasets`,
-        `controllers.${datasetType}.elements.${elementType}`,
         `elements.${elementType}`,
         ''
       ]);
@@ -213,30 +216,30 @@ export default class Config {
   /**
    * Returns the options scope keys for resolving plugin options.
    * @param {{id: string, additionalOptionScopes?: string[]}} plugin
-	 * @return {string[]}
+   * @return {string[]}
    */
   pluginScopeKeys(plugin) {
     const id = plugin.id;
     const type = this.type;
     return cachedKeys(`${type}-plugin-${id}`,
       () => [
-        `controllers.${type}.plugins.${id}`,
         `plugins.${id}`,
         ...plugin.additionalOptionScopes || [],
       ]);
   }
 
   /**
-	 * Resolves the objects from options and defaults for option value resolution.
-	 * @param {object} mainScope - The main scope object for options
-	 * @param {string[]} scopeKeys - The keys in resolution order
+   * Resolves the objects from options and defaults for option value resolution.
+   * @param {object} mainScope - The main scope object for options
+   * @param {string[]} scopeKeys - The keys in resolution order
    * @param {boolean} [resetCache] - reset the cache for this mainScope
-	 */
+   */
   getOptionScopes(mainScope, scopeKeys, resetCache) {
-    let cache = this._scopeCache.get(mainScope);
+    const {_scopeCache, options, type} = this;
+    let cache = _scopeCache.get(mainScope);
     if (!cache || resetCache) {
       cache = new Map();
-      this._scopeCache.set(mainScope, cache);
+      _scopeCache.set(mainScope, cache);
     }
     const cached = cache.get(scopeKeys);
     if (cached) {
@@ -249,9 +252,10 @@ export default class Config {
       scopes.add(mainScope);
       scopeKeys.forEach(key => addIfFound(scopes, mainScope, key));
     }
-    scopeKeys.forEach(key => addIfFound(scopes, this.options, key));
+    scopeKeys.forEach(key => addIfFound(scopes, options, key));
+    scopeKeys.forEach(key => addIfFound(scopes, overrides[type] || {}, key));
     scopeKeys.forEach(key => addIfFound(scopes, defaults, key));
-    scopeKeys.forEach(key => addIfFound(scopes, defaults.descriptors, key));
+    scopeKeys.forEach(key => addIfFound(scopes, descriptors, key));
 
     const array = [...scopes];
     if (keysCached.has(scopeKeys)) {
@@ -261,26 +265,29 @@ export default class Config {
   }
 
   /**
-	 * Returns the option scopes for resolving chart options
-	 * @return {object[]}
-	 */
+   * Returns the option scopes for resolving chart options
+   * @return {object[]}
+   */
   chartOptionScopes() {
+    const {options, type} = this;
+
     return [
-      this.options,
-      defaults.controllers[this.type] || {},
-      {type: this.type},
+      options,
+      overrides[type] || {},
+      defaults.datasets[type] || {}, // https://github.com/chartjs/Chart.js/issues/8531
+      {type},
       defaults,
-      defaults.descriptors
+      descriptors
     ];
   }
 
   /**
-	 * @param {object[]} scopes
-	 * @param {string[]} names
-	 * @param {function|object} context
-	 * @param {string[]} [prefixes]
-	 * @return {object}
-	 */
+   * @param {object[]} scopes
+   * @param {string[]} names
+   * @param {function|object} context
+   * @param {string[]} [prefixes]
+   * @return {object}
+   */
   resolveNamedOptions(scopes, names, context, prefixes = ['']) {
     const result = {$shared: true};
     const {resolver, subPrefixes} = getResolver(this._resolverCache, scopes, prefixes);
@@ -300,14 +307,15 @@ export default class Config {
   }
 
   /**
-	 * @param {object[]} scopes
-	 * @param {object} [context]
+   * @param {object[]} scopes
+   * @param {object} [context]
    * @param {string[]} [prefixes]
-	 */
-  createResolver(scopes, context, prefixes = ['']) {
+   * @param {{scriptable: boolean, indexable: boolean, allKeys?: boolean}} [descriptorDefaults]
+   */
+  createResolver(scopes, context, prefixes = [''], descriptorDefaults) {
     const {resolver} = getResolver(this._resolverCache, scopes, prefixes);
     return isObject(context)
-      ? _attachContext(resolver, isFunction(context) ? context() : context)
+      ? _attachContext(resolver, context, undefined, descriptorDefaults)
       : resolver;
   }
 }
@@ -336,7 +344,7 @@ function needContext(proxy, names) {
 
   for (const prop of names) {
     if ((isScriptable(prop) && isFunction(proxy[prop]))
-			|| (isIndexable(prop) && isArray(proxy[prop]))) {
+      || (isIndexable(prop) && isArray(proxy[prop]))) {
       return true;
     }
   }

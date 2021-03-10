@@ -85,6 +85,16 @@ export function valueOrDefault(value, defaultValue) {
   return typeof value === 'undefined' ? defaultValue : value;
 }
 
+export const toPercentage = (value, dimension) =>
+  typeof value === 'string' && value.endsWith('%') ?
+    parseFloat(value) / 100
+    : value / dimension;
+
+export const toDimension = (value, dimension) =>
+  typeof value === 'string' && value.endsWith('%') ?
+    parseFloat(value) / 100 * dimension
+    : +value;
+
 /**
  * Calls `fn` with the given `args` in the scope defined by `thisArg` and returns the
  * value returned by `fn`. If `fn` is not a function, this method returns undefined.

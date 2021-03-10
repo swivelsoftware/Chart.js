@@ -1,5 +1,5 @@
 import animator from './core.animator';
-import defaults from './core.defaults';
+import defaults, {overrides} from './core.defaults';
 import Interaction from './core.interaction';
 import layouts from './core.layouts';
 import {BasicPlatform, DomPlatform} from '../platform';
@@ -11,6 +11,7 @@ import {each, callback as callCallback, uid, valueOrDefault, _elementsEqual} fro
 import {clearCanvas, clipArea, unclipArea, _isPointInArea} from '../helpers/helpers.canvas';
 // @ts-ignore
 import {version} from '../../package.json';
+import {debounce} from '../helpers/helpers.extras';
 
 /**
  * @typedef { import("../platform/platform.base").ChartEvent } ChartEvent
@@ -106,6 +107,7 @@ class Chart {
     this._options = options;
     this._layers = [];
     this._metasets = [];
+    this._stacks = undefined;
     this.boxes = [];
     this.currentDevicePixelRatio = undefined;
     this.chartArea = undefined;
@@ -122,6 +124,7 @@ class Chart {
     this.attached = false;
     this._animationsDisabled = undefined;
     this.$context = undefined;
+    this._doResize = debounce(() => this.update('resize'), options.resizeDelay || 0);
 
     // Add the chart instance to the global namespace
     instances[me.id] = me;
@@ -157,7 +160,7 @@ class Chart {
   }
 
   set options(options) {
-    this.config.update(options);
+    this.config.options = options;
   }
 
   /**
@@ -239,10 +242,13 @@ class Chart {
 
     me.notifyPlugins('resize', {size: newSize});
 
-    callCallback(options.onResize, [newSize], me);
+    callCallback(options.onResize, [me, newSize], me);
 
     if (me.attached) {
-      me.update('resize');
+      if (me._doResize()) {
+        // The resize update is delayed, only draw without updating.
+        me.render();
+      }
     }
   }
 
@@ -365,8 +371,11 @@ class Chart {
 	 */
   _removeUnreferencedMetasets() {
     const me = this;
-    const datasets = me.data.datasets;
-    me._metasets.forEach((meta, index) => {
+    const {_metasets: metasets, data: {datasets}} = me;
+    if (metasets.length > datasets.length) {
+      delete me._stacks;
+    }
+    metasets.forEach((meta, index) => {
       if (datasets.filter(x => x === meta._dataset).length === 0) {
         me._destroyDatasetMeta(index);
       }
@@ -401,11 +410,11 @@ class Chart {
         meta.controller.updateIndex(i);
         meta.controller.linkScales();
       } else {
-        const controllerDefaults = defaults.controllers[type];
         const ControllerClass = registry.getController(type);
+        const {datasetElementType, dataElementType} = defaults.datasets[type];
         Object.assign(ControllerClass.prototype, {
-          dataElementType: registry.getElement(controllerDefaults.dataElementType),
-          datasetElementType: controllerDefaults.datasetElementType && registry.getElement(controllerDefaults.datasetElementType)
+          dataElementType: registry.getElement(dataElementType),
+          datasetElementType: datasetElementType && registry.getElement(datasetElementType)
         });
         meta.controller = new ControllerClass(me, i);
         newControllers.push(meta.controller);
@@ -439,7 +448,7 @@ class Chart {
     const me = this;
     const config = me.config;
 
-    config.update(config.options);
+    config.update();
     me._options = config.createResolver(config.chartOptionScopes(), me.getContext());
 
     each(me.scales, (scale) => {
@@ -1107,6 +1116,10 @@ Object.defineProperties(Chart, {
   instances: {
     enumerable,
     value: instances
+  },
+  overrides: {
+    enumerable,
+    value: overrides
   },
   registry: {
     enumerable,

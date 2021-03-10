@@ -1,6 +1,6 @@
 import Animations from './core.animations';
 import defaults from './core.defaults';
-import {isObject, isArray, valueOrDefault, resolveObjectKey, defined} from '../helpers/helpers.core';
+import {isArray, isFinite, isObject, valueOrDefault, resolveObjectKey, defined} from '../helpers/helpers.core';
 import {listenArrayEvents, unlistenArrayEvents} from '../helpers/helpers.collection';
 import {sign} from '../helpers/helpers.math';
 
@@ -66,20 +66,25 @@ function getSortedDatasetIndices(chart, filterVisible) {
   return keys;
 }
 
-function applyStack(stack, value, dsIndex, allOther) {
+function applyStack(stack, value, dsIndex, options) {
   const keys = stack.keys;
+  const singleMode = options.mode === 'single';
   let i, ilen, datasetIndex, otherValue;
+
+  if (value === null) {
+    return;
+  }
 
   for (i = 0, ilen = keys.length; i < ilen; ++i) {
     datasetIndex = +keys[i];
     if (datasetIndex === dsIndex) {
-      if (allOther) {
+      if (options.all) {
         continue;
       }
       break;
     }
     otherValue = stack.values[datasetIndex];
-    if (!isNaN(otherValue) && (value === 0 || sign(value) === sign(otherValue))) {
+    if (isFinite(otherValue) && (singleMode || (value === 0 || sign(value) === sign(otherValue)))) {
       value += otherValue;
     }
   }
@@ -393,7 +398,7 @@ export default class DatasetController {
         parsed = me.parsePrimitiveData(meta, data, start, count);
       }
 
-      const isNotInOrderComparedToPrev = () => isNaN(cur[iAxis]) || (prev && cur[iAxis] < prev[iAxis]);
+      const isNotInOrderComparedToPrev = () => cur[iAxis] === null || (prev && cur[iAxis] < prev[iAxis]);
       for (i = 0; i < count; ++i) {
         meta._parsed[i + start] = cur = parsed[i];
         if (sorted) {
@@ -513,7 +518,7 @@ export default class DatasetController {
   /**
 	 * @protected
 	 */
-  applyStack(scale, parsed) {
+  applyStack(scale, parsed, mode) {
     const chart = this.chart;
     const meta = this._cachedMeta;
     const value = parsed[scale.axis];
@@ -521,14 +526,15 @@ export default class DatasetController {
       keys: getSortedDatasetIndices(chart, true),
       values: parsed._stacks[scale.axis]
     };
-    return applyStack(stack, value, meta.index);
+    return applyStack(stack, value, meta.index, {mode});
   }
 
   /**
 	 * @protected
 	 */
   updateRangeFromParsed(range, scale, parsed, stack) {
-    let value = parsed[scale.axis];
+    const parsedValue = parsed[scale.axis];
+    let value = parsedValue === null ? NaN : parsedValue;
     const values = stack && parsed._stacks[scale.axis];
     if (stack && values) {
       stack.values = values;
@@ -536,7 +542,7 @@ export default class DatasetController {
       // in addition to the stacked value
       range.min = Math.min(range.min, value);
       range.max = Math.max(range.max, value);
-      value = applyStack(stack, value, this._cachedMeta.index, true);
+      value = applyStack(stack, parsedValue, this._cachedMeta.index, {all: true});
     }
     range.min = Math.min(range.min, value);
     range.max = Math.max(range.max, value);
@@ -561,7 +567,7 @@ export default class DatasetController {
       parsed = _parsed[i];
       value = parsed[scale.axis];
       otherValue = parsed[otherScale.axis];
-      return (isNaN(value) || isNaN(otherValue) || otherMin > otherValue || otherMax < otherValue);
+      return !isFinite(value) || otherMin > otherValue || otherMax < otherValue;
     }
 
     for (i = 0; i < ilen; ++i) {
@@ -594,7 +600,7 @@ export default class DatasetController {
 
     for (i = 0, ilen = parsed.length; i < ilen; ++i) {
       value = parsed[i][scale.axis];
-      if (!isNaN(value)) {
+      if (isFinite(value)) {
         values.push(value);
       }
     }
@@ -763,11 +769,11 @@ export default class DatasetController {
   /**
 	 * @private
 	 */
-  _resolveAnimations(index, mode, active) {
+  _resolveAnimations(index, transition, active) {
     const me = this;
     const chart = me.chart;
     const cache = me._cachedDataOpts;
-    const cacheKey = 'animation-' + mode;
+    const cacheKey = `animation-${transition}`;
     const cached = cache[cacheKey];
     if (cached) {
       return cached;
@@ -775,11 +781,11 @@ export default class DatasetController {
     let options;
     if (chart.options.animation !== false) {
       const config = me.chart.config;
-      const scopeKeys = config.datasetAnimationScopeKeys(me._type);
-      const scopes = config.getOptionScopes(me.getDataset().animation, scopeKeys);
-      options = config.createResolver(scopes, me.getContext(index, active, mode));
+      const scopeKeys = config.datasetAnimationScopeKeys(me._type, transition);
+      const scopes = config.getOptionScopes(me.getDataset(), scopeKeys);
+      options = config.createResolver(scopes, me.getContext(index, active, transition));
     }
-    const animations = new Animations(chart, options && options[mode] || options);
+    const animations = new Animations(chart, options && options.animations);
     if (options && options._cacheable) {
       cache[cacheKey] = Object.freeze(animations);
     }

@@ -85,7 +85,7 @@ the color of the bars is generally set this way.
 | [`borderWidth`](#borderwidth) | `number`\|`object` | Yes | Yes | `0`
 | [`borderRadius`](#borderradius) | `number`\|`object` | Yes | Yes | `0`
 | [`clip`](#general) | `number`\|`object` | - | - | `undefined`
-| [`data`](#data-structure) | `object[]` | - | - | **required**
+| [`data`](#data-structure) | `object`\|`object[]`\|`number[]`\|`string[]` | - | - | **required**
 | [`hoverBackgroundColor`](#interactions) | [`Color`](../general/colors.md) | Yes | Yes | `undefined`
 | [`hoverBorderColor`](#interactions) | [`Color`](../general/colors.md) | Yes | Yes | `undefined`
 | [`hoverBorderWidth`](#interactions) | `number` | Yes | Yes | `1`
@@ -176,7 +176,7 @@ The bar chart accepts the following configuration from the associated dataset op
 | `maxBarThickness` | `number` | | Set this to ensure that bars are not sized thicker than this.
 | `minBarLength` | `number` | | Set this to ensure that bars have a minimum length in pixels.
 
-### Example Usage
+### Example dataset configuration
 
 ```javascript
 data: {
@@ -200,7 +200,7 @@ If not set (default), the base sample widths are calculated using the smallest i
 
 ## Config Options
 
-These are the customisation options specific to Bar charts. These options are merged with the global chart configuration options, and form the options of the chart.
+These are the customisation options specific to Bar charts. These options are looked up on access, and form together with the global chart configuration, `Chart.defaults`, the options of the chart.
 
 | Name | Type | Default | Description
 | ---- | ---- | ------- | -----------
@@ -215,7 +215,7 @@ The bar chart sets unique default values for the following configuration from th
 | `offset` | `boolean` | `true` | If true, extra space is added to both edges and the axis is scaled to fit into the chart area.
 | `gridLines.offsetGridLines` | `boolean` | `true` | If true, the bars for a particular data point fall between the grid lines. The grid line will move to the left by one half of the tick interval. If false, the grid line will go right down the middle of the bars. [more...](#offsetgridlines)
 
-### Example Usage
+### Example scale configuration
 
 ```javascript
 options = {
@@ -235,7 +235,7 @@ If true, the bars for a particular data point fall between the grid lines. The g
 
 ## Default Options
 
-It is common to want to apply a configuration setting to all created bar charts. The global bar chart settings are stored in `Chart.defaults.controllers.bar`. Changing the global options only affects charts created after the change. Existing charts are not changed.
+It is common to want to apply a configuration setting to all created bar charts. The global bar chart settings are stored in `Chart.overrides.bar`. Changing the global options only affects charts created after the change. Existing charts are not changed.
 
 ## barPercentage vs categoryPercentage
 
@@ -305,7 +305,7 @@ export const ExampleChart1 = () => {
       data: {
         labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July'],
         datasets: [{
-		  axis: 'y',
+      axis: 'y',
           label: 'My First Dataset',
           data: [65, 59, 80, 81, 56, 55, 40],
           fill: false,
@@ -331,7 +331,7 @@ export const ExampleChart1 = () => {
         }]
       },
       options: {
-      	indexAxis: 'y',
+        indexAxis: 'y',
         scales: {
           x: {
             beginAtZero: true
@@ -354,12 +354,12 @@ var myBarChart = new Chart(ctx, {
     type: 'bar',
     data: data,
     options: {
-    	indexAxis: 'y'
+      indexAxis: 'y'
     }
 });
 ```
 
-### Config Options
+### Horizontal Bar Chart config Options
 
 The configuration options for the horizontal bar chart are the same as for the [bar chart](#scale-configuration). However, any options specified on the x-axis in a bar chart, are applied to the y-axis in a horizontal bar chart.
 

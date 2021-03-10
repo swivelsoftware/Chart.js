@@ -4,14 +4,14 @@ title: Tooltip
 
 ## Tooltip Configuration
 
-The tooltip configuration is passed into the `options.plugins.tooltip` namespace. The global options for the chart tooltips is defined in `Chart.defaults.plugins.tooltip`.
+Namespace: `options.plugins.tooltip`, the global options for the chart tooltips is defined in `Chart.defaults.plugins.tooltip`.
 
 | Name | Type | Default | Description
 | ---- | ---- | ------- | -----------
 | `enabled` | `boolean` | `true` | Are on-canvas tooltips enabled?
-| `custom` | `function` | `null` | See [custom tooltip](#external-custom-tooltips) section.
-| `mode` | `string` | | Sets which elements appear in the tooltip. [more...](../general/interactions/modes.md#interaction-modes).
-| `intersect` | `boolean` | | If true, the tooltip mode applies only when the mouse position intersects with an element. If false, the mode will be applied at all times.
+| `external` | `function` | `null` | See [external tooltip](#external-custom-tooltips) section.
+| `mode` | `string` | `interaction.mode` | Sets which elements appear in the tooltip. [more...](interactions/modes.md#interaction-modes).
+| `intersect` | `boolean` | `interaction.intersect` | If true, the tooltip mode applies only when the mouse position intersects with an element. If false, the mode will be applied at all times.
 | `position` | `string` | `'average'` | The mode for positioning the tooltip. [more...](#position-modes)
 | `callbacks` | `object` | | See the [callbacks section](#tooltip-callbacks).
 | `itemSort` | `function` | | Sort tooltip items. [more...](#sort-callback)
@@ -31,8 +31,7 @@ The tooltip configuration is passed into the `options.plugins.tooltip` namespace
 | `footerAlign` | `string` | `'left'` | Horizontal alignment of the footer text lines. [more...](#alignment)
 | `footerSpacing` | `number` | `2` | Spacing to add to top and bottom of each footer line.
 | `footerMarginTop` | `number` | `6` | Margin to add before drawing the footer.
-| `xPadding` | `number` | `6` | Padding to add on left and right of tooltip.
-| `yPadding` | `number` | `6` | Padding to add on top and bottom of tooltip.
+| `padding` | | `6` | Padding inside the tooltip on the 4 sides
 | `caretPadding` | `number` | `2` | Extra distance to move the end of the tooltip arrow away from the tooltip point.
 | `caretSize` | `number` | `5` | Size, in px, of the tooltip arrow.
 | `cornerRadius` | `number` | `6` | Radius of tooltip corner curves.
@@ -62,13 +61,13 @@ Example:
 ```javascript
 /**
  * Custom positioner
- * @function Tooltip.positioners.custom
+ * @function Tooltip.positioners.myCustomPositioner
  * @param elements {Chart.Element[]} the tooltip elements
  * @param eventPosition {Point} the position of the event in canvas coordinates
  * @returns {Point} the tooltip position
  */
 const tooltipPlugin = Chart.registry.getPlugin('tooltip');
-tooltipPlugin.positioners.custom = function(elements, eventPosition) {
+tooltipPlugin.positioners.myCustomPositioner = function(elements, eventPosition) {
     /** @type {Tooltip} */
     var tooltip = this;
 
@@ -101,7 +100,7 @@ Allows filtering of [tooltip items](#tooltip-item-context). Must implement at mi
 
 ## Tooltip Callbacks
 
-The tooltip label configuration is nested below the tooltip configuration using the `callbacks` key. The tooltip has the following callbacks for providing text. For all functions, `this` will be the tooltip object created from the `Tooltip` constructor.
+Namespace: `options.plugins.tooltip.callbacks`, the tooltip has the following callbacks for providing text. For all functions, `this` will be the tooltip object created from the `Tooltip` constructor.
 
 All functions are called with the same arguments: a [tooltip item context](#tooltip-item-context). All functions must return either a string or an array of strings. Arrays of strings are treated as multiple lines of text.
 
@@ -140,7 +139,7 @@ var chart = new Chart(ctx, {
                         if (label) {
                             label += ': ';
                         }
-                        if (!isNaN(context.parsed.y)) {
+                        if (context.parsed.y !== null) {
                             label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
                         }
                         return label;
@@ -206,7 +205,6 @@ var chart = new Chart(ctx, {
 });
 ```
 
-
 ### Tooltip Item Context
 
 The tooltip items passed to the tooltip callbacks implement the following interface.
@@ -244,7 +242,7 @@ The tooltip items passed to the tooltip callbacks implement the following interf
 
 ## External (Custom) Tooltips
 
-Custom tooltips allow you to hook into the tooltip rendering process so that you can render the tooltip in your own custom way. Generally this is used to create an HTML tooltip instead of an on-canvas tooltip. The `custom` option takes a function which is passed a context parameter containing the `chart` and `tooltip`. You can enable custom tooltips in the global or chart configuration like so:
+External tooltips allow you to hook into the tooltip rendering process so that you can render the tooltip in your own custom way. Generally this is used to create an HTML tooltip instead of an on-canvas tooltip. The `external` option takes a function which is passed a context parameter containing the `chart` and `tooltip`. You can enable external tooltips in the global or chart configuration like so:
 
 ```javascript
 var myPieChart = new Chart(ctx, {
@@ -256,7 +254,7 @@ var myPieChart = new Chart(ctx, {
                 // Disable the on-canvas tooltip
                 enabled: false,
 
-                custom: function(context) {
+                external: function(context) {
                     // Tooltip Element
                     var tooltipEl = document.getElementById('chartjs-tooltip');
 
@@ -321,7 +319,7 @@ var myPieChart = new Chart(ctx, {
                     tooltipEl.style.left = position.left + window.pageXOffset + tooltipModel.caretX + 'px';
                     tooltipEl.style.top = position.top + window.pageYOffset + tooltipModel.caretY + 'px';
                     tooltipEl.style.font = tooltipModel.bodyFont.string;
-                    tooltipEl.style.padding = tooltipModel.yPadding + 'px ' + tooltipModel.xPadding + 'px';
+                    tooltipEl.style.padding = tooltipModel.padding + 'px ' + tooltipModel.padding + 'px';
                     tooltipEl.style.pointerEvents = 'none';
                 }
             }
@@ -330,7 +328,7 @@ var myPieChart = new Chart(ctx, {
 });
 ```
 
-See [samples](https://www.chartjs.org/samples/) for examples on how to get started with custom tooltips.
+See [samples](https://www.chartjs.org/samples/) for examples on how to get started with external tooltips.
 
 ## Tooltip Model
 

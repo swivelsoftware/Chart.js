@@ -35,7 +35,7 @@ Set the [`ticks.sampleSize`](./axes/cartesian/index.mdx#tick-configuration) opti
 ## Disable Animations
 
 If your charts have long render times, it is a good idea to disable animations. Doing so will mean that the chart needs to only be rendered once during an update instead of multiple times. This will have the effect of reducing CPU usage and improving general page performance.
-Line charts use Path2D caching when animations are disabled.
+Line charts use Path2D caching when animations are disabled and Path2D is available.
 
 To disable animations
 
@@ -79,6 +79,7 @@ new Chart(ctx, {
 Chromium (Chrome: version 69, Edge: 79, Opera: 56) added the ability to [transfer rendering control of a canvas](https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/transferControlToOffscreen) to a web worker. Web workers can use the [OffscreenCanvas API](https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas) to render from a web worker onto canvases in the DOM. Chart.js is a canvas-based library and supports rendering in a web worker - just pass an OffscreenCanvas into the Chart constructor instead of a Canvas element. Note that as of today, this API is only supported in Chromium based browsers.
 
 By moving all Chart.js calculations onto a separate thread, the main thread can be freed up for other uses. Some tips and tricks when using Chart.js in a web worker:
+
 * Transferring data between threads can be expensive, so ensure that your config and data objects are as small as possible. Try generating them on the worker side if you can (workers can make HTTP requests!) or passing them to your worker as ArrayBuffers, which can be transferred quickly from one thread to another.
 * You can't transfer functions between threads, so if your config object includes functions you'll have to strip them out before transferring and then add them back later.
 * You can't access the DOM from worker threads, so Chart.js plugins that use the DOM (including any mouse interactions) will likely not work.
@@ -112,46 +113,13 @@ onmessage = function(event) {
 
 ## Line Charts
 
-### Disable Bezier Curves
+### Leave Bézier curves disabled
 
-If you are drawing lines on your chart, disabling bezier curves will improve render times since drawing a straight line is more performant than a bezier curve.
-
-To disable bezier curves for an entire chart:
-
-```javascript
-new Chart(ctx, {
-    type: 'line',
-    data: data,
-    options: {
-        elements: {
-            line: {
-                tension: 0 // disables bezier curves
-            }
-        }
-    }
-});
-```
+If you are drawing lines on your chart, disabling Bézier curves will improve render times since drawing a straight line is more performant than a Bézier curve. Bézier curves are disabled by default.
 
 ### Automatic data decimation during draw
 
-Line element will automatically decimate data, when the following conditions are met: `tension` is `0`, `stepped` is `false` (default) and `borderDash` is `[]` (default). This improves rendering speed by skipping drawing of invisible line segments.
-
-```javascript
-new Chart(ctx, {
-    type: 'line',
-    data: data,
-    options: {
-        elements: {
-            line: {
-                tension: 0, // disables bezier curves
-                fill: false,
-                stepped: false,
-                borderDash: []
-            }
-        }
-    }
-});
-```
+Line element will automatically decimate data, when `tension`, `stepped`, and `borderDash` are left set to their default values (`false`, `0`, and `[]` respectively). This improves rendering speed by skipping drawing of invisible line segments.
 
 ### Enable spanGaps
 

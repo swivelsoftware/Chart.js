@@ -1,6 +1,7 @@
 import Animations from '../core/core.animations';
 import Element from '../core/core.element';
 import {each, noop, isNullOrUndef, isArray, _elementsEqual} from '../helpers/helpers.core';
+import {toPadding} from '../helpers/helpers.options';
 import {getRtlAdapter, overrideTextDirection, restoreTextDirection} from '../helpers/helpers.rtl';
 import {distanceBetweenPoints} from '../helpers/helpers.math';
 import {drawPoint, toFontString} from '../helpers';
@@ -135,15 +136,16 @@ function createTooltipItem(chart, item) {
 /**
  * Get the size of the tooltip
  */
-function getTooltipSize(tooltip) {
+function getTooltipSize(tooltip, options) {
   const ctx = tooltip._chart.ctx;
-  const {body, footer, options, title} = tooltip;
+  const {body, footer, title} = tooltip;
   const {bodyFont, footerFont, titleFont, boxWidth, boxHeight} = options;
   const titleLineCount = title.length;
   const footerLineCount = footer.length;
   const bodyLineItemCount = body.length;
 
-  let height = options.yPadding * 2; // Tooltip Padding
+  const padding = toPadding(options.padding);
+  let height = padding.height;
   let width = 0;
 
   // Count of all lines in the body
@@ -201,7 +203,7 @@ function getTooltipSize(tooltip) {
   ctx.restore();
 
   // Add padding
-  width += 2 * options.xPadding;
+  width += 2 * padding.width;
 
   return {width, height};
 }
@@ -320,13 +322,14 @@ function getBackgroundPoint(options, size, alignment, chart) {
   return {x, y};
 }
 
-function getAlignedX(tooltip, align) {
-  const options = tooltip.options;
+function getAlignedX(tooltip, align, options) {
+  const padding = toPadding(options.padding);
+
   return align === 'center'
     ? tooltip.x + tooltip.width / 2
     : align === 'right'
-      ? tooltip.x + tooltip.width - options.xPadding
-      : tooltip.x + options.xPadding;
+      ? tooltip.x + tooltip.width - padding.right
+      : tooltip.x + padding.left;
 }
 
 /**
@@ -334,6 +337,14 @@ function getAlignedX(tooltip, align) {
  */
 function getBeforeAfterBodyLines(callback) {
   return pushOrConcat([], splitNewlines(callback));
+}
+
+function createTooltipContext(parent, tooltip, tooltipItems) {
+  return Object.assign(Object.create(parent), {
+    tooltip,
+    tooltipItems,
+    type: 'tooltip'
+  });
 }
 
 export class Tooltip extends Element {
@@ -346,7 +357,9 @@ export class Tooltip extends Element {
     this._eventPosition = undefined;
     this._size = undefined;
     this._cachedAnimations = undefined;
+    this._tooltipItems = [];
     this.$animations = undefined;
+    this.$context = undefined;
     this.options = config.options;
     this.dataPoints = undefined;
     this.title = undefined;
@@ -370,6 +383,7 @@ export class Tooltip extends Element {
   initialize(options) {
     this.options = options;
     this._cachedAnimations = undefined;
+    this.$context = undefined;
   }
 
   /**
@@ -384,18 +398,28 @@ export class Tooltip extends Element {
     }
 
     const chart = me._chart;
-    const options = me.options;
-    const opts = options.enabled && chart.options.animation && options.animation;
+    const options = me.options.setContext(me.getContext());
+    const opts = options.enabled && chart.options.animation && options.animations;
     const animations = new Animations(me._chart, opts);
-    me._cachedAnimations = Object.freeze(animations);
+    if (opts._cacheable) {
+      me._cachedAnimations = Object.freeze(animations);
+    }
 
     return animations;
   }
 
-  getTitle(context) {
+  /**
+	 * @protected
+	 */
+  getContext() {
     const me = this;
-    const opts = me.options;
-    const callbacks = opts.callbacks;
+    return me.$context ||
+			(me.$context = createTooltipContext(me._chart.getContext(), me, me._tooltipItems));
+  }
+
+  getTitle(context, options) {
+    const me = this;
+    const {callbacks} = options;
 
     const beforeTitle = callbacks.beforeTitle.apply(me, [context]);
     const title = callbacks.title.apply(me, [context]);
@@ -409,13 +433,13 @@ export class Tooltip extends Element {
     return lines;
   }
 
-  getBeforeBody(tooltipItems) {
-    return getBeforeAfterBodyLines(this.options.callbacks.beforeBody.apply(this, [tooltipItems]));
+  getBeforeBody(tooltipItems, options) {
+    return getBeforeAfterBodyLines(options.callbacks.beforeBody.apply(this, [tooltipItems]));
   }
 
-  getBody(tooltipItems) {
+  getBody(tooltipItems, options) {
     const me = this;
-    const callbacks = me.options.callbacks;
+    const {callbacks} = options;
     const bodyItems = [];
 
     each(tooltipItems, (context) => {
@@ -434,14 +458,14 @@ export class Tooltip extends Element {
     return bodyItems;
   }
 
-  getAfterBody(tooltipItems) {
-    return getBeforeAfterBodyLines(this.options.callbacks.afterBody.apply(this, [tooltipItems]));
+  getAfterBody(tooltipItems, options) {
+    return getBeforeAfterBodyLines(options.callbacks.afterBody.apply(this, [tooltipItems]));
   }
 
   // Get the footer and beforeFooter and afterFooter lines
-  getFooter(tooltipItems) {
+  getFooter(tooltipItems, options) {
     const me = this;
-    const callbacks = me.options.callbacks;
+    const {callbacks} = options;
 
     const beforeFooter = callbacks.beforeFooter.apply(me, [tooltipItems]);
     const footer = callbacks.footer.apply(me, [tooltipItems]);
@@ -458,10 +482,9 @@ export class Tooltip extends Element {
   /**
 	 * @private
 	 */
-  _createItems() {
+  _createItems(options) {
     const me = this;
     const active = me._active;
-    const options = me.options;
     const data = me._chart.data;
     const labelColors = [];
     const labelPointStyles = [];
@@ -499,9 +522,10 @@ export class Tooltip extends Element {
 
   update(changed) {
     const me = this;
-    const options = me.options;
+    const options = me.options.setContext(me.getContext());
     const active = me._active;
     let properties;
+    let tooltipItems = [];
 
     if (!active.length) {
       if (me.opacity !== 0) {
@@ -511,15 +535,15 @@ export class Tooltip extends Element {
       }
     } else {
       const position = positioners[options.position].call(me, active, me._eventPosition);
-      const tooltipItems = me._createItems();
+      tooltipItems = me._createItems(options);
 
-      me.title = me.getTitle(tooltipItems);
-      me.beforeBody = me.getBeforeBody(tooltipItems);
-      me.body = me.getBody(tooltipItems);
-      me.afterBody = me.getAfterBody(tooltipItems);
-      me.footer = me.getFooter(tooltipItems);
+      me.title = me.getTitle(tooltipItems, options);
+      me.beforeBody = me.getBeforeBody(tooltipItems, options);
+      me.body = me.getBody(tooltipItems, options);
+      me.afterBody = me.getAfterBody(tooltipItems, options);
+      me.footer = me.getFooter(tooltipItems, options);
 
-      const size = me._size = getTooltipSize(me);
+      const size = me._size = getTooltipSize(me, options);
       const positionAndSize = Object.assign({}, position, size);
       const alignment = determineAlignment(me._chart, options, positionAndSize);
       const backgroundPoint = getBackgroundPoint(options, positionAndSize, alignment, me._chart);
@@ -538,25 +562,28 @@ export class Tooltip extends Element {
       };
     }
 
+    me._tooltipItems = tooltipItems;
+    me.$context = undefined;
+
     if (properties) {
       me._resolveAnimations().update(me, properties);
     }
 
-    if (changed && options.custom) {
-      options.custom.call(me, {chart: me._chart, tooltip: me});
+    if (changed && options.external) {
+      options.external.call(me, {chart: me._chart, tooltip: me});
     }
   }
 
-  drawCaret(tooltipPoint, ctx, size) {
-    const caretPosition = this.getCaretPosition(tooltipPoint, size);
+  drawCaret(tooltipPoint, ctx, size, options) {
+    const caretPosition = this.getCaretPosition(tooltipPoint, size, options);
 
     ctx.lineTo(caretPosition.x1, caretPosition.y1);
     ctx.lineTo(caretPosition.x2, caretPosition.y2);
     ctx.lineTo(caretPosition.x3, caretPosition.y3);
   }
 
-  getCaretPosition(tooltipPoint, size) {
-    const {xAlign, yAlign, options} = this;
+  getCaretPosition(tooltipPoint, size, options) {
+    const {xAlign, yAlign} = this;
     const {cornerRadius, caretSize} = options;
     const {x: ptX, y: ptY} = tooltipPoint;
     const {width, height} = size;
@@ -611,9 +638,8 @@ export class Tooltip extends Element {
     return {x1, x2, x3, y1, y2, y3};
   }
 
-  drawTitle(pt, ctx) {
+  drawTitle(pt, ctx, options) {
     const me = this;
-    const options = me.options;
     const title = me.title;
     const length = title.length;
     let titleFont, titleSpacing, i;
@@ -621,7 +647,7 @@ export class Tooltip extends Element {
     if (length) {
       const rtlHelper = getRtlAdapter(options.rtl, me.x, me.width);
 
-      pt.x = getAlignedX(me, options.titleAlign);
+      pt.x = getAlignedX(me, options.titleAlign, options);
 
       ctx.textAlign = rtlHelper.textAlign(options.titleAlign);
       ctx.textBaseline = 'middle';
@@ -646,13 +672,12 @@ export class Tooltip extends Element {
   /**
 	 * @private
 	 */
-  _drawColorBox(ctx, pt, i, rtlHelper) {
+  _drawColorBox(ctx, pt, i, rtlHelper, options) {
     const me = this;
-    const options = me.options;
     const labelColors = me.labelColors[i];
     const labelPointStyle = me.labelPointStyles[i];
     const {boxHeight, boxWidth, bodyFont} = options;
-    const colorX = getAlignedX(me, 'left');
+    const colorX = getAlignedX(me, 'left', options);
     const rtlColorX = rtlHelper.x(colorX);
     const yOffSet = boxHeight < bodyFont.size ? (bodyFont.size - boxHeight) / 2 : 0;
     const colorY = pt.y + yOffSet;
@@ -697,9 +722,9 @@ export class Tooltip extends Element {
     ctx.fillStyle = me.labelTextColors[i];
   }
 
-  drawBody(pt, ctx) {
+  drawBody(pt, ctx, options) {
     const me = this;
-    const {body, options} = me;
+    const {body} = me;
     const {bodyFont, bodySpacing, bodyAlign, displayColors, boxHeight, boxWidth} = options;
     let bodyLineHeight = bodyFont.size;
     let xLinePadding = 0;
@@ -718,7 +743,7 @@ export class Tooltip extends Element {
     ctx.textBaseline = 'middle';
     ctx.font = toFontString(bodyFont);
 
-    pt.x = getAlignedX(me, bodyAlignForCalculation);
+    pt.x = getAlignedX(me, bodyAlignForCalculation, options);
 
     // Before body lines
     ctx.fillStyle = options.bodyColor;
@@ -739,7 +764,7 @@ export class Tooltip extends Element {
       lines = bodyItem.lines;
       // Draw Legend-like boxes if needed
       if (displayColors && lines.length) {
-        me._drawColorBox(ctx, pt, i, rtlHelper);
+        me._drawColorBox(ctx, pt, i, rtlHelper, options);
         bodyLineHeight = Math.max(bodyFont.size, boxHeight);
       }
 
@@ -761,9 +786,8 @@ export class Tooltip extends Element {
     pt.y -= bodySpacing; // Remove last body spacing
   }
 
-  drawFooter(pt, ctx) {
+  drawFooter(pt, ctx, options) {
     const me = this;
-    const options = me.options;
     const footer = me.footer;
     const length = footer.length;
     let footerFont, i;
@@ -771,7 +795,7 @@ export class Tooltip extends Element {
     if (length) {
       const rtlHelper = getRtlAdapter(options.rtl, me.x, me.width);
 
-      pt.x = getAlignedX(me, options.footerAlign);
+      pt.x = getAlignedX(me, options.footerAlign, options);
       pt.y += options.footerMarginTop;
 
       ctx.textAlign = rtlHelper.textAlign(options.footerAlign);
@@ -789,8 +813,8 @@ export class Tooltip extends Element {
     }
   }
 
-  drawBackground(pt, ctx, tooltipSize) {
-    const {xAlign, yAlign, options} = this;
+  drawBackground(pt, ctx, tooltipSize, options) {
+    const {xAlign, yAlign} = this;
     const {x, y} = pt;
     const {width, height} = tooltipSize;
     const radius = options.cornerRadius;
@@ -802,22 +826,22 @@ export class Tooltip extends Element {
     ctx.beginPath();
     ctx.moveTo(x + radius, y);
     if (yAlign === 'top') {
-      this.drawCaret(pt, ctx, tooltipSize);
+      this.drawCaret(pt, ctx, tooltipSize, options);
     }
     ctx.lineTo(x + width - radius, y);
     ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
     if (yAlign === 'center' && xAlign === 'right') {
-      this.drawCaret(pt, ctx, tooltipSize);
+      this.drawCaret(pt, ctx, tooltipSize, options);
     }
     ctx.lineTo(x + width, y + height - radius);
     ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
     if (yAlign === 'bottom') {
-      this.drawCaret(pt, ctx, tooltipSize);
+      this.drawCaret(pt, ctx, tooltipSize, options);
     }
     ctx.lineTo(x + radius, y + height);
     ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
     if (yAlign === 'center' && xAlign === 'left') {
-      this.drawCaret(pt, ctx, tooltipSize);
+      this.drawCaret(pt, ctx, tooltipSize, options);
     }
     ctx.lineTo(x, y + radius);
     ctx.quadraticCurveTo(x, y, x + radius, y);
@@ -834,10 +858,9 @@ export class Tooltip extends Element {
 	 * Update x/y animation targets when _active elements are animating too
 	 * @private
 	 */
-  _updateAnimationTarget() {
+  _updateAnimationTarget(options) {
     const me = this;
     const chart = me._chart;
-    const options = me.options;
     const anims = me.$animations;
     const animX = anims && anims.x;
     const animY = anims && anims.y;
@@ -846,7 +869,7 @@ export class Tooltip extends Element {
       if (!position) {
         return;
       }
-      const size = me._size = getTooltipSize(me);
+      const size = me._size = getTooltipSize(me, options);
       const positionAndSize = Object.assign({}, position, me._size);
       const alignment = determineAlignment(chart, options, positionAndSize);
       const point = getBackgroundPoint(options, positionAndSize, alignment, chart);
@@ -864,14 +887,14 @@ export class Tooltip extends Element {
 
   draw(ctx) {
     const me = this;
-    const options = me.options;
+    const options = me.options.setContext(me.getContext());
     let opacity = me.opacity;
 
     if (!opacity) {
       return;
     }
 
-    me._updateAnimationTarget();
+    me._updateAnimationTarget(options);
 
     const tooltipSize = {
       width: me.width,
@@ -885,6 +908,8 @@ export class Tooltip extends Element {
     // IE11/Edge does not like very small opacities, so snap to 0
     opacity = Math.abs(opacity) < 1e-3 ? 0 : opacity;
 
+    const padding = toPadding(options.padding);
+
     // Truthy/falsey value for empty tooltip
     const hasTooltipContent = me.title.length || me.beforeBody.length || me.body.length || me.afterBody.length || me.footer.length;
 
@@ -893,20 +918,20 @@ export class Tooltip extends Element {
       ctx.globalAlpha = opacity;
 
       // Draw Background
-      me.drawBackground(pt, ctx, tooltipSize);
+      me.drawBackground(pt, ctx, tooltipSize, options);
 
       overrideTextDirection(ctx, options.textDirection);
 
-      pt.y += options.yPadding;
+      pt.y += padding.top;
 
       // Titles
-      me.drawTitle(pt, ctx);
+      me.drawTitle(pt, ctx, options);
 
       // Body
-      me.drawBody(pt, ctx);
+      me.drawBody(pt, ctx, options);
 
       // Footer
-      me.drawFooter(pt, ctx);
+      me.drawFooter(pt, ctx, options);
 
       restoreTextDirection(ctx, options.textDirection);
 
@@ -986,7 +1011,7 @@ export class Tooltip extends Element {
     if (changed) {
       me._active = active;
 
-      if (options.enabled || options.custom) {
+      if (options.enabled || options.external) {
         me._eventPosition = {
           x: e.x,
           y: e.y
@@ -1072,7 +1097,7 @@ export default {
 
   defaults: {
     enabled: true,
-    custom: null,
+    external: null,
     position: 'average',
     backgroundColor: 'rgba(0,0,0,0.8)',
     titleColor: '#fff',
@@ -1094,8 +1119,7 @@ export default {
       style: 'bold',
     },
     footerAlign: 'left',
-    yPadding: 6,
-    xPadding: 6,
+    padding: 6,
     caretPadding: 2,
     caretSize: 5,
     cornerRadius: 6,
@@ -1108,6 +1132,8 @@ export default {
     animation: {
       duration: 400,
       easing: 'easeOutQuart',
+    },
+    animations: {
       numbers: {
         type: 'number',
         properties: ['x', 'y', 'width', 'height', 'caretX', 'caretY'],
@@ -1198,14 +1224,20 @@ export default {
   },
 
   descriptors: {
-    _scriptable: (name) => name !== 'filter' && name !== 'itemSort' && name !== 'custom',
+    _scriptable: (name) => name !== 'filter' && name !== 'itemSort' && name !== 'external',
     _indexable: false,
     callbacks: {
       _scriptable: false,
       _indexable: false,
+    },
+    animation: {
+      _fallback: false
+    },
+    animations: {
+      _fallback: 'animation'
     }
   },
 
-  // For easier configuration, resolve additionally from `interaction` and root of options and defaults.
-  additionalOptionScopes: ['interaction', '']
+  // Resolve additionally from `interaction` options and defaults.
+  additionalOptionScopes: ['interaction']
 };

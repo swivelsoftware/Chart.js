@@ -274,7 +274,8 @@ describe('Chart.plugins', function() {
       chart.notifyPlugins('hook');
 
       expect(plugin.hook).toHaveBeenCalled();
-      expect(plugin.hook.calls.first().args[2]).toEqualOptions({a: 42});
+      expect(Object.keys(plugin.hook.calls.first().args[2])).toEqual(['a']);
+      expect(plugin.hook.calls.first().args[2]).toEqual(jasmine.objectContaining({a: 42}));
 
       Chart.unregister(plugin);
     });
@@ -360,6 +361,37 @@ describe('Chart.plugins', function() {
 
       // The plugin on the chart should only be started once
       expect(results).toEqual([1]);
+    });
+
+    it('should default to false for _scriptable, _indexable', function(done) {
+      const plugin = {
+        id: 'test',
+        start: function(chart, args, opts) {
+          expect(opts.fun).toEqual(jasmine.any(Function));
+          expect(opts.fun()).toEqual('test');
+          expect(opts.arr).toEqual([1, 2, 3]);
+
+          expect(opts.sub.subfun).toEqual(jasmine.any(Function));
+          expect(opts.sub.subfun()).toEqual('subtest');
+          expect(opts.sub.subarr).toEqual([3, 2, 1]);
+          done();
+        }
+      };
+      window.acquireChart({
+        options: {
+          plugins: {
+            test: {
+              fun: () => 'test',
+              arr: [1, 2, 3],
+              sub: {
+                subfun: () => 'subtest',
+                subarr: [3, 2, 1],
+              }
+            }
+          }
+        },
+        plugins: [plugin]
+      });
     });
   });
 });

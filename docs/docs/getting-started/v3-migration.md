@@ -77,6 +77,7 @@ A number of changes were made to the configuration options passed to the `Chart`
 * Polar area `startAngle` option is now consistent with `Radar`, 0 is at top and value is in degrees. Default is changed from `-½π` to  `0`.
 * Doughnut `rotation` option is now in degrees and 0 is at top. Default is changed from `-½π` to  `0`.
 * Doughnut `circumference` option is now in degrees. Default is changed from `2π` to `360`.
+* Doughnut `cutoutPercentage` was renamed to `cutout`and accepts pixels as numer and percent as string ending with `%`.
 * `scale` option was removed in favor of `options.scales.r` (or any other scale id, with `axis: 'r'`)
 * `scales.[x/y]Axes` arrays were removed. Scales are now configured directly to `options.scales` object with the object key being the scale Id.
 * `scales.[x/y]Axes.barPercentage` was moved to dataset option `barPercentage`
@@ -84,6 +85,8 @@ A number of changes were made to the configuration options passed to the `Chart`
 * `scales.[x/y]Axes.categoryPercentage` was moved to dataset option `categoryPercentage`
 * `scales.[x/y]Axes.maxBarThickness` was moved to dataset option `maxBarThickness`
 * `scales.[x/y]Axes.minBarLength` was moved to dataset option `minBarLength`
+* `scales.[x/y]Axes.scaleLabel` was renamed to `scales[id].title`
+* `scales.[x/y]Axes.scaleLabel.labelString` was renamed to `scales[id].title.text`
 * `scales.[x/y]Axes.ticks.beginAtZero` was renamed to `scales[id].beginAtZero`
 * `scales.[x/y]Axes.ticks.max` was renamed to `scales[id].max`
 * `scales.[x/y]Axes.ticks.min` was renamed to `scales[id].min`
@@ -98,16 +101,18 @@ A number of changes were made to the configuration options passed to the `Chart`
 * `scales.[x/y]Axes.zeroLine*` options of axes were removed. Use scriptable scale options instead.
 * The dataset option `steppedLine` was removed. Use `stepped`
 * The chart option `showLines` was renamed to `showLine` to match the dataset option.
+* The chart option `startAngle` was moved to `radial` scale options.
 * To override the platform class used in a chart instance, pass `platform: PlatformClass` in the config object. Note that the class should be passed, not an instance of the class.
 * `aspectRatio` defaults to 1 for doughnut, pie, polarArea, and radar charts
 * `TimeScale` does not read `t` from object data by default anymore. The default property is `x` or `y`, depending on the orientation. See [data structures](../general/data-structures.md) for details on how to change the default.
 * `tooltips` namespace was renamed to `tooltip` to match the plugin name
 * `legend`, `title` and `tooltip` namespaces were moved from `options` to `options.plugins`.
+* `tooltips.custom` was renamed to `plugins.tooltip.external`
 
 #### Defaults
 
 * `global` namespace was removed from `defaults`. So `Chart.defaults.global` is now `Chart.defaults`
-* Dataset controller defaults were relocate to `controllers`. For example `Chart.defaults.line` is now `Chart.defaults.controllers.line`
+* Dataset controller defaults were relocate to `overrides`. For example `Chart.defaults.line` is now `Chart.overrides.line`
 * `default` prefix was removed from defaults. For example `Chart.defaults.global.defaultColor` is now `Chart.defaults.color`
 * `defaultColor` was split to `color`, `borderColor` and `backgroundColor`
 * `defaultFontColor` was renamed to `color`
@@ -132,9 +137,9 @@ options: {
       id: 'x',
       type: 'time',
       display: true,
-      scaleLabel: {
+      title: {
         display: true,
-        labelString: 'Date'
+        text: 'Date'
       },
       ticks: {
         major: {
@@ -153,9 +158,9 @@ options: {
     yAxes: [{
       id: 'y',
       display: true,
-      scaleLabel: {
+      title: {
         display: true,
-        labelString: 'value'
+        text: 'value'
       }
     }]
   }
@@ -170,9 +175,9 @@ options: {
     x: {
       type: 'time',
       display: true,
-      scaleLabel: {
+      title: {
         display: true,
-        labelString: 'Date'
+        text: 'Date'
       },
       ticks: {
         major: {
@@ -190,9 +195,9 @@ options: {
     },
     y: {
       display: true,
-      scaleLabel: {
+      title: {
         display: true,
-        labelString: 'value'
+        text: 'value'
       }
     }
   }
@@ -225,6 +230,7 @@ Animation system was completely rewritten in Chart.js v3. Each property can now 
 #### Ticks
 
 * `options.gridLines.tickMarkLength` was renamed to `options.gridLines.tickLength`.
+* `options.ticks.fixedStepSize` is no longer used. Use `options.ticks.stepSize`.
 * `options.ticks.major` and `options.ticks.minor` were replaced with scriptable options for tick fonts.
 * `Chart.Ticks.formatters.linear` was renamed to `Chart.Ticks.formatters.numeric`.
 
@@ -236,6 +242,7 @@ Animation system was completely rewritten in Chart.js v3. Each property can now 
 * All properties of tooltip model related to the tooltip options have been moved to reside within the `options` property.
 * The callbacks no longer are given a `data` parameter. The tooltip item parameter contains the chart and dataset instead
 * The tooltip item's `index` parameter was renamed to `dataIndex` and `value` was renamed to `formattedValue`
+* The `xPadding` and `yPadding` options were merged into a single `padding` object
 
 ## Developer migration
 
@@ -260,7 +267,7 @@ A few changes were made to controllers that are more straight-forward, but will 
 
 The following properties and methods were removed:
 
-#### Chart
+#### Removed from Chart
 
 * `Chart.animationService`
 * `Chart.active`
@@ -294,14 +301,15 @@ The following properties and methods were removed:
 * `Chart.Tooltip` is now provided by the tooltip plugin. The positioners can be accessed from `tooltipPlugin.positioners`
 * `ILayoutItem.minSize`
 
-#### Dataset Controllers
+#### Removed from Dataset Controllers
 
 * `BarController.getDatasetMeta().bar`
 * `DatasetController.addElementAndReset`
 * `DatasetController.createMetaData`
 * `DatasetController.createMetaDataset`
+* `DoughnutController.getRingIndex`
 
-#### Elements
+#### Removed from Elements
 
 * `Element.getArea`
 * `Element.height`
@@ -310,7 +318,7 @@ The following properties and methods were removed:
 * `Element.inLabelRange`
 * `Line.calculatePointY`
 
-#### Helpers
+#### Removed from Helpers
 
 * `helpers.addEvent`
 * `helpers.aliasPixel`
@@ -336,11 +344,11 @@ The following properties and methods were removed:
 * `helpers.scaleMerge`
 * `helpers.where`
 
-#### Layout
+#### Removed from Layout
 
 * `Layout.defaults`
 
-#### Scales
+#### Removed from Scales
 
 * `LinearScaleBase.handleDirectionalChanges`
 * `LogarithmicScale.minNotZero`
@@ -354,7 +362,7 @@ The following properties and methods were removed:
 * `TimeScale.getLabelCapacity` is now private
 * `TimeScale.tickFormatFunction` is now private
 
-#### Plugins (Legend, Title, and Tooltip)
+#### Removed from Plugins (Legend, Title, and Tooltip)
 
 * `IPlugin.afterScaleUpdate`. Use `afterLayout` instead
 * `Legend.margins` is now private
@@ -442,18 +450,19 @@ The private APIs listed below were renamed:
 * `DatasetController.resyncElements` was renamed to `DatasetController._resyncElements`
 * `LayoutItem.isFullWidth` was renamed to `LayoutItem.isFullSize`
 * `RadialLinearScale.setReductions` was renamed to `RadialLinearScale._setReductions`
+* `RadialLinearScale.pointLabels` was renamed to `RadialLinearScale._pointLabels`
 * `Scale.handleMargins` was renamed to `Scale._handleMargins`
 
 ### Changed
 
 The APIs listed in this section have changed in signature or behaviour from version 2.
 
-#### Scales
+#### Changed in Scales
 
 * `Scale.getLabelForIndex` was replaced by `scale.getLabelForValue`
 * `Scale.getPixelForValue` now has only one parameter. For the `TimeScale` that parameter must be millis since the epoch
 
-##### Ticks
+##### Changed in Ticks
 
 * `Scale.afterBuildTicks` now has no parameters like the other callbacks
 * `Scale.buildTicks` is now expected to return tick objects
@@ -462,11 +471,11 @@ The APIs listed in this section have changed in signature or behaviour from vers
 * When the `autoSkip` option is enabled, `Scale.ticks` now contains only the non-skipped ticks instead of all ticks.
 * Ticks are now always generated in monotonically increasing order
 
-##### Time Scale
+##### Changed in Time Scale
 
 * `getValueForPixel` now returns milliseconds since the epoch
 
-#### Controllers
+#### Changed in Controllers
 
 ##### Core Controller
 
@@ -478,15 +487,15 @@ The APIs listed in this section have changed in signature or behaviour from vers
 * `updateElement` was replaced with `updateElements` now taking the elements to update, the `start` index, `count`, and `mode`
 * `setHoverStyle` and `removeHoverStyle` now additionally take the `datasetIndex` and `index`
 
-#### Interactions
+#### Changed in Interactions
 
 * Interaction mode methods now return an array of objects containing the `element`, `datasetIndex`, and `index`
 
-#### Layout
+#### Changed in Layout
 
 * `ILayoutItem.update` no longer has a return value
 
-#### Helpers
+#### Changed in Helpers
 
 All helpers are now exposed in a flat hierarchy, e.g., `Chart.helpers.canvas.clipArea` -> `Chart.helpers.clipArea`
 
@@ -498,14 +507,14 @@ All helpers are now exposed in a flat hierarchy, e.g., `Chart.helpers.canvas.cli
 * `helpers.clear` was renamed to `helpers.clearCanvas` and now takes `canvas` and optionally `ctx` as parameter(s).
 * `helpers.retinaScale` accepts optional third parameter `forceStyle`, which forces overriding current canvas style. `forceRatio` no longer falls back to `window.devicePixelRatio`, instead it defaults to `1`.
 
-#### Platform
+#### Changed in Platform
 
 * `Chart.platform` is no longer the platform object used by charts. Every chart instance now has a separate platform instance.
 * `Chart.platforms` is an object that contains two usable platform classes, `BasicPlatform` and `DomPlatform`. It also contains `BasePlatform`, a class that all platforms must extend from.
 * If the canvas passed in is an instance of `OffscreenCanvas`, the `BasicPlatform` is automatically used.
 * `isAttached` method was added to platform.
 
-#### IPlugin interface
+#### Changed in IPlugin interface
 
 * All plugin hooks have unified signature with 3 arguments: `chart`, `args` and `options`. This means change in signature for these hooks: `beforeInit`, `afterInit`, `reset`, `beforeLayout`, `afterLayout`, `beforeRender`, `afterRender`, `beforeDraw`, `afterDraw`, `beforeDatasetsDraw`, `afterDatasetsDraw`, `beforeEvent`, `afterEvent`, `resize`, `destroy`.
 * `afterDatasetsUpdate`, `afterUpdate`, `beforeDatasetsUpdate`, and `beforeUpdate` now receive `args` object as second argument. `options` argument is always the last and thus was moved from 2nd to 3rd place.

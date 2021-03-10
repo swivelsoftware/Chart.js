@@ -1,12 +1,6 @@
 import DatasetController from '../core/core.datasetController';
 import {toRadians, PI} from '../helpers/index';
 
-function getStartAngleRadians(deg) {
-  // radialLinear scale draws angleLines using startAngle. 0 is expected to be at top.
-  // Here we adjust to standard unit circle used in drawing, where 0 is at right.
-  return toRadians(deg) - 0.5 * PI;
-}
-
 export default class PolarAreaController extends DatasetController {
 
   constructor(chart, datasetIndex) {
@@ -51,7 +45,7 @@ export default class PolarAreaController extends DatasetController {
     const scale = me._cachedMeta.rScale;
     const centerX = scale.xCenter;
     const centerY = scale.yCenter;
-    const datasetStartAngle = getStartAngleRadians(opts.startAngle);
+    const datasetStartAngle = scale.getIndexAngle(0) - 0.5 * PI;
     let angle = datasetStartAngle;
     let i;
 
@@ -122,32 +116,25 @@ PolarAreaController.id = 'polarArea';
 PolarAreaController.defaults = {
   dataElementType: 'arc',
   animation: {
+    animateRotate: true,
+    animateScale: true
+  },
+  animations: {
     numbers: {
       type: 'number',
       properties: ['x', 'y', 'startAngle', 'endAngle', 'innerRadius', 'outerRadius']
     },
-    animateRotate: true,
-    animateScale: true
   },
-  aspectRatio: 1,
   indexAxis: 'r',
-  scales: {
-    r: {
-      type: 'radialLinear',
-      angleLines: {
-        display: false
-      },
-      beginAtZero: true,
-      gridLines: {
-        circular: true
-      },
-      pointLabels: {
-        display: false
-      }
-    }
-  },
-
   startAngle: 0,
+};
+
+/**
+ * @type {any}
+ */
+PolarAreaController.overrides = {
+  aspectRatio: 1,
+
   plugins: {
     legend: {
       labels: {
@@ -191,6 +178,22 @@ PolarAreaController.defaults = {
         }
       }
     }
-  }
+  },
 
+  scales: {
+    r: {
+      type: 'radialLinear',
+      angleLines: {
+        display: false
+      },
+      beginAtZero: true,
+      gridLines: {
+        circular: true
+      },
+      pointLabels: {
+        display: false
+      },
+      startAngle: 0
+    }
+  }
 };

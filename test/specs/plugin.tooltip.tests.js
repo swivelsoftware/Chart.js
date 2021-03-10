@@ -55,6 +55,12 @@ describe('Plugin.Tooltip', function() {
             tooltip: {
               mode: 'index',
               intersect: false,
+              padding: {
+                left: 6,
+                top: 6,
+                right: 6,
+                bottom: 6
+              }
             }
           },
           hover: {
@@ -74,8 +80,12 @@ describe('Plugin.Tooltip', function() {
 
       await jasmine.triggerMouseEvent(chart, 'mousemove', {x: point.x, y: chart.chartArea.top + 10});
 
-      expect(tooltip.options.xPadding).toEqual(6);
-      expect(tooltip.options.yPadding).toEqual(6);
+      expect(tooltip.options.padding).toEqualOptions({
+        left: 6,
+        top: 6,
+        right: 6,
+        bottom: 6,
+      });
       expect(tooltip.xAlign).toEqual('left');
       expect(tooltip.yAlign).toEqual('center');
       expect(tooltip.options.bodyColor).toEqual('#fff');
@@ -234,8 +244,7 @@ describe('Plugin.Tooltip', function() {
     var tooltip = chart.tooltip;
     var defaults = Chart.defaults;
 
-    expect(tooltip.options.xPadding).toEqual(6);
-    expect(tooltip.options.yPadding).toEqual(6);
+    expect(tooltip.options.padding).toEqual(6);
     expect(tooltip.xAlign).toEqual('left');
     expect(tooltip.yAlign).toEqual('center');
 
@@ -384,8 +393,7 @@ describe('Plugin.Tooltip', function() {
     var tooltip = chart.tooltip;
     var defaults = Chart.defaults;
 
-    expect(tooltip.options.xPadding).toEqual(6);
-    expect(tooltip.options.yPadding).toEqual(6);
+    expect(tooltip.options.padding).toEqual(6);
     expect(tooltip.xAlign).toEqual('left');
     expect(tooltip.yAlign).toEqual('center');
 
@@ -1178,8 +1186,7 @@ describe('Plugin.Tooltip', function() {
     var tooltip = chart.tooltip;
     var defaults = Chart.defaults;
 
-    expect(tooltip.options.xPadding).toEqual(6);
-    expect(tooltip.options.yPadding).toEqual(6);
+    expect(tooltip.options.padding).toEqual(6);
     expect(tooltip.xAlign).toEqual('center');
     expect(tooltip.yAlign).toEqual('top');
 
@@ -1258,7 +1265,7 @@ describe('Plugin.Tooltip', function() {
   describe('text align', function() {
     var defaults = Chart.defaults;
     var makeView = function(title, body, footer) {
-      return {
+      const model = {
         // Positioning
         x: 100,
         y: 100,
@@ -1268,10 +1275,10 @@ describe('Plugin.Tooltip', function() {
         yAlign: 'top',
 
         options: {
+          setContext: () => model.options,
           enabled: true,
 
-          xPadding: 5,
-          yPadding: 5,
+          padding: 5,
 
           // Body
           bodyFont: {
@@ -1337,6 +1344,7 @@ describe('Plugin.Tooltip', function() {
           backgroundColor: 'rgb(0, 255, 255)'
         }]
       };
+      return model;
     };
     var drawBody = [
       {name: 'save', args: []},
@@ -1364,6 +1372,7 @@ describe('Plugin.Tooltip', function() {
     var mockContext = window.createMockContext();
     var tooltip = new Tooltip({
       _chart: {
+        getContext: () => ({}),
         options: {
           plugins: {
             tooltip: {

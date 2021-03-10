@@ -1,7 +1,77 @@
 import {isNullOrUndef, resolve} from '../helpers';
 
+function lttbDecimation(data, availableWidth, options) {
+  /**
+   * Implementation of the Largest Triangle Three Buckets algorithm.
+   *
+   * This implementation is based on the original implementation by Sveinn Steinarsson
+   * in https://github.com/sveinn-steinarsson/flot-downsample/blob/master/jquery.flot.downsample.js
+   *
+   * The original implementation is MIT licensed.
+   */
+  const samples = options.samples || availableWidth;
+  const decimated = [];
+
+  const bucketWidth = (data.length - 2) / (samples - 2);
+  let sampledIndex = 0;
+  let a = 0;
+  let i, maxAreaPoint, maxArea, area, nextA;
+  decimated[sampledIndex++] = data[a];
+
+  for (i = 0; i < samples - 2; i++) {
+    let avgX = 0;
+    let avgY = 0;
+    let j;
+    const avgRangeStart = Math.floor((i + 1) * bucketWidth) + 1;
+    const avgRangeEnd = Math.min(Math.floor((i + 2) * bucketWidth) + 1, data.length);
+    const avgRangeLength = avgRangeEnd - avgRangeStart;
+
+    for (j = avgRangeStart; j < avgRangeEnd; j++) {
+      avgX = data[j].x;
+      avgY = data[j].y;
+    }
+
+    avgX /= avgRangeLength;
+    avgY /= avgRangeLength;
+
+    const rangeOffs = Math.floor(i * bucketWidth) + 1;
+    const rangeTo = Math.floor((i + 1) * bucketWidth) + 1;
+    const {x: pointAx, y: pointAy} = data[a];
+
+    // Note that this is changed from the original algorithm which initializes these
+    // values to 1. The reason for this change is that if the area is small, nextA
+    // would never be set and thus a crash would occur in the next loop as `a` would become
+    // `undefined`. Since the area is always positive, but could be 0 in the case of a flat trace,
+    // initializing with a negative number is the correct solution.
+    maxArea = area = -1;
+
+    for (j = rangeOffs; j < rangeTo; j++) {
+      area = 0.5 * Math.abs(
+        (pointAx - avgX) * (data[j].y - pointAy) -
+        (pointAx - data[j].x) * (avgY - pointAy)
+      );
+
+      if (area > maxArea) {
+        maxArea = area;
+        maxAreaPoint = data[j];
+        nextA = j;
+      }
+    }
+
+    decimated[sampledIndex++] = maxAreaPoint;
+    a = nextA;
+  }
+
+  // Include the last point
+  decimated[sampledIndex++] = data[data.length - 1];
+
+  return decimated;
+}
+
 function minMaxDecimation(data, availableWidth) {
-  let i, point, x, y, prevX, minIndex, maxIndex, minY, maxY;
+  let avgX = 0;
+  let countX = 0;
+  let i, point, x, y, prevX, minIndex, maxIndex, startIndex, minY, maxY;
   const decimated = [];
 
   const xMin = data[0].x;
@@ -23,19 +93,48 @@ function minMaxDecimation(data, availableWidth) {
         maxY = y;
         maxIndex = i;
       }
+      // For first point in group, countX is `0`, so average will be `x` / 1.
+      // Use point.x here because we're computing the average data `x` value
+      avgX = (countX * avgX + point.x) / ++countX;
     } else {
       // Push up to 4 points, 3 for the last interval and the first point for this interval
-      if (minIndex && maxIndex) {
-        decimated.push(data[minIndex], data[maxIndex]);
+      const lastIndex = i - 1;
+
+      if (!isNullOrUndef(minIndex) && !isNullOrUndef(maxIndex)) {
+        // The interval is defined by 4 points: start, min, max, end.
+        // The starting point is already considered at this point, so we need to determine which
+        // of the other points to add. We need to sort these points to ensure the decimated data
+        // is still sorted and then ensure there are no duplicates.
+        const intermediateIndex1 = Math.min(minIndex, maxIndex);
+        const intermediateIndex2 = Math.max(minIndex, maxIndex);
+
+        if (intermediateIndex1 !== startIndex && intermediateIndex1 !== lastIndex) {
+          decimated.push({
+            ...data[intermediateIndex1],
+            x: avgX,
+          });
+        }
+        if (intermediateIndex2 !== startIndex && intermediateIndex2 !== lastIndex) {
+          decimated.push({
+            ...data[intermediateIndex2],
+            x: avgX
+          });
+        }
       }
-      if (i > 0) {
+
+      // lastIndex === startIndex will occur when a range has only 1 point which could
+      // happen with very uneven data
+      if (i > 0 && lastIndex !== startIndex) {
         // Last point in the previous interval
-        decimated.push(data[i - 1]);
+        decimated.push(data[lastIndex]);
       }
+
+      // Start of the new interval
       decimated.push(point);
       prevX = truncX;
+      countX = 0;
       minY = maxY = y;
-      minIndex = maxIndex = i;
+      minIndex = maxIndex = startIndex = i;
     }
   }
 
@@ -93,7 +192,6 @@ export default {
         // First time we are seeing this dataset
         // We override the 'data' property with a setter that stores the
         // raw data in _data, but reads the decimated data from _decimated
-        // TODO: Undo this on chart destruction
         dataset._data = data;
         delete dataset.data;
         Object.defineProperty(dataset, 'data', {
@@ -111,6 +209,9 @@ export default {
       // Point the chart to the decimated data
       let decimated;
       switch (options.algorithm) {
+      case 'lttb':
+        decimated = lttbDecimation(data, availableWidth, options);
+        break;
       case 'min-max':
         decimated = minMaxDecimation(data, availableWidth);
         break;

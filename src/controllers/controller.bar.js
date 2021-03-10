@@ -401,15 +401,14 @@ export default class BarController extends DatasetController {
 	 */
   _calculateBarValuePixels(index) {
     const me = this;
-    const meta = me._cachedMeta;
-    const vScale = meta.vScale;
+    const {vScale, _stacked} = me._cachedMeta;
     const {base: baseValue, minBarLength} = me.options;
     const parsed = me.getParsed(index);
     const custom = parsed._custom;
     const floating = isFloatBar(custom);
     let value = parsed[vScale.axis];
     let start = 0;
-    let length = meta._stacked ? me.applyStack(vScale, parsed) : value;
+    let length = _stacked ? me.applyStack(vScale, parsed, _stacked) : value;
     let head, size;
 
     if (length !== value) {
@@ -492,7 +491,7 @@ export default class BarController extends DatasetController {
     clipArea(chart.ctx, chart.chartArea);
 
     for (; i < ilen; ++i) {
-      if (!isNaN(me.getParsed(i)[vScale.axis])) {
+      if (me.getParsed(i)[vScale.axis] !== null) {
         rects[i].draw(me._ctx);
       }
     }
@@ -511,22 +510,26 @@ BarController.defaults = {
   datasetElementType: false,
   dataElementType: 'bar',
 
+  categoryPercentage: 0.8,
+  barPercentage: 0.9,
+
+  animations: {
+    numbers: {
+      type: 'number',
+      properties: ['x', 'y', 'base', 'width', 'height']
+    }
+  }
+};
+
+/**
+ * @type {any}
+ */
+BarController.overrides = {
   interaction: {
     mode: 'index'
   },
 
   hover: {},
-
-  datasets: {
-    categoryPercentage: 0.8,
-    barPercentage: 0.9,
-    animation: {
-      numbers: {
-        type: 'number',
-        properties: ['x', 'y', 'base', 'width', 'height']
-      }
-    }
-  },
 
   scales: {
     _index_: {

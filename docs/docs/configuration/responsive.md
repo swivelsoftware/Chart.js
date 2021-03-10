@@ -13,12 +13,15 @@ Chart.js provides a [few options](#configuration-options) to enable responsivene
 
 ## Configuration Options
 
+Namespace: `options`
+
 | Name | Type | Default | Description
 | ---- | ---- | ------- | -----------
 | `responsive` | `boolean` | `true` | Resizes the chart canvas when its container does ([important note...](#important-note)).
 | `maintainAspectRatio` | `boolean` | `true` | Maintain the original canvas aspect ratio `(width / height)` when resizing.
 | `aspectRatio` | `number` | `2` | Canvas aspect ratio (i.e. `width / height`, a value of 1 representing a square canvas). Note that this option is ignored if the height is explicitly defined either as attribute or via the style.
 | `onResize` | `function` | `null` | Called when a resize occurs. Gets passed two arguments: the chart instance and the new size.
+| `resizeDelay` | `number` | `0` | Delay the resize update by give amount of milliseconds. This can ease the resize process by debouncing update of the elements.
 
 ## Important Note
 
@@ -55,9 +58,9 @@ You may also find that, due to complexities in when the browser lays out the doc
 
 ```javascript
 window.addEventListener('beforeprint', () => {
-	myChart.resize(600, 600);
+  myChart.resize(600, 600);
 });
 window.addEventListener('afterprint', () => {
-	myChart.resize();
+  myChart.resize();
 });
 ```
